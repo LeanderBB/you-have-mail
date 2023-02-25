@@ -1,0 +1,25 @@
+[package]
+name = "you-have-mail-common"
+version = "0.1.0"
+edition = "2021"
+authors = ["Leander Beernaert <lbb-dev@pm.me>"]
+license = "AGPL-3.0-only"
+categories = ["api-bindings", "email"]
+readme = "README.md"
+
+[features]
+default = ["proton-backend"]
+proton-backend = ["dep:proton-api-rs"]
+
+[dependencies]
+thiserror = "1"
+async-trait = "0.1"
+anyhow = "1"
+
+[dependencies.proton-api-rs]
+version = "0.1.1"
+optional = true
+
+
+[dev-dependencies]
+mockall = "0.11"
