@@ -8,13 +8,13 @@ use you_have_mail_common::{Account, AccountError, Notifier, ObserverBuilder};
 #[cfg(feature = "proton-backend")]
 fn new_backed() -> Box<dyn Backend> {
     let app_version = std::env::var("YHM_PROTON_APP_VERSION").unwrap();
-    return you_have_mail_common::backend::proton::new_proton_backend(&app_version);
+    return you_have_mail_common::backend::proton::new_backend(&app_version);
 }
 
 #[cfg(not(feature = "proton-backend"))]
 fn new_backed() -> Box<dyn Backend> {
     use you_have_mail_common::backend::null::NullTestAccount;
-    return you_have_mail_common::backend::null::new_null_backend(&[NullTestAccount {
+    return you_have_mail_common::backend::null::new_backend(&[NullTestAccount {
         email: "foo".to_string(),
         password: "bar".to_string(),
         totp: None,

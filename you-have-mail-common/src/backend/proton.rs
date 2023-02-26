@@ -11,7 +11,8 @@ use proton_api_rs::{
 };
 use std::fmt::{Debug, Formatter};
 
-pub fn new_proton_backend(app_version: &str) -> Box<dyn Backend> {
+/// Create a proton mail backend.
+pub fn new_backend(app_version: &str) -> Box<dyn Backend> {
     Box::new(ProtonBackend {
         builder: ClientBuilder::new().app_version(app_version),
     })

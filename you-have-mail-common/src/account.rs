@@ -5,7 +5,7 @@ use thiserror::Error;
 /// Represents a user account. While it would have been more idiomatic to have the account
 /// represent as an enum, the code is meant to be used with other language bindings where
 /// such a thing may not be possible.
-/// User `Backend::login` to obtain a new account.
+/// User [Backend::login](fn@crate::backend::Backend::login) to obtain a new account.
 #[derive(Debug)]
 pub struct Account {
     state: AccountState,

@@ -1,4 +1,4 @@
-use crate::backend::null::{new_null_backend, NullTestAccount};
+use crate::backend::null::{new_backend, NullTestAccount};
 use crate::backend::Backend;
 use crate::MockNotifier;
 use crate::{Account, Notifier, ObserverBuilder};
@@ -11,7 +11,7 @@ async fn new_backend_and_account() -> (Box<dyn Backend>, Account) {
         password: "bar".to_string(),
         totp: None,
     };
-    let backend = new_null_backend(&[accounts]);
+    let backend = new_backend(&[accounts]);
     let account = backend.login("foo", "bar").await.unwrap();
 
     assert!(account.is_logged_in());

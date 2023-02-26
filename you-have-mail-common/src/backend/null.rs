@@ -13,7 +13,8 @@ pub struct NullTestAccount {
     pub totp: Option<String>,
 }
 
-pub fn new_null_backend(accounts: &[NullTestAccount]) -> Box<dyn Backend> {
+#[doc(hidden)]
+pub fn new_backend(accounts: &[NullTestAccount]) -> Box<dyn Backend> {
     Box::new(NullBacked {
         accounts: HashMap::from_iter(accounts.iter().map(|a| (a.email.clone(), a.clone()))),
     })

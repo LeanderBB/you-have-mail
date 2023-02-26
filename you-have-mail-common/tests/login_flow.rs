@@ -8,7 +8,7 @@ async fn test_login_flow() {
         password: "bar".to_string(),
         totp: Some("1234".to_string()),
     };
-    let backend = you_have_mail_common::backend::null::new_null_backend(&[accounts]);
+    let backend = you_have_mail_common::backend::null::new_backend(&[accounts]);
 
     backend
         .login("z", "b")

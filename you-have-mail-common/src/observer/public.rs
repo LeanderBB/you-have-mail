@@ -21,7 +21,7 @@ pub enum ObserverAccountStatus {
     LoggedOut,
 }
 
-/// Account info for active accounts in the `Observer`.
+/// Account info for active accounts in the [Observer](struct@Observer).
 #[derive(Debug, Clone)]
 pub struct ObserverAccount {
     pub email: String,
@@ -41,7 +41,7 @@ pub enum ObserverRPCError<T> {
     Error(#[from] ObserverError),
 }
 
-/// Errors that may occur during the `Observer`'s execution.
+/// Errors that may occur during the [Observer](struct@Observer)'s execution.
 #[derive(Debug, Error)]
 pub enum ObserverError {
     #[error("{0}")]

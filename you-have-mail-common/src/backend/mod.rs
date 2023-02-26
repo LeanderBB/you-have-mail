@@ -7,9 +7,11 @@ use mockall::automock;
 use std::fmt::Debug;
 use thiserror::Error;
 
+#[doc(hidden)]
 pub mod null;
 
 #[cfg(feature = "proton-backend")]
+#[cfg_attr(docsrs, doc(cfg(feature = "proton-backend")))]
 pub mod proton;
 
 /// Expected backend errors.
