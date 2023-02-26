@@ -10,7 +10,7 @@ use std::collections::HashMap;
 pub struct NullTestAccount {
     pub email: String,
     pub password: String,
-    pub totp: String,
+    pub totp: Option<String>,
 }
 
 pub fn new_null_backend(accounts: &[NullTestAccount]) -> Box<dyn Backend> {
@@ -49,9 +49,9 @@ impl Backend for NullBacked {
                 )));
             }
 
-            return if !account.totp.is_empty() {
+            return if let Some(totp) = &account.totp {
                 Ok(AccountState::AwaitingTotp(Box::new(NullAwaitTotp {
-                    totp: account.totp.clone(),
+                    totp: totp.clone(),
                 })))
             } else {
                 Ok(AccountState::LoggedIn(Box::new(NullAccount {})))
