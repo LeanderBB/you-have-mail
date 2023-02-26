@@ -126,4 +126,12 @@ impl Account {
             }
         }
     }
+
+    pub(crate) fn get_impl(&self) -> Option<&dyn crate::backend::Account> {
+        if let AccountState::LoggedIn(a) = &self.state {
+            Some(a.as_ref())
+        } else {
+            None
+        }
+    }
 }

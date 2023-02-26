@@ -15,6 +15,9 @@ proton-backend = ["dep:proton-api-rs"]
 thiserror = "1"
 async-trait = "0.1"
 anyhow = "1"
+chacha20poly1305 = "0.10"
+serde_json = "1"
+serde = "1"
 
 [dependencies.proton-api-rs]
 version = "0.1.1"

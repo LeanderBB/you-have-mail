@@ -44,6 +44,12 @@ pub trait Backend: Send + Sync + Debug {
 
     /// Login an account.
     async fn login(&self, username: &str, password: &str) -> BackendResult<crate::Account>;
+
+    /// Load the necessary information to refresh the user's account access credentials.
+    fn auth_refresher_from_config(
+        &self,
+        value: serde_json::Value,
+    ) -> Result<Box<dyn AuthRefresher>, anyhow::Error>;
 }
 
 /// Trait that needs to be implemented for all backend accounts
@@ -55,6 +61,9 @@ pub trait Account: Send + Debug {
 
     /// Logout the account.
     async fn logout(&mut self) -> BackendResult<()>;
+
+    /// Load the necessary information to refresh the user's account access credentials.
+    fn auth_refresher_config(&self) -> Result<(String, serde_json::Value), anyhow::Error>;
 }
 
 /// Trait for accounts that require 2FA support
@@ -66,4 +75,11 @@ pub trait AwaitTotp: Send + Debug {
         self: Box<Self>,
         totp: &str,
     ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)>;
+}
+
+/// Trait to refresh the accounts' login credentials.
+#[cfg_attr(test, automock)]
+#[async_trait]
+pub trait AuthRefresher {
+    async fn refresh(self: Box<Self>) -> Result<crate::Account, BackendError>;
 }

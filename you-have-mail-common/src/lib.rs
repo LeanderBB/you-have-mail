@@ -31,9 +31,13 @@
 
 mod account;
 pub mod backend;
+mod config;
+mod encryption;
 mod observer;
 mod traits;
 
 pub use account::*;
+pub use config::*;
+pub use encryption::EncryptionKey;
 pub use observer::*;
 pub use traits::*;

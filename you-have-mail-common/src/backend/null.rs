@@ -1,8 +1,12 @@
 //! Null backend implementation, useful for testing.
-use crate::backend::{Account, AwaitTotp, Backend, BackendError, BackendResult, NewEmailReply};
+use crate::backend::{
+    Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, NewEmailReply,
+};
 use crate::AccountState;
-use anyhow::anyhow;
+use anyhow::{anyhow, Error};
 use async_trait::async_trait;
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::collections::HashMap;
 
 #[doc(hidden)]
@@ -28,18 +32,29 @@ struct NullBacked {
 
 #[doc(hidden)]
 #[derive(Debug)]
-struct NullAccount {}
+struct NullAccount {
+    email: String,
+}
 
 #[doc(hidden)]
 #[derive(Debug)]
 struct NullAwaitTotp {
+    email: String,
     totp: String,
 }
+
+#[doc(hidden)]
+#[derive(Debug)]
+struct NullAuthRefresher {
+    email: String,
+}
+
+const NULL_BACKEND_NAME: &str = "Null Backend";
 
 #[async_trait]
 impl Backend for NullBacked {
     fn name(&self) -> &str {
-        "null backend"
+        NULL_BACKEND_NAME
     }
 
     async fn login(&self, email: &str, password: &str) -> BackendResult<crate::Account> {
@@ -53,12 +68,17 @@ impl Backend for NullBacked {
             return if let Some(totp) = &account.totp {
                 Ok(crate::Account::new(
                     email,
-                    AccountState::AwaitingTotp(Box::new(NullAwaitTotp { totp: totp.clone() })),
+                    AccountState::AwaitingTotp(Box::new(NullAwaitTotp {
+                        email: email.to_string(),
+                        totp: totp.clone(),
+                    })),
                 ))
             } else {
                 Ok(crate::Account::new(
                     email,
-                    AccountState::LoggedIn(Box::new(NullAccount {})),
+                    AccountState::LoggedIn(Box::new(NullAccount {
+                        email: email.to_string(),
+                    })),
                 ))
             };
         }
@@ -67,6 +87,26 @@ impl Backend for NullBacked {
             "invalid user name or password"
         )));
     }
+
+    fn auth_refresher_from_config(&self, value: Value) -> Result<Box<dyn AuthRefresher>, Error> {
+        let cfg = serde_json::from_value::<NullAuthRefresherInfo>(value).map_err(|e| anyhow!(e))?;
+        Ok(Box::new(NullAuthRefresher { email: cfg.email }))
+    }
+}
+
+#[async_trait]
+impl AuthRefresher for NullAuthRefresher {
+    async fn refresh(self: Box<Self>) -> Result<crate::Account, BackendError> {
+        Ok(crate::Account::new(
+            self.email.clone(),
+            AccountState::LoggedIn(Box::new(NullAccount { email: self.email })),
+        ))
+    }
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct NullAuthRefresherInfo {
+    email: String,
 }
 
 #[async_trait]
@@ -77,6 +117,16 @@ impl Account for NullAccount {
 
     async fn logout(&mut self) -> BackendResult<()> {
         Ok(())
+    }
+
+    fn auth_refresher_config(&self) -> Result<(String, Value), Error> {
+        Ok((
+            NULL_BACKEND_NAME.to_string(),
+            serde_json::to_value(NullAuthRefresherInfo {
+                email: self.email.clone(),
+            })
+            .map_err(|e| anyhow!(e))?,
+        ))
     }
 }
 
@@ -90,6 +140,6 @@ impl AwaitTotp for NullAwaitTotp {
             return Err((self, BackendError::Request(anyhow!("Invalid totp"))));
         }
 
-        Ok(Box::new(NullAccount {}))
+        Ok(Box::new(NullAccount { email: self.email }))
     }
 }

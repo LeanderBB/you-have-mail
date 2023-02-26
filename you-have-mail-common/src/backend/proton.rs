@@ -1,14 +1,18 @@
 //! You have mail implementation for proton mail accounts.
 
-use crate::backend::{Account, AwaitTotp, Backend, BackendError, BackendResult, NewEmailReply};
+use crate::backend::{
+    Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, NewEmailReply,
+};
 use crate::AccountState;
-use anyhow::anyhow;
+use anyhow::{anyhow, Error};
 use async_trait::async_trait;
-use proton_api_rs::domain::{EventId, LabelID, MessageAction, MoreEvents};
+use proton_api_rs::domain::{EventId, ExposeSecret, LabelID, MessageAction, MoreEvents, UserUid};
 use proton_api_rs::{
     Client, ClientBuilder, ClientBuilderError, ClientLoginState, HttpClientError, RequestError,
     TOTPClient,
 };
+use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::fmt::{Debug, Formatter};
 
 /// Create a proton mail backend.
@@ -22,6 +26,8 @@ struct ProtonBackend {
     builder: ClientBuilder,
 }
 
+const PROTON_BACKEND_NAME: &str = "Proton Mail";
+
 impl Debug for ProtonBackend {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         write!(f, "ProtonBackend")
@@ -29,13 +35,36 @@ impl Debug for ProtonBackend {
 }
 
 struct ProtonAccount {
+    email: String,
     client: Option<Client>,
     last_event_id: Option<EventId>,
 }
 
+struct ProtonAuthRefresher {
+    builder: ClientBuilder,
+    email: String,
+    uid: String,
+    token: String,
+}
+
+#[derive(Deserialize)]
+struct ProtonAuthRefresherInfo {
+    email: String,
+    uid: String,
+    token: String,
+}
+
+#[derive(Serialize)]
+struct ProtonAuthRefresherInfoRead<'a> {
+    email: &'a str,
+    uid: &'a str,
+    token: &'a str,
+}
+
 impl ProtonAccount {
-    fn new(c: Client) -> Self {
+    fn new(c: Client, email: String) -> Self {
         Self {
+            email,
             client: Some(c),
             last_event_id: None,
         }
@@ -49,6 +78,7 @@ impl Debug for ProtonAccount {
 }
 
 struct ProtonAwaitTotp {
+    email: String,
     client: TOTPClient,
 }
 
@@ -61,20 +91,34 @@ impl Debug for ProtonAwaitTotp {
 #[async_trait]
 impl Backend for ProtonBackend {
     fn name(&self) -> &str {
-        "Proton Mail"
+        PROTON_BACKEND_NAME
     }
 
     async fn login(&self, email: &str, password: &str) -> BackendResult<crate::Account> {
         match self.builder.clone().login(email, password).await? {
             ClientLoginState::Authenticated(c) => Ok(crate::Account::new(
                 email,
-                AccountState::LoggedIn(Box::new(ProtonAccount::new(c))),
+                AccountState::LoggedIn(Box::new(ProtonAccount::new(c, email.to_string()))),
             )),
             ClientLoginState::AwaitingTotp(c) => Ok(crate::Account::new(
                 email,
-                AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp { client: c })),
+                AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp {
+                    client: c,
+                    email: email.to_string(),
+                })),
             )),
         }
+    }
+
+    fn auth_refresher_from_config(&self, value: Value) -> Result<Box<dyn AuthRefresher>, Error> {
+        let config =
+            serde_json::from_value::<ProtonAuthRefresherInfo>(value).map_err(|e| anyhow!(e))?;
+        Ok(Box::new(ProtonAuthRefresher {
+            builder: self.builder.clone(),
+            email: config.email,
+            uid: config.uid,
+            token: config.token,
+        }))
     }
 }
 
@@ -125,6 +169,19 @@ impl Account for ProtonAccount {
         }
         Ok(())
     }
+
+    fn auth_refresher_config(&self) -> Result<(String, Value), Error> {
+        let Some(client) = &self.client else {
+            return Err(anyhow!("invalid state"));
+        };
+        let info = ProtonAuthRefresherInfoRead {
+            email: &self.email,
+            uid: client.user_uid().expose_secret().as_str(),
+            token: client.user_refresh_token().expose_secret().as_str(),
+        };
+        let value = serde_json::to_value(&info).map_err(|e| anyhow!(e))?;
+        Ok((PROTON_BACKEND_NAME.to_string(), value))
+    }
 }
 
 #[async_trait]
@@ -134,12 +191,26 @@ impl AwaitTotp for ProtonAwaitTotp {
         totp: &str,
     ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)> {
         match self.client.submit_totp(totp).await {
-            Ok(c) => Ok(Box::new(ProtonAccount::new(c))),
+            Ok(c) => Ok(Box::new(ProtonAccount::new(c, self.email))),
             Err((c, e)) => {
                 self.client = c;
                 Err((self, e.into()))
             }
         }
+    }
+}
+
+#[async_trait]
+impl AuthRefresher for ProtonAuthRefresher {
+    async fn refresh(self: Box<Self>) -> Result<crate::Account, BackendError> {
+        let client = self
+            .builder
+            .with_token(&UserUid::from(self.uid), &self.token)
+            .await?;
+        Ok(crate::Account::new(
+            self.email.clone(),
+            AccountState::LoggedIn(Box::new(ProtonAccount::new(client, self.email))),
+        ))
     }
 }
 
