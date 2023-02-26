@@ -13,7 +13,7 @@ use proton_api_rs::{
 };
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use std::fmt::{Debug, Formatter};
+use std::fmt::Debug;
 use std::sync::Arc;
 
 /// Create a proton mail backend.
@@ -23,24 +23,21 @@ pub fn new_backend(app_version: &str) -> Arc<dyn Backend> {
     })
 }
 
+#[derive(Debug)]
 struct ProtonBackend {
     builder: ClientBuilder,
 }
 
 const PROTON_BACKEND_NAME: &str = "Proton Mail";
 
-impl Debug for ProtonBackend {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ProtonBackend")
-    }
-}
-
+#[derive(Debug)]
 struct ProtonAccount {
     email: String,
     client: Option<Client>,
     last_event_id: Option<EventId>,
 }
 
+#[derive(Debug)]
 struct ProtonAuthRefresher {
     builder: ClientBuilder,
     email: String,
@@ -72,21 +69,10 @@ impl ProtonAccount {
     }
 }
 
-impl Debug for ProtonAccount {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ProtonAccount")
-    }
-}
-
+#[derive(Debug)]
 struct ProtonAwaitTotp {
     email: String,
     client: TOTPClient,
-}
-
-impl Debug for ProtonAwaitTotp {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        write!(f, "ProtonAwaitTotp")
-    }
 }
 
 #[async_trait]
