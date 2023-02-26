@@ -12,9 +12,7 @@ async fn new_backend_and_account() -> (Box<dyn Backend>, Account) {
         totp: None,
     };
     let backend = new_null_backend(&[accounts]);
-    let account = Account::login(backend.as_ref(), "foo", "bar")
-        .await
-        .unwrap();
+    let account = backend.login("foo", "bar").await.unwrap();
 
     assert!(account.is_logged_in());
     (backend, account)

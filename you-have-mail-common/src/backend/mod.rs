@@ -41,7 +41,7 @@ pub trait Backend: Send + Sync + Debug {
     fn name(&self) -> &str;
 
     /// Login an account.
-    async fn login(&self, username: &str, password: &str) -> BackendResult<crate::AccountState>;
+    async fn login(&self, username: &str, password: &str) -> BackendResult<crate::Account>;
 }
 
 /// Trait that needs to be implemented for all backend accounts

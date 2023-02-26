@@ -42,9 +42,7 @@ async fn main() {
     let password = std::env::var("YHM_PASSWORD").unwrap();
 
     let backend = new_backed();
-    let mut account = Account::login(backend.as_ref(), &email, &password)
-        .await
-        .unwrap();
+    let mut account = backend.login(&email, &password).await.unwrap();
 
     if account.is_awaiting_totp() {
         let mut stdout = tokio::io::stdout();

@@ -63,16 +63,16 @@ impl Backend for ProtonBackend {
         "Proton Mail"
     }
 
-    async fn login(&self, username: &str, password: &str) -> BackendResult<AccountState> {
-        match self.builder.clone().login(username, password).await? {
-            ClientLoginState::Authenticated(c) => {
-                Ok(AccountState::LoggedIn(Box::new(ProtonAccount::new(c))))
-            }
-            ClientLoginState::AwaitingTotp(c) => {
-                Ok(AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp {
-                    client: c,
-                })))
-            }
+    async fn login(&self, email: &str, password: &str) -> BackendResult<crate::Account> {
+        match self.builder.clone().login(email, password).await? {
+            ClientLoginState::Authenticated(c) => Ok(crate::Account::new(
+                email,
+                AccountState::LoggedIn(Box::new(ProtonAccount::new(c))),
+            )),
+            ClientLoginState::AwaitingTotp(c) => Ok(crate::Account::new(
+                email,
+                AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp { client: c })),
+            )),
         }
     }
 }

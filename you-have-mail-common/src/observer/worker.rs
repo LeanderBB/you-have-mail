@@ -1,5 +1,6 @@
+use crate::backend::BackendError;
 use crate::observer::rpc::ObserverRequest;
-use crate::{Account, Notifier, ObserverAccount, ObserverAccountStatus};
+use crate::{Account, AccountError, Notifier, ObserverAccount, ObserverAccountStatus};
 use proton_api_rs::log::error;
 use proton_api_rs::tokio;
 use std::collections::HashMap;
@@ -22,18 +23,33 @@ struct WorkerAccount {
 }
 
 impl Worker {
+    fn new(notifier: Box<dyn Notifier>, poll_interval: Duration) -> Self {
+        Self {
+            notifier,
+            poll_interval,
+            accounts: HashMap::new(),
+            paused: false,
+        }
+    }
+
     pub fn build(
         notifier: Box<dyn Notifier>,
         poll_interval: Duration,
     ) -> (impl Future<Output = ()>, Sender<ObserverRequest>) {
         let (sender, receiver) = proton_api_rs::tokio::sync::mpsc::channel::<ObserverRequest>(5);
-        let observer = Self {
-            notifier,
-            poll_interval,
-            accounts: HashMap::new(),
-            paused: false,
-        };
+        let observer = Self::new(notifier, poll_interval);
         (observer_task(observer, receiver), sender)
+    }
+
+    #[cfg(test)]
+    pub(crate) fn add_account(&mut self, account: Account) {
+        self.accounts.insert(
+            account.email().to_string(),
+            WorkerAccount {
+                account,
+                status: ObserverAccountStatus::Online,
+            },
+        );
     }
 
     async fn handle_request(&mut self, request: ObserverRequest) -> bool {
@@ -100,13 +116,36 @@ impl Worker {
         }
 
         for (email, wa) in &mut self.accounts {
+            // Skip accounts which are not logged in.
+            if wa.status == ObserverAccountStatus::LoggedOut {
+                continue;
+            }
+
             match wa.account.check().await {
                 Ok(check) => {
+                    wa.status = ObserverAccountStatus::Online;
                     if check.count > 0 {
                         self.notifier.notify(&wa.account, check.count);
                     }
                 }
                 Err(e) => {
+                    if let AccountError::Backend(be) = &e {
+                        match be {
+                            BackendError::LoggedOut => {
+                                if wa.status == ObserverAccountStatus::LoggedOut {
+                                    return;
+                                }
+                                wa.status = ObserverAccountStatus::LoggedOut;
+                            }
+                            BackendError::Offline => {
+                                if wa.status == ObserverAccountStatus::Offline {
+                                    return;
+                                }
+                                wa.status = ObserverAccountStatus::Offline;
+                            }
+                            _ => {}
+                        }
+                    }
                     self.notifier.notify_error(email, e);
                 }
             }
@@ -132,5 +171,110 @@ async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequ
             }
 
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use crate::backend::{BackendError, MockAccount, NewEmailReply};
+    use crate::observer::worker::Worker;
+    use crate::{Account, AccountError, AccountState, MockNotifier};
+    use mockall::Sequence;
+    use proton_api_rs::tokio;
+    use std::time::Duration;
+
+    #[tokio::test]
+    async fn worker_notifies_offline_only_once() {
+        let mut notifier = MockNotifier::new();
+        notifier
+            .expect_notify_error()
+            .withf(|_, e: &AccountError| e.is_offline())
+            .times(1)
+            .return_const(());
+        let mut mock_account = MockAccount::new();
+        mock_account
+            .expect_check()
+            .times(4)
+            .returning(|| Err(BackendError::Offline));
+        let account = Account::new("foo", AccountState::LoggedIn(Box::new(mock_account)));
+        let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
+
+        worker.add_account(account);
+
+        // Poll account multiple times
+        worker.poll_accounts().await;
+        worker.poll_accounts().await;
+        worker.poll_accounts().await;
+        worker.poll_accounts().await;
+    }
+
+    #[tokio::test]
+    async fn worker_notifies_offline_only_once_and_continues_once_account_comes_online() {
+        let mut notifier = MockNotifier::new();
+        notifier
+            .expect_notify_error()
+            .withf(|_, e: &AccountError| e.is_offline())
+            .times(1)
+            .return_const(());
+        notifier
+            .expect_notify()
+            .withf(|_, _| true)
+            .times(1)
+            .return_const(());
+        let mut mock_account = MockAccount::new();
+        let mut mock_sequence = Sequence::new();
+        mock_account
+            .expect_check()
+            .times(2)
+            .in_sequence(&mut mock_sequence)
+            .returning(|| Err(BackendError::Offline));
+        mock_account
+            .expect_check()
+            .times(1)
+            .in_sequence(&mut mock_sequence)
+            .returning(|| Ok(NewEmailReply { count: 1 }));
+        let account = Account::new("foo", AccountState::LoggedIn(Box::new(mock_account)));
+        let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
+
+        worker.add_account(account);
+
+        // First two are offline
+        worker.poll_accounts().await;
+        worker.poll_accounts().await;
+        // Last one should be online
+        worker.poll_accounts().await;
+    }
+
+    #[tokio::test]
+    async fn worker_notifies_logged_out_only_once_and_continues_offline() {
+        let mut notifier = MockNotifier::new();
+        notifier
+            .expect_notify_error()
+            .withf(|_, e: &AccountError| e.is_logged_out())
+            .times(1)
+            .return_const(());
+        notifier.expect_notify().times(0).return_const(());
+        let mut mock_account = MockAccount::new();
+        let mut mock_sequence = Sequence::new();
+        mock_account
+            .expect_check()
+            .times(1)
+            .in_sequence(&mut mock_sequence)
+            .returning(|| Err(BackendError::LoggedOut));
+        mock_account
+            .expect_check()
+            .times(0)
+            .in_sequence(&mut mock_sequence)
+            .returning(|| Ok(NewEmailReply { count: 1 }));
+        let account = Account::new("foo", AccountState::LoggedIn(Box::new(mock_account)));
+        let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
+
+        worker.add_account(account);
+
+        // First all puts the account in logged in mode.
+        worker.poll_accounts().await;
+        // Next calls are noop.
+        worker.poll_accounts().await;
+        worker.poll_accounts().await;
     }
 }

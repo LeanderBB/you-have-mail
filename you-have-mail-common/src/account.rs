@@ -5,6 +5,7 @@ use thiserror::Error;
 /// Represents a user account. While it would have been more idiomatic to have the account
 /// represent as an enum, the code is meant to be used with other language bindings where
 /// such a thing may not be possible.
+/// User `Backend::login` to obtain a new account.
 #[derive(Debug)]
 pub struct Account {
     state: AccountState,
@@ -31,20 +32,30 @@ pub enum AccountError {
     Backend(#[from] crate::backend::BackendError),
 }
 
+impl AccountError {
+    pub fn is_offline(&self) -> bool {
+        if let AccountError::Backend(e) = self {
+            return matches!(e, crate::backend::BackendError::Offline);
+        }
+        false
+    }
+
+    pub fn is_logged_out(&self) -> bool {
+        if let AccountError::Backend(e) = self {
+            return matches!(e, crate::backend::BackendError::LoggedOut);
+        }
+        false
+    }
+}
+
 pub type AccountResult<T> = Result<T, AccountError>;
 
 impl Account {
-    /// Login to a new account for a given backend.
-    pub async fn login(
-        backend: &dyn crate::backend::Backend,
-        email: &str,
-        password: &str,
-    ) -> AccountResult<Self> {
-        let account_state = backend.login(email, password).await?;
-        Ok(Self {
-            state: account_state,
+    pub(crate) fn new<T: Into<String>>(email: T, state: AccountState) -> Self {
+        Self {
+            state,
             email: email.into(),
-        })
+        }
     }
 
     /// Whether the account is logged in.

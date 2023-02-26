@@ -41,8 +41,8 @@ impl Backend for NullBacked {
         "null backend"
     }
 
-    async fn login(&self, username: &str, password: &str) -> BackendResult<AccountState> {
-        if let Some(account) = self.accounts.get(username) {
+    async fn login(&self, email: &str, password: &str) -> BackendResult<crate::Account> {
+        if let Some(account) = self.accounts.get(email) {
             if account.password != password {
                 return Err(BackendError::Request(anyhow!(
                     "invalid user name or password"
@@ -50,11 +50,15 @@ impl Backend for NullBacked {
             }
 
             return if let Some(totp) = &account.totp {
-                Ok(AccountState::AwaitingTotp(Box::new(NullAwaitTotp {
-                    totp: totp.clone(),
-                })))
+                Ok(crate::Account::new(
+                    email,
+                    AccountState::AwaitingTotp(Box::new(NullAwaitTotp { totp: totp.clone() })),
+                ))
             } else {
-                Ok(AccountState::LoggedIn(Box::new(NullAccount {})))
+                Ok(crate::Account::new(
+                    email,
+                    AccountState::LoggedIn(Box::new(NullAccount {})),
+                ))
             };
         }
 
