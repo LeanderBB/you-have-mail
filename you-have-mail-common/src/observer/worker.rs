@@ -101,11 +101,11 @@ impl Worker {
 }
 
 async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequest>) {
-    let sleep = tokio::time::sleep(observer.poll_interval);
+    let sleep = tokio::time::interval(observer.poll_interval);
     tokio::pin!(sleep);
     loop {
         tokio::select! {
-            _ = &mut sleep => {
+            _ = sleep.tick() => {
                 observer.poll_accounts().await;
             }
 
