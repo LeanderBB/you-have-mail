@@ -47,6 +47,8 @@ pub enum ObserverRPCError<T, E> {
 /// Errors that may occur during the [Observer](struct@Observer)'s execution.
 #[derive(Debug, Error)]
 pub enum ObserverError {
+    #[error("The given account is already active {0:?}")]
+    AccountAlreadyActive(Account),
     #[error("{0}")]
     AccountError(#[from] AccountError),
     #[error("Unknown error occurred: {0}")]

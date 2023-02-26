@@ -1,9 +1,12 @@
 use crate::backend::BackendError;
 use crate::observer::rpc::ObserverRequest;
-use crate::{Account, AccountError, Config, Notifier, ObserverAccount, ObserverAccountStatus};
+use crate::{
+    Account, AccountError, Config, Notifier, ObserverAccount, ObserverAccountStatus, ObserverError,
+};
 use proton_api_rs::log::error;
 use proton_api_rs::tokio;
 use secrecy::ExposeSecret;
+use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::future::Future;
 use std::time::Duration;
@@ -56,15 +59,18 @@ impl Worker {
     async fn handle_request(&mut self, request: ObserverRequest) -> bool {
         match request {
             ObserverRequest::AddAccount(account, reply) => {
-                self.accounts.insert(
-                    account.email().to_string(),
-                    WorkerAccount {
-                        account,
-                        status: ObserverAccountStatus::Online,
-                    },
-                );
+                let result = match self.accounts.entry(account.email().to_string()) {
+                    Entry::Occupied(_) => Err(ObserverError::AccountAlreadyActive(account)),
+                    Entry::Vacant(v) => {
+                        v.insert(WorkerAccount {
+                            account,
+                            status: ObserverAccountStatus::Online,
+                        });
+                        Ok(())
+                    }
+                };
 
-                if reply.send(Ok(())).await.is_err() {
+                if reply.send(result).await.is_err() {
                     error!("Failed to send reply for remove account request");
                 }
 

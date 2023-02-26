@@ -110,3 +110,34 @@ async fn resume_after_pause_calls_notifier() {
 
     h.await.unwrap();
 }
+
+#[tokio::test]
+async fn adding_account_with_same_email_twice_is_error() {
+    let (_, account) = new_backend_and_account().await;
+    let (_, account2) = new_backend_and_account().await;
+
+    let mut notifier = MockNotifier::new();
+    notifier
+        .expect_notify()
+        .withf(|account: &Account, num: &usize| account.email() == "foo" && *num == 1)
+        .times(..)
+        .return_const(());
+
+    notifier.expect_notify_error().times(0);
+
+    let notifier: Box<dyn Notifier> = Box::new(notifier);
+
+    let h = {
+        let (observer, task) = ObserverBuilder::new(notifier)
+            .poll_interval(Duration::from_millis(500))
+            .build();
+        let h = tokio::spawn(task);
+        observer.add_account(account).await.unwrap();
+        observer.add_account(account2).await.unwrap_err();
+        tokio::time::sleep(Duration::from_secs(1)).await;
+        observer.shutdown_worker().await.unwrap();
+        h
+    };
+
+    h.await.unwrap();
+}
