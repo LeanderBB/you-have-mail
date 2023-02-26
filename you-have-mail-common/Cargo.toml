@@ -26,6 +26,9 @@ optional = true
 
 [dev-dependencies]
 mockall = "0.11"
+dirs = "4"
+keyring = "2"
+hex = "0.4"
 
 [[example]]
 name = "cli"
