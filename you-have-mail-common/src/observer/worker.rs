@@ -1,8 +1,9 @@
 use crate::backend::BackendError;
 use crate::observer::rpc::ObserverRequest;
-use crate::{Account, AccountError, Notifier, ObserverAccount, ObserverAccountStatus};
+use crate::{Account, AccountError, Config, Notifier, ObserverAccount, ObserverAccountStatus};
 use proton_api_rs::log::error;
 use proton_api_rs::tokio;
+use secrecy::ExposeSecret;
 use std::collections::HashMap;
 use std::future::Future;
 use std::time::Duration;
@@ -105,6 +106,18 @@ impl Worker {
             }
             ObserverRequest::Resume => {
                 self.paused = false;
+                false
+            }
+            ObserverRequest::GenConfig(key, reply) => {
+                let r = Config::store(
+                    key.expose_secret(),
+                    self.accounts.values().map(|a| &a.account),
+                );
+
+                if reply.send(r).await.is_err() {
+                    error!("Failed to send reply for gen config request");
+                }
+
                 false
             }
         }

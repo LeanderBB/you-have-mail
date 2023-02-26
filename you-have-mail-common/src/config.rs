@@ -145,6 +145,8 @@ struct ConfigJSON {
 
 #[tokio::test]
 async fn test_config_store_and_load() {
+    use secrecy::ExposeSecret;
+
     let null_backed = crate::backend::null::new_backend(&[
         crate::backend::null::NullTestAccount {
             email: "foo".to_string(),
@@ -166,9 +168,9 @@ async fn test_config_store_and_load() {
     };
     let account2 = Account::new(null_backed.clone(), "bar");
 
-    let config_encrypted = Config::store(&key, [account1, account2].iter()).unwrap();
+    let config_encrypted = Config::store(key.expose_secret(), [account1, account2].iter()).unwrap();
 
-    let accounts = Config::load(&key, &[null_backed], &config_encrypted).unwrap();
+    let accounts = Config::load(key.expose_secret(), &[null_backed], &config_encrypted).unwrap();
 
     assert_eq!(accounts.len(), 2);
     assert_eq!(accounts[0].0.email(), "foo");

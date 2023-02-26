@@ -1,7 +1,10 @@
-use crate::observer::rpc::{AddAccountRequest, ObserverPRC, ObserverRequest, RemoveAccountRequest};
+use crate::observer::rpc::{
+    AddAccountRequest, GenConfigRequest, ObserverPRC, ObserverRequest, RemoveAccountRequest,
+};
 use crate::observer::worker::Worker;
-use crate::{Account, AccountError, Notifier};
+use crate::{Account, AccountError, ConfigStoreError, EncryptionKey, Notifier};
 use proton_api_rs::tokio::sync::mpsc::Sender;
+use secrecy::Secret;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -30,7 +33,7 @@ pub struct ObserverAccount {
 
 /// Errors returned during observer RPC calls.
 #[derive(Debug, Error)]
-pub enum ObserverRPCError<T> {
+pub enum ObserverRPCError<T, E> {
     #[error("Failed to send request to observer")]
     SendFailed(T),
     #[error("Failed to send request to observer, but did no manage to recover request type")]
@@ -38,7 +41,7 @@ pub enum ObserverRPCError<T> {
     #[error("No reply received for the request")]
     NoReply,
     #[error("{0}")]
-    Error(#[from] ObserverError),
+    Error(#[from] E),
 }
 
 /// Errors that may occur during the [Observer](struct@Observer)'s execution.
@@ -67,7 +70,7 @@ impl ObserverBuilder {
         }
     }
 
-    /// Controlls the poll interval to check for new updates.
+    /// Controls the poll interval to check for new updates.
     pub fn poll_interval(mut self, poll_interval: Duration) -> Self {
         self.poll_interval = poll_interval;
         self
@@ -84,7 +87,11 @@ impl Observer {
         (Self(Arc::new(sender)), task)
     }
 
-    pub async fn add_account(&self, account: Account) -> Result<(), ObserverRPCError<Account>> {
+    /// Add a new account to be observed for new emails.
+    pub async fn add_account(
+        &self,
+        account: Account,
+    ) -> Result<(), ObserverRPCError<Account, ObserverError>> {
         if !account.is_logged_in() {
             return Err(ObserverRPCError::Error(ObserverError::AccountError(
                 AccountError::InvalidState,
@@ -94,17 +101,19 @@ impl Observer {
         self.perform_rpc(AddAccountRequest { account }).await
     }
 
+    /// Remove an account with the following email from the observer list.
     pub async fn remove_account<T: Into<String>>(
         &self,
         email: T,
-    ) -> Result<(), ObserverRPCError<String>> {
+    ) -> Result<(), ObserverRPCError<String, ObserverError>> {
         self.perform_rpc(RemoveAccountRequest {
             email: email.into(),
         })
         .await
     }
 
-    pub async fn shutdown_worker(&self) -> Result<(), ObserverRPCError<()>> {
+    /// Signal that the worker should terminate.
+    pub async fn shutdown_worker(&self) -> Result<(), ObserverRPCError<(), ObserverError>> {
         if self.0.send(ObserverRequest::Exit).await.is_err() {
             return Err(ObserverRPCError::SendFailed(()));
         }
@@ -112,7 +121,8 @@ impl Observer {
         Ok(())
     }
 
-    pub async fn pause(&self) -> Result<(), ObserverRPCError<()>> {
+    /// Pause the execution of the observer.
+    pub async fn pause(&self) -> Result<(), ObserverRPCError<(), ObserverError>> {
         if self.0.send(ObserverRequest::Pause).await.is_err() {
             return Err(ObserverRPCError::SendFailed(()));
         }
@@ -120,7 +130,8 @@ impl Observer {
         Ok(())
     }
 
-    pub async fn resume(&self) -> Result<(), ObserverRPCError<()>> {
+    /// Resume the execution of the observer.
+    pub async fn resume(&self) -> Result<(), ObserverRPCError<(), ObserverError>> {
         if self.0.send(ObserverRequest::Resume).await.is_err() {
             return Err(ObserverRPCError::SendFailed(()));
         }
@@ -128,12 +139,20 @@ impl Observer {
         Ok(())
     }
 
+    /// Generate configuration data for the currently active account list.
+    pub async fn generate_config(
+        &self,
+        key: Secret<EncryptionKey>,
+    ) -> Result<Box<[u8]>, ObserverRPCError<(), ConfigStoreError>> {
+        self.perform_rpc(GenConfigRequest { key }).await
+    }
+
     async fn perform_rpc<T: ObserverPRC>(
         &self,
         value: T,
-    ) -> Result<T::Output, ObserverRPCError<T::SendFailedValue>> {
+    ) -> Result<T::Output, ObserverRPCError<T::SendFailedValue, T::Error>> {
         let (sender, mut receiver) =
-            proton_api_rs::tokio::sync::mpsc::channel::<Result<T::Output, ObserverError>>(1);
+            proton_api_rs::tokio::sync::mpsc::channel::<Result<T::Output, T::Error>>(1);
         let request = value.into_request(sender);
         if let Err(e) = self.0.send(request).await {
             if let Some(v) = T::recover_send_value(e.0) {

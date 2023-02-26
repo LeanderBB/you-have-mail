@@ -2,21 +2,22 @@
 use anyhow::anyhow;
 use chacha20poly1305::aead::{Aead, OsRng};
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key, KeyInit, Nonce};
+use secrecy::Secret;
 
 #[derive(Copy, Clone, Eq, PartialEq)]
 /// Encryption Key for use with [`encrypt`] and [`decrypt`].
 pub struct EncryptionKey(Key);
 
-impl Default for EncryptionKey {
-    fn default() -> Self {
-        Self::new()
+impl secrecy::Zeroize for EncryptionKey {
+    fn zeroize(&mut self) {
+        self.0.zeroize()
     }
 }
 
 impl EncryptionKey {
-    pub fn new() -> Self {
+    pub fn new() -> Secret<Self> {
         let mut rng = OsRng::default();
-        Self(ChaCha20Poly1305::generate_key(&mut rng))
+        Secret::new(Self(ChaCha20Poly1305::generate_key(&mut rng)))
     }
 }
 
@@ -61,9 +62,11 @@ pub fn decrypt(key: &EncryptionKey, bytes: &[u8]) -> Result<Box<[u8]>, anyhow::E
 
 #[test]
 fn test_encrypt_decrypt() {
+    use secrecy::ExposeSecret;
+
     let value = b"Hello World!!";
     let key = EncryptionKey::new();
-    let encrypted = encrypt(&key, value).unwrap();
-    let decrypted = decrypt(&key, &encrypted).unwrap();
+    let encrypted = encrypt(key.expose_secret(), value).unwrap();
+    let decrypted = decrypt(key.expose_secret(), &encrypted).unwrap();
     assert_eq!(decrypted.as_ref(), value);
 }

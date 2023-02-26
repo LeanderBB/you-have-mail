@@ -1,5 +1,6 @@
-use crate::{Account, ObserverAccount, ObserverError};
+use crate::{Account, ConfigStoreError, EncryptionKey, ObserverAccount, ObserverError};
 use proton_api_rs::tokio::sync::mpsc::Sender;
+use secrecy::Secret;
 
 /// RPC Requests for the `Observer`.
 pub enum ObserverRequest {
@@ -9,13 +10,18 @@ pub enum ObserverRequest {
     GetAccounts(Sender<Result<Vec<ObserverAccount>, ObserverError>>),
     Pause,
     Resume,
+    GenConfig(
+        Secret<EncryptionKey>,
+        Sender<Result<Box<[u8]>, ConfigStoreError>>,
+    ),
 }
 
 #[doc(hidden)]
 pub trait ObserverPRC {
     type Output;
+    type Error;
     type SendFailedValue;
-    fn into_request(self, reply: ObserverRPCReply<Self::Output>) -> ObserverRequest;
+    fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest;
     fn recover_send_value(request: ObserverRequest) -> Option<Self::SendFailedValue>;
 }
 
@@ -25,14 +31,12 @@ pub struct RemoveAccountRequest {
 }
 
 #[doc(hidden)]
-type ObserverRPCReply<T> = Sender<Result<T, ObserverError>>;
-
-#[doc(hidden)]
 impl ObserverPRC for RemoveAccountRequest {
     type Output = ();
+    type Error = ObserverError;
     type SendFailedValue = String;
 
-    fn into_request(self, reply: ObserverRPCReply<Self::Output>) -> ObserverRequest {
+    fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
         ObserverRequest::RemoveAccount(self.email, reply)
     }
 
@@ -51,9 +55,10 @@ pub struct AddAccountRequest {
 
 impl ObserverPRC for AddAccountRequest {
     type Output = ();
+    type Error = ObserverError;
     type SendFailedValue = Account;
 
-    fn into_request(self, sender: ObserverRPCReply<Self::Output>) -> ObserverRequest {
+    fn into_request(self, sender: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
         ObserverRequest::AddAccount(self.account, sender)
     }
 
@@ -70,10 +75,30 @@ pub struct GetAccountList {}
 
 impl ObserverPRC for GetAccountList {
     type Output = Vec<ObserverAccount>;
+    type Error = ObserverError;
     type SendFailedValue = ();
 
-    fn into_request(self, reply: ObserverRPCReply<Self::Output>) -> ObserverRequest {
+    fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
         ObserverRequest::GetAccounts(reply)
+    }
+
+    fn recover_send_value(_: ObserverRequest) -> Option<Self::SendFailedValue> {
+        Some(())
+    }
+}
+
+#[doc(hidden)]
+pub struct GenConfigRequest {
+    pub key: Secret<EncryptionKey>,
+}
+
+impl ObserverPRC for GenConfigRequest {
+    type Output = Box<[u8]>;
+    type Error = ConfigStoreError;
+    type SendFailedValue = ();
+
+    fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
+        ObserverRequest::GenConfig(self.key, reply)
     }
 
     fn recover_send_value(_: ObserverRequest) -> Option<Self::SendFailedValue> {
