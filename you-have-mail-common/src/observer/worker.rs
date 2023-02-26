@@ -116,6 +116,11 @@ impl Worker {
         }
 
         for (email, wa) in &mut self.accounts {
+            // Track logged out status if for some reason something slips through.
+            if wa.account.is_logged_out() {
+                wa.status = ObserverAccountStatus::LoggedOut;
+            }
+
             // Skip accounts which are not logged in.
             if wa.status == ObserverAccountStatus::LoggedOut {
                 continue;
