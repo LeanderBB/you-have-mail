@@ -1,9 +1,10 @@
 use crate::backend::{AuthRefresher, Backend};
 use crate::encryption::{decrypt, encrypt};
-use crate::EncryptionKey;
+use crate::{Account, EncryptionKey};
 use anyhow::anyhow;
 use proton_api_rs::tokio;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
 use thiserror::Error;
 
 /// Config stores a You Have Mail application state with all the active user accounts
@@ -42,25 +43,27 @@ pub enum ConfigStoreError {
     JSON(#[source] anyhow::Error),
 }
 
+pub type ConfigAccount = (Account, Option<Box<dyn AuthRefresher>>);
+
 impl Config {
     pub fn load(
         key: &EncryptionKey,
-        backends: &[Box<dyn Backend>],
+        backends: &[Arc<dyn Backend>],
         data: &[u8],
-    ) -> Result<Vec<Box<dyn AuthRefresher>>, ConfigLoadError> {
+    ) -> Result<Vec<ConfigAccount>, ConfigLoadError> {
         let decrypted = decrypt(key, data).map_err(ConfigLoadError::Decryption)?;
         let config = serde_json::from_slice::<ConfigJSON>(decrypted.as_ref())
             .map_err(|e| ConfigLoadError::JSON(anyhow!(e)))?;
 
-        let mut result = Vec::<Box<dyn AuthRefresher>>::with_capacity(config.accounts.len());
+        let mut result = Vec::with_capacity(config.accounts.len());
 
-        fn find_backend_with_tag<'a>(
-            backends: &'a [Box<dyn Backend>],
+        fn find_backend_with_tag(
+            backends: &[Arc<dyn Backend>],
             tag: &str,
-        ) -> Option<&'a dyn Backend> {
+        ) -> Option<Arc<dyn Backend>> {
             for b in backends {
                 if b.name() == tag {
-                    return Some(b.as_ref());
+                    return Some(b.clone());
                 }
             }
             None
@@ -71,15 +74,21 @@ impl Config {
                 return Err(ConfigLoadError::BackendNotFound {account:account.email,backend:account.backend });
             };
 
-            let refresher = b.auth_refresher_from_config(account.value).map_err(|e| {
-                ConfigLoadError::BackendConfig {
-                    account: account.email,
-                    backend: account.backend,
-                    error: e,
-                }
-            })?;
+            let refresher = if let Some(value) = account.value {
+                Some(b.auth_refresher_from_config(value).map_err(|e| {
+                    ConfigLoadError::BackendConfig {
+                        account: account.email.clone(),
+                        backend: account.backend,
+                        error: e,
+                    }
+                })?)
+            } else {
+                None
+            };
 
-            result.push(refresher);
+            let account = Account::new(b, account.email);
+
+            result.push((account, refresher));
         }
 
         Ok(result)
@@ -87,26 +96,26 @@ impl Config {
 
     pub fn store<'a>(
         key: &EncryptionKey,
-        accounts: impl Iterator<Item = &'a crate::Account>,
+        accounts: impl Iterator<Item = &'a Account>,
     ) -> Result<Box<[u8]>, ConfigStoreError> {
         let mut json_accounts = Vec::<ConfigJSONAccount>::new();
 
         for account in accounts {
-            if !account.is_logged_in() {
-                //TODO: Logged out account should still be stored!
-                continue;
-            }
-            let account_impl = account.get_impl().unwrap();
-            let (tag, value) = account_impl.auth_refresher_config().map_err(|e| {
-                ConfigStoreError::BackendConfig {
-                    account: account.email().to_string(),
-                    error: anyhow!(e),
-                }
-            })?;
+            let value = if account.is_logged_in() {
+                let account_impl = account.get_impl().unwrap();
+                Some(account_impl.auth_refresher_config().map_err(|e| {
+                    ConfigStoreError::BackendConfig {
+                        account: account.email().to_string(),
+                        error: anyhow!(e),
+                    }
+                })?)
+            } else {
+                None
+            };
 
             json_accounts.push(ConfigJSONAccount {
                 email: account.email().to_string(),
-                backend: tag,
+                backend: account.backend().name().to_string(),
                 value,
             })
         }
@@ -126,7 +135,7 @@ impl Config {
 struct ConfigJSONAccount {
     email: String,
     backend: String,
-    value: serde_json::Value,
+    value: Option<serde_json::Value>,
 }
 
 #[derive(Deserialize, Serialize)]
@@ -150,20 +159,20 @@ async fn test_config_store_and_load() {
     ]);
 
     let key = EncryptionKey::new();
-    let account1 = null_backed.login("foo", "foo").await.unwrap();
-    let account2 = null_backed.login("bar", "bar").await.unwrap();
+    let account1 = {
+        let mut a = Account::new(null_backed.clone(), "foo");
+        a.login("foo").await.unwrap();
+        a
+    };
+    let account2 = Account::new(null_backed.clone(), "bar");
 
     let config_encrypted = Config::store(&key, [account1, account2].iter()).unwrap();
 
     let accounts = Config::load(&key, &[null_backed], &config_encrypted).unwrap();
 
     assert_eq!(accounts.len(), 2);
-    let mut logged_in_account = Vec::<crate::Account>::with_capacity(accounts.len());
-
-    for a in accounts {
-        logged_in_account.push(a.refresh().await.unwrap());
-    }
-
-    assert_eq!(logged_in_account[0].email(), "foo");
-    assert_eq!(logged_in_account[1].email(), "bar");
+    assert_eq!(accounts[0].0.email(), "foo");
+    assert_eq!(accounts[1].0.email(), "bar");
+    assert!(accounts[0].1.is_some());
+    assert!(accounts[1].1.is_none());
 }

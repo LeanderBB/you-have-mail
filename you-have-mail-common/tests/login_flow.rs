@@ -1,5 +1,6 @@
 use proton_api_rs::tokio;
 use you_have_mail_common::backend::null::NullTestAccount;
+use you_have_mail_common::Account;
 
 #[tokio::test]
 async fn test_login_flow() {
@@ -10,12 +11,13 @@ async fn test_login_flow() {
     };
     let backend = you_have_mail_common::backend::null::new_backend(&[accounts]);
 
-    backend
-        .login("z", "b")
+    let mut account = Account::new(backend, "foo");
+    account
+        .login("b")
         .await
         .expect_err("Account should not be logged in");
 
-    let mut account = backend.login("foo", "bar").await.unwrap();
+    account.login("bar").await.unwrap();
     assert!(!account.is_logged_out());
     assert!(!account.is_logged_in());
     assert!(account.is_awaiting_totp());

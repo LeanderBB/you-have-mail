@@ -1,18 +1,19 @@
 use proton_api_rs::tokio;
 use proton_api_rs::tokio::io::AsyncBufReadExt;
 use proton_api_rs::tokio::io::AsyncWriteExt;
+use std::sync::Arc;
 use std::time::Duration;
 use you_have_mail_common::backend::Backend;
 use you_have_mail_common::{Account, AccountError, Notifier, ObserverBuilder};
 
 #[cfg(feature = "proton-backend")]
-fn new_backed() -> Box<dyn Backend> {
+fn new_backed() -> Arc<dyn Backend> {
     let app_version = std::env::var("YHM_PROTON_APP_VERSION").unwrap();
     return you_have_mail_common::backend::proton::new_backend(&app_version);
 }
 
 #[cfg(not(feature = "proton-backend"))]
-fn new_backed() -> Box<dyn Backend> {
+fn new_backed() -> Arc<dyn Backend> {
     use you_have_mail_common::backend::null::NullTestAccount;
     return you_have_mail_common::backend::null::new_backend(&[NullTestAccount {
         email: "foo".to_string(),
@@ -42,7 +43,8 @@ async fn main() {
     let password = std::env::var("YHM_PASSWORD").unwrap();
 
     let backend = new_backed();
-    let mut account = backend.login(&email, &password).await.unwrap();
+    let mut account = Account::new(backend, &email);
+    account.login(&password).await.unwrap();
 
     if account.is_awaiting_totp() {
         let mut stdout = tokio::io::stdout();

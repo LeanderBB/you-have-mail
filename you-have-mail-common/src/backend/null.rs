@@ -8,6 +8,7 @@ use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::Arc;
 
 #[doc(hidden)]
 #[derive(Debug, Clone)]
@@ -18,8 +19,8 @@ pub struct NullTestAccount {
 }
 
 #[doc(hidden)]
-pub fn new_backend(accounts: &[NullTestAccount]) -> Box<dyn Backend> {
-    Box::new(NullBacked {
+pub fn new_backend(accounts: &[NullTestAccount]) -> Arc<dyn Backend> {
+    Arc::new(NullBacked {
         accounts: HashMap::from_iter(accounts.iter().map(|a| (a.email.clone(), a.clone()))),
     })
 }
@@ -57,7 +58,7 @@ impl Backend for NullBacked {
         NULL_BACKEND_NAME
     }
 
-    async fn login(&self, email: &str, password: &str) -> BackendResult<crate::Account> {
+    async fn login(&self, email: &str, password: &str) -> BackendResult<AccountState> {
         if let Some(account) = self.accounts.get(email) {
             if account.password != password {
                 return Err(BackendError::Request(anyhow!(
@@ -66,20 +67,14 @@ impl Backend for NullBacked {
             }
 
             return if let Some(totp) = &account.totp {
-                Ok(crate::Account::new(
-                    email,
-                    AccountState::AwaitingTotp(Box::new(NullAwaitTotp {
-                        email: email.to_string(),
-                        totp: totp.clone(),
-                    })),
-                ))
+                Ok(AccountState::AwaitingTotp(Box::new(NullAwaitTotp {
+                    email: email.to_string(),
+                    totp: totp.clone(),
+                })))
             } else {
-                Ok(crate::Account::new(
-                    email,
-                    AccountState::LoggedIn(Box::new(NullAccount {
-                        email: email.to_string(),
-                    })),
-                ))
+                Ok(AccountState::LoggedIn(Box::new(NullAccount {
+                    email: email.to_string(),
+                })))
             };
         }
 
@@ -96,11 +91,10 @@ impl Backend for NullBacked {
 
 #[async_trait]
 impl AuthRefresher for NullAuthRefresher {
-    async fn refresh(self: Box<Self>) -> Result<crate::Account, BackendError> {
-        Ok(crate::Account::new(
-            self.email.clone(),
-            AccountState::LoggedIn(Box::new(NullAccount { email: self.email })),
-        ))
+    async fn refresh(self: Box<Self>) -> Result<AccountState, BackendError> {
+        Ok(AccountState::LoggedIn(Box::new(NullAccount {
+            email: self.email,
+        })))
     }
 }
 
@@ -119,14 +113,11 @@ impl Account for NullAccount {
         Ok(())
     }
 
-    fn auth_refresher_config(&self) -> Result<(String, Value), Error> {
-        Ok((
-            NULL_BACKEND_NAME.to_string(),
-            serde_json::to_value(NullAuthRefresherInfo {
-                email: self.email.clone(),
-            })
-            .map_err(|e| anyhow!(e))?,
-        ))
+    fn auth_refresher_config(&self) -> Result<Value, Error> {
+        serde_json::to_value(NullAuthRefresherInfo {
+            email: self.email.clone(),
+        })
+        .map_err(|e| anyhow!(e))
     }
 }
 

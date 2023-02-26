@@ -196,7 +196,11 @@ mod tests {
             .expect_check()
             .times(4)
             .returning(|| Err(BackendError::Offline));
-        let account = Account::new("foo", AccountState::LoggedIn(Box::new(mock_account)));
+        let account = Account::with_state(
+            crate::backend::null::new_backend(&[]),
+            "foo",
+            AccountState::LoggedIn(Box::new(mock_account)),
+        );
         let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
 
         worker.add_account(account);
@@ -233,7 +237,11 @@ mod tests {
             .times(1)
             .in_sequence(&mut mock_sequence)
             .returning(|| Ok(NewEmailReply { count: 1 }));
-        let account = Account::new("foo", AccountState::LoggedIn(Box::new(mock_account)));
+        let account = Account::with_state(
+            crate::backend::null::new_backend(&[]),
+            "foo",
+            AccountState::LoggedIn(Box::new(mock_account)),
+        );
         let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
 
         worker.add_account(account);
@@ -266,7 +274,11 @@ mod tests {
             .times(0)
             .in_sequence(&mut mock_sequence)
             .returning(|| Ok(NewEmailReply { count: 1 }));
-        let account = Account::new("foo", AccountState::LoggedIn(Box::new(mock_account)));
+        let account = Account::with_state(
+            crate::backend::null::new_backend(&[]),
+            "foo",
+            AccountState::LoggedIn(Box::new(mock_account)),
+        );
         let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
 
         worker.add_account(account);

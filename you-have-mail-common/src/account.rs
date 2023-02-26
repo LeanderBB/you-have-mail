@@ -1,5 +1,6 @@
-use crate::backend::NewEmailReply;
+use crate::backend::{AuthRefresher, NewEmailReply};
 use proton_api_rs::log::error;
+use std::sync::Arc;
 use thiserror::Error;
 
 /// Represents a user account. While it would have been more idiomatic to have the account
@@ -8,6 +9,7 @@ use thiserror::Error;
 /// User [Backend::login](fn@crate::backend::Backend::login) to obtain a new account.
 #[derive(Debug)]
 pub struct Account {
+    backend: Arc<dyn crate::backend::Backend>,
     state: AccountState,
     email: String,
 }
@@ -51,8 +53,21 @@ impl AccountError {
 pub type AccountResult<T> = Result<T, AccountError>;
 
 impl Account {
-    pub(crate) fn new<T: Into<String>>(email: T, state: AccountState) -> Self {
+    pub fn new<T: Into<String>>(backend: Arc<dyn crate::backend::Backend>, email: T) -> Self {
         Self {
+            backend,
+            state: AccountState::LoggedOut,
+            email: email.into(),
+        }
+    }
+
+    pub fn with_state<T: Into<String>>(
+        backend: Arc<dyn crate::backend::Backend>,
+        email: T,
+        state: AccountState,
+    ) -> Self {
+        Self {
+            backend,
             state,
             email: email.into(),
         }
@@ -78,6 +93,11 @@ impl Account {
         &self.email
     }
 
+    /// Get the account's backend.
+    pub fn backend(&self) -> &dyn crate::backend::Backend {
+        self.backend.as_ref()
+    }
+
     /// Run check on the account to see if new emails have arrived.
     pub async fn check(&mut self) -> AccountResult<NewEmailReply> {
         match &mut self.state {
@@ -87,6 +107,16 @@ impl Account {
             }
             _ => Err(AccountError::InvalidState),
         }
+    }
+
+    /// Login to the account with the given password.
+    pub async fn login(&mut self, password: &str) -> AccountResult<()> {
+        if !self.is_logged_out() {
+            return Err(AccountError::InvalidState);
+        }
+
+        self.state = self.backend.login(&self.email, password).await?;
+        Ok(())
     }
 
     /// Logout the current account.
@@ -125,6 +155,16 @@ impl Account {
                 Err(AccountError::InvalidState)
             }
         }
+    }
+
+    /// Refresh the authentication token for this account.
+    pub async fn refresh(&mut self, refresher: Box<dyn AuthRefresher>) -> AccountResult<()> {
+        if !self.is_logged_out() {
+            return Err(AccountError::InvalidState);
+        }
+
+        self.state = refresher.refresh().await?;
+        Ok(())
     }
 
     pub(crate) fn get_impl(&self) -> Option<&dyn crate::backend::Account> {

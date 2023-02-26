@@ -1,6 +1,7 @@
 //! Implementations for possible account backends from which one can receive email
 //! notifications for.
 
+use crate::AccountState;
 use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
@@ -43,7 +44,7 @@ pub trait Backend: Send + Sync + Debug {
     fn name(&self) -> &str;
 
     /// Login an account.
-    async fn login(&self, username: &str, password: &str) -> BackendResult<crate::Account>;
+    async fn login(&self, username: &str, password: &str) -> BackendResult<AccountState>;
 
     /// Load the necessary information to refresh the user's account access credentials.
     fn auth_refresher_from_config(
@@ -63,7 +64,7 @@ pub trait Account: Send + Debug {
     async fn logout(&mut self) -> BackendResult<()>;
 
     /// Load the necessary information to refresh the user's account access credentials.
-    fn auth_refresher_config(&self) -> Result<(String, serde_json::Value), anyhow::Error>;
+    fn auth_refresher_config(&self) -> Result<serde_json::Value, anyhow::Error>;
 }
 
 /// Trait for accounts that require 2FA support
@@ -81,5 +82,5 @@ pub trait AwaitTotp: Send + Debug {
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait AuthRefresher {
-    async fn refresh(self: Box<Self>) -> Result<crate::Account, BackendError>;
+    async fn refresh(self: Box<Self>) -> Result<AccountState, BackendError>;
 }

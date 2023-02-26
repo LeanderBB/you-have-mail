@@ -3,16 +3,18 @@ use crate::backend::Backend;
 use crate::MockNotifier;
 use crate::{Account, Notifier, ObserverBuilder};
 use proton_api_rs::tokio;
+use std::sync::Arc;
 use std::time::Duration;
 
-async fn new_backend_and_account() -> (Box<dyn Backend>, Account) {
+async fn new_backend_and_account() -> (Arc<dyn Backend>, Account) {
     let accounts = NullTestAccount {
         email: "foo".to_string(),
         password: "bar".to_string(),
         totp: None,
     };
     let backend = new_backend(&[accounts]);
-    let account = backend.login("foo", "bar").await.unwrap();
+    let mut account = Account::new(backend.clone(), "foo");
+    account.login("bar").await.unwrap();
 
     assert!(account.is_logged_in());
     (backend, account)

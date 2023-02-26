@@ -14,10 +14,11 @@ use proton_api_rs::{
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::{Debug, Formatter};
+use std::sync::Arc;
 
 /// Create a proton mail backend.
-pub fn new_backend(app_version: &str) -> Box<dyn Backend> {
-    Box::new(ProtonBackend {
+pub fn new_backend(app_version: &str) -> Arc<dyn Backend> {
+    Arc::new(ProtonBackend {
         builder: ClientBuilder::new().app_version(app_version),
     })
 }
@@ -94,19 +95,17 @@ impl Backend for ProtonBackend {
         PROTON_BACKEND_NAME
     }
 
-    async fn login(&self, email: &str, password: &str) -> BackendResult<crate::Account> {
+    async fn login(&self, email: &str, password: &str) -> BackendResult<AccountState> {
         match self.builder.clone().login(email, password).await? {
-            ClientLoginState::Authenticated(c) => Ok(crate::Account::new(
-                email,
-                AccountState::LoggedIn(Box::new(ProtonAccount::new(c, email.to_string()))),
-            )),
-            ClientLoginState::AwaitingTotp(c) => Ok(crate::Account::new(
-                email,
-                AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp {
+            ClientLoginState::Authenticated(c) => Ok(AccountState::LoggedIn(Box::new(
+                ProtonAccount::new(c, email.to_string()),
+            ))),
+            ClientLoginState::AwaitingTotp(c) => {
+                Ok(AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp {
                     client: c,
                     email: email.to_string(),
-                })),
-            )),
+                })))
+            }
         }
     }
 
@@ -170,7 +169,7 @@ impl Account for ProtonAccount {
         Ok(())
     }
 
-    fn auth_refresher_config(&self) -> Result<(String, Value), Error> {
+    fn auth_refresher_config(&self) -> Result<Value, Error> {
         let Some(client) = &self.client else {
             return Err(anyhow!("invalid state"));
         };
@@ -180,7 +179,7 @@ impl Account for ProtonAccount {
             token: client.user_refresh_token().expose_secret().as_str(),
         };
         let value = serde_json::to_value(&info).map_err(|e| anyhow!(e))?;
-        Ok((PROTON_BACKEND_NAME.to_string(), value))
+        Ok(value)
     }
 }
 
@@ -202,15 +201,14 @@ impl AwaitTotp for ProtonAwaitTotp {
 
 #[async_trait]
 impl AuthRefresher for ProtonAuthRefresher {
-    async fn refresh(self: Box<Self>) -> Result<crate::Account, BackendError> {
+    async fn refresh(self: Box<Self>) -> Result<AccountState, BackendError> {
         let client = self
             .builder
             .with_token(&UserUid::from(self.uid), &self.token)
             .await?;
-        Ok(crate::Account::new(
-            self.email.clone(),
-            AccountState::LoggedIn(Box::new(ProtonAccount::new(client, self.email))),
-        ))
+        Ok(AccountState::LoggedIn(Box::new(ProtonAccount::new(
+            client, self.email,
+        ))))
     }
 }
 
