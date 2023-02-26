@@ -112,6 +112,22 @@ impl Observer {
         Ok(())
     }
 
+    pub async fn pause(&self) -> Result<(), ObserverRPCError<()>> {
+        if self.0.send(ObserverRequest::Pause).await.is_err() {
+            return Err(ObserverRPCError::SendFailed(()));
+        }
+
+        Ok(())
+    }
+
+    pub async fn resume(&self) -> Result<(), ObserverRPCError<()>> {
+        if self.0.send(ObserverRequest::Resume).await.is_err() {
+            return Err(ObserverRPCError::SendFailed(()));
+        }
+
+        Ok(())
+    }
+
     async fn perform_rpc<T: ObserverPRC>(
         &self,
         value: T,

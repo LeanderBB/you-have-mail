@@ -7,7 +7,7 @@ async fn test_login_flow() {
     let accounts = NullTestAccount {
         email: "foo".to_string(),
         password: "bar".to_string(),
-        totp: "1234".to_string(),
+        totp: Some("1234".to_string()),
     };
     let backend = you_have_mail_common::backend::null::new_null_backend(&[accounts]);
 

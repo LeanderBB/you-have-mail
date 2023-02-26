@@ -12,6 +12,7 @@ pub struct Worker {
     accounts: HashMap<String, WorkerAccount>,
     notifier: Box<dyn Notifier>,
     poll_interval: Duration,
+    paused: bool,
 }
 
 /// Represents and active account.
@@ -30,6 +31,7 @@ impl Worker {
             notifier,
             poll_interval,
             accounts: HashMap::new(),
+            paused: false,
         };
         (observer_task(observer, receiver), sender)
     }
@@ -81,10 +83,22 @@ impl Worker {
                 false
             }
             ObserverRequest::Exit => true,
+            ObserverRequest::Pause => {
+                self.paused = true;
+                false
+            }
+            ObserverRequest::Resume => {
+                self.paused = false;
+                false
+            }
         }
     }
 
     async fn poll_accounts(&mut self) {
+        if self.paused {
+            return;
+        }
+
         for (email, wa) in &mut self.accounts {
             match wa.account.check().await {
                 Ok(check) => {

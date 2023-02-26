@@ -7,6 +7,8 @@ pub enum ObserverRequest {
     AddAccount(Account, Sender<Result<(), ObserverError>>),
     RemoveAccount(String, Sender<Result<(), ObserverError>>),
     GetAccounts(Sender<Result<Vec<ObserverAccount>, ObserverError>>),
+    Pause,
+    Resume,
 }
 
 #[doc(hidden)]

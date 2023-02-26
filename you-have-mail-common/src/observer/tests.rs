@@ -9,7 +9,7 @@ async fn new_backend_and_account() -> (Box<dyn Backend>, Account) {
     let accounts = NullTestAccount {
         email: "foo".to_string(),
         password: "bar".to_string(),
-        totp: String::new(),
+        totp: None,
     };
     let backend = new_null_backend(&[accounts]);
     let account = Account::login(backend.as_ref(), "foo", "bar")
@@ -21,7 +21,7 @@ async fn new_backend_and_account() -> (Box<dyn Backend>, Account) {
 }
 
 #[tokio::test]
-async fn observer_calls_notifier() {
+async fn notifier_called() {
     let (_, account) = new_backend_and_account().await;
 
     let mut notifier = MockNotifier::new();
@@ -42,6 +42,68 @@ async fn observer_calls_notifier() {
         let h = tokio::spawn(task);
         observer.add_account(account).await.unwrap();
         tokio::time::sleep(Duration::from_secs(1)).await;
+        observer.shutdown_worker().await.unwrap();
+        h
+    };
+
+    h.await.unwrap();
+}
+
+#[tokio::test]
+async fn paused_not_call_notifier() {
+    let (_, account) = new_backend_and_account().await;
+
+    let mut notifier = MockNotifier::new();
+    notifier
+        .expect_notify()
+        .withf(|account: &Account, num: &usize| account.email() == "foo" && *num == 1)
+        .times(0)
+        .return_const(());
+
+    notifier.expect_notify_error().times(0);
+
+    let notifier: Box<dyn Notifier> = Box::new(notifier);
+
+    let h = {
+        let (observer, task) = ObserverBuilder::new(notifier)
+            .poll_interval(Duration::from_millis(10))
+            .build();
+        let h = tokio::spawn(task);
+        observer.pause().await.unwrap();
+        observer.add_account(account).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        observer.shutdown_worker().await.unwrap();
+        h
+    };
+
+    h.await.unwrap();
+}
+
+#[tokio::test]
+async fn resume_after_pause_calls_notifier() {
+    let (_, account) = new_backend_and_account().await;
+
+    let mut notifier = MockNotifier::new();
+    notifier
+        .expect_notify()
+        .withf(|account: &Account, num: &usize| account.email() == "foo" && *num == 1)
+        .times(1..)
+        .return_const(());
+
+    notifier.expect_notify_error().times(0);
+
+    let notifier: Box<dyn Notifier> = Box::new(notifier);
+
+    let h = {
+        let (observer, task) = ObserverBuilder::new(notifier)
+            .poll_interval(Duration::from_millis(10))
+            .build();
+        let h = tokio::spawn(task);
+        observer.pause().await.unwrap();
+        observer.add_account(account).await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
+        observer.resume().await.unwrap();
+        tokio::time::sleep(Duration::from_millis(100)).await;
         observer.shutdown_worker().await.unwrap();
         h
     };
