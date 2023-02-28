@@ -41,3 +41,5 @@ pub use config::*;
 pub use encryption::EncryptionKey;
 pub use observer::*;
 pub use traits::*;
+
+pub use secrecy::{ExposeSecret, Secret};

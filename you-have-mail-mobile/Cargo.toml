@@ -1,0 +1,22 @@
+[package]
+name = "you-have-mail-mobile"
+version = "0.1.0"
+edition = "2021"
+authors = ["Leander Beernaert <lbb-dev@pm.me>"]
+license = "AGPL-3.0-only"
+categories = ["api-bindings", "email"]
+readme = "README.md"
+description= "You-Have-Mail mobile API bindings"
+
+[lib]
+crate-type = ["cdylib"]
+name = "youhavemail"
+
+[dependencies]
+uniffi = {version ="0.23"}
+you-have-mail-common = {path = "../you-have-mail-common", version = "0.1.0" }
+thiserror = "1"
+tokio = "1"
+
+[build-dependencies]
+uniffi = {version ="0.23", features=["build", "cli"]}

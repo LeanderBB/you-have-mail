@@ -58,6 +58,10 @@ impl Backend for NullBacked {
         NULL_BACKEND_NAME
     }
 
+    fn description(&self) -> &str {
+        "Test backend to verify app behavior"
+    }
+
     async fn login(&self, email: &str, password: &str) -> BackendResult<AccountState> {
         if let Some(account) = self.accounts.get(email) {
             if account.password != password {

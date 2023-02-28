@@ -27,13 +27,28 @@ impl AsRef<[u8]> for EncryptionKey {
     }
 }
 
-impl From<[u8; 32]> for EncryptionKey {
-    fn from(value: [u8; 32]) -> Self {
+const ENCRYPTION_KEY_BYTES_LEN: usize = 32;
+
+impl From<[u8; ENCRYPTION_KEY_BYTES_LEN]> for EncryptionKey {
+    fn from(value: [u8; ENCRYPTION_KEY_BYTES_LEN]) -> Self {
         Self(Key::from(value))
     }
 }
 
-pub fn encrypt(key: &EncryptionKey, bytes: &[u8]) -> Result<Box<[u8]>, anyhow::Error> {
+impl TryFrom<&[u8]> for EncryptionKey {
+    type Error = ();
+    fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
+        if value.len() != ENCRYPTION_KEY_BYTES_LEN {
+            return Err(());
+        }
+
+        let mut bytes = [0u8; ENCRYPTION_KEY_BYTES_LEN];
+        bytes.copy_from_slice(value);
+        Ok(bytes.into())
+    }
+}
+
+pub fn encrypt(key: &EncryptionKey, bytes: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
     if bytes.is_empty() {
         return Err(anyhow!("Empty data"));
     }
@@ -42,10 +57,10 @@ pub fn encrypt(key: &EncryptionKey, bytes: &[u8]) -> Result<Box<[u8]>, anyhow::E
     let cipher = ChaCha20Poly1305::new(&key.0);
     let mut encrypted = cipher.encrypt(&nonce, bytes).map_err(|e| anyhow!(e))?;
     encrypted.extend_from_slice(nonce.as_slice());
-    Ok(encrypted.into_boxed_slice())
+    Ok(encrypted)
 }
 
-pub fn decrypt(key: &EncryptionKey, bytes: &[u8]) -> Result<Box<[u8]>, anyhow::Error> {
+pub fn decrypt(key: &EncryptionKey, bytes: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
     const NONCE_LEN: usize = 12;
     if bytes.len() < NONCE_LEN {
         return Err(anyhow!("Data is not large enough"));
@@ -57,7 +72,7 @@ pub fn decrypt(key: &EncryptionKey, bytes: &[u8]) -> Result<Box<[u8]>, anyhow::E
     let decrypted = cipher
         .decrypt(nonce, &bytes[0..data_len])
         .map_err(|e| anyhow!(e))?;
-    Ok(decrypted.into_boxed_slice())
+    Ok(decrypted)
 }
 
 #[test]
@@ -68,5 +83,5 @@ fn test_encrypt_decrypt() {
     let key = EncryptionKey::new();
     let encrypted = encrypt(key.expose_secret(), value).unwrap();
     let decrypted = decrypt(key.expose_secret(), &encrypted).unwrap();
-    assert_eq!(decrypted.as_ref(), value);
+    assert_eq!(decrypted.as_slice(), value);
 }

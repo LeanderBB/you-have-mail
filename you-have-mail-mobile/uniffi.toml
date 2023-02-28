@@ -1,0 +1,12 @@
+[bindings.kotlin]
+package_name = "dev.lbeernaert.youhavemail"
+cdylib_name = "youhavemail"
+
+[bindings.python]
+cdylib_name = "youhavemail"
+
+[bindings.ruby]
+cdylib_name = "youhavemail"
+
+[bindings.swift]
+cdylib_name = "youhavemail"

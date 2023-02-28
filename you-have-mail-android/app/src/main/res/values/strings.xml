@@ -1,0 +1,13 @@
+<resources>
+    <string name="app_name">YouHaveMail</string>
+    <string name="connecting_to_service">Connecting to Service...</string>
+    <string name="no_accounts">No active accounts.</string>
+    <string name="add_account_title">Add Account</string>
+    <string name="username">Username</string>
+    <string name="password">Password</string>
+    <string name="login">Login</string>
+    <string name="totp_title">TOTP</string>
+    <string name="totp_request">Please type in TOTP verification code</string>
+    <string name="account_add_success">Account Successfully added</string>
+    <string name="backend_title">Select Backend</string>
+</resources>

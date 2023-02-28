@@ -73,6 +73,16 @@ impl Account {
         }
     }
 
+    /// Take ownership of the current account and put the state to LoggedOut on the the original
+    /// instance.
+    pub fn take(&mut self) -> Account {
+        Account {
+            backend: self.backend.clone(),
+            email: self.email.clone(),
+            state: std::mem::replace(&mut self.state, AccountState::LoggedOut),
+        }
+    }
+
     /// Whether the account is logged in.
     pub fn is_logged_in(&self) -> bool {
         matches!(self.state, AccountState::LoggedIn(..))

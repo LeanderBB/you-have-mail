@@ -81,6 +81,10 @@ impl Backend for ProtonBackend {
         PROTON_BACKEND_NAME
     }
 
+    fn description(&self) -> &str {
+        "For Proton accounts (mail.proton.com)"
+    }
+
     async fn login(&self, email: &str, password: &str) -> BackendResult<AccountState> {
         match self.builder.clone().login(email, password).await? {
             ClientLoginState::Authenticated(c) => Ok(AccountState::LoggedIn(Box::new(

@@ -97,7 +97,7 @@ impl Config {
     pub fn store<'a>(
         key: &EncryptionKey,
         accounts: impl Iterator<Item = &'a Account>,
-    ) -> Result<Box<[u8]>, ConfigStoreError> {
+    ) -> Result<Vec<u8>, ConfigStoreError> {
         let mut json_accounts = Vec::<ConfigJSONAccount>::new();
 
         for account in accounts {

@@ -1,0 +1,101 @@
+namespace youhavemail {
+    [Throws=ServiceError]
+    Service new_service(Notifier notifier);
+
+    [Throws=ServiceError]
+    Service new_service_from_config(Notifier notifier, ServiceFromConfigCallback cb, [ByRef]sequence<u8> encryption_key, [ByRef]sequence<u8> bytes);
+};
+
+[Error]
+interface ServiceError {
+    RPCFailed(string msg);
+    AccountAlreadyActive(string email);
+    InvalidAccountState();
+    RequestError(string msg);
+    LoggedOut();
+    Offline();
+    Unknown(string msg);
+    Config(ConfigError error);
+};
+
+[Error]
+interface ConfigError {
+    BackendNotFound(string account, string backend);
+    BackendConfig(string account, string backend, string error);
+    Crypto(string msg);
+    JSON(string msg);
+    RPCFailed(string msg);
+};
+
+enum ObserverAccountState {
+    "Offline",
+    "LoggedOut",
+    "Online",
+};
+
+interface Backend {
+    string name();
+    string description();
+};
+
+interface Account {
+    [Throws=ServiceError]
+    void login(string password);
+
+    [Throws=ServiceError]
+    void logout();
+
+    [Throws=ServiceError]
+    void submit_totp(string totp);
+
+    boolean is_logged_in();
+
+    boolean is_awaiting_totp();
+
+    boolean is_logged_out();
+};
+
+interface ObserverAccount {
+    string email();
+    ObserverAccountState state();
+};
+
+callback interface Notifier {
+    void notify(string email, u64 message_count);
+
+    void notify_error(string email, ServiceError error);
+};
+
+callback interface ServiceFromConfigCallback {
+    void notify_error(string email, ServiceError error);
+};
+
+
+interface Service {
+    sequence<Backend> get_backends();
+
+    [Self=ByArc]
+    Account new_account([ByRef]Backend backend, string email);
+
+    [Throws=ServiceError]
+    sequence<ObserverAccount> get_observed_accounts();
+
+    [Throws=ServiceError]
+    void add_account(Account account);
+
+    [Throws=ServiceError]
+    void logout_account(string email);
+
+    [Throws=ServiceError]
+    void pause();
+
+    [Throws=ServiceError]
+    void resume();
+
+    [Throws=ServiceError]
+    void shutdown();
+
+    [Throws=ConfigError]
+    sequence<u8> get_config([ByRef]sequence<u8> encryption_key);
+
+};

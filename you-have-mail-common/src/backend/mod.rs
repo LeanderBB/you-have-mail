@@ -43,6 +43,9 @@ pub trait Backend: Send + Sync + Debug {
     /// Return the backend's name.
     fn name(&self) -> &str;
 
+    /// Return the backend's description
+    fn description(&self) -> &str;
+
     /// Login an account.
     async fn login(&self, username: &str, password: &str) -> BackendResult<AccountState>;
 
@@ -56,7 +59,7 @@ pub trait Backend: Send + Sync + Debug {
 /// Trait that needs to be implemented for all backend accounts
 #[cfg_attr(test, automock)]
 #[async_trait]
-pub trait Account: Send + Debug {
+pub trait Account: Send + Sync + Debug {
     /// Execute the code that will check whether new mail is available.
     async fn check(&mut self) -> BackendResult<NewEmailReply>;
 
@@ -70,7 +73,7 @@ pub trait Account: Send + Debug {
 /// Trait for accounts that require 2FA support
 #[cfg_attr(test, automock)]
 #[async_trait]
-pub trait AwaitTotp: Send + Debug {
+pub trait AwaitTotp: Send + Sync + Debug {
     /// Called when TOTP code will be submitted.
     async fn submit_totp(
         self: Box<Self>,
@@ -81,6 +84,6 @@ pub trait AwaitTotp: Send + Debug {
 /// Trait to refresh the accounts' login credentials.
 #[cfg_attr(test, automock)]
 #[async_trait]
-pub trait AuthRefresher {
+pub trait AuthRefresher: Send + Sync + Debug {
     async fn refresh(self: Box<Self>) -> Result<AccountState, BackendError>;
 }

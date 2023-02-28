@@ -11,6 +11,7 @@ readme = "README.md"
 default = ["proton-backend"]
 proton-backend = ["dep:proton-api-rs"]
 
+
 [dependencies]
 thiserror = "1"
 async-trait = "0.1"
@@ -21,6 +22,7 @@ serde = "1"
 secrecy = "0.8"
 
 [dependencies.proton-api-rs]
+path = "../../proton-api-rs"
 version = "0.1.2"
 optional = true
 

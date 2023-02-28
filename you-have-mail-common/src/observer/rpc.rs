@@ -12,7 +12,7 @@ pub enum ObserverRequest {
     Resume,
     GenConfig(
         Secret<EncryptionKey>,
-        Sender<Result<Box<[u8]>, ConfigStoreError>>,
+        Sender<Result<Vec<u8>, ConfigStoreError>>,
     ),
 }
 
@@ -71,9 +71,9 @@ impl ObserverPRC for AddAccountRequest {
 }
 
 #[doc(hidden)]
-pub struct GetAccountList {}
+pub struct GetAccountListRequest {}
 
-impl ObserverPRC for GetAccountList {
+impl ObserverPRC for GetAccountListRequest {
     type Output = Vec<ObserverAccount>;
     type Error = ObserverError;
     type SendFailedValue = ();
@@ -93,7 +93,7 @@ pub struct GenConfigRequest {
 }
 
 impl ObserverPRC for GenConfigRequest {
-    type Output = Box<[u8]>;
+    type Output = Vec<u8>;
     type Error = ConfigStoreError;
     type SendFailedValue = ();
 

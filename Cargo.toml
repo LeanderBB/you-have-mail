@@ -1,4 +1,5 @@
 [workspace]
 members = [
-    "you-have-mail-common"
+    "you-have-mail-common",
+    "you-have-mail-mobile",
 ]

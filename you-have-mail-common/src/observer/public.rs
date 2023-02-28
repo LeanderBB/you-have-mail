@@ -1,5 +1,6 @@
 use crate::observer::rpc::{
-    AddAccountRequest, GenConfigRequest, ObserverPRC, ObserverRequest, RemoveAccountRequest,
+    AddAccountRequest, GenConfigRequest, GetAccountListRequest, ObserverPRC, ObserverRequest,
+    RemoveAccountRequest,
 };
 use crate::observer::worker::Worker;
 use crate::{Account, AccountError, ConfigStoreError, EncryptionKey, Notifier};
@@ -89,6 +90,13 @@ impl Observer {
         (Self(Arc::new(sender)), task)
     }
 
+    /// Get the list of observed accounts and their status
+    pub async fn get_accounts(
+        &self,
+    ) -> Result<Vec<ObserverAccount>, ObserverRPCError<(), ObserverError>> {
+        self.perform_rpc(GetAccountListRequest {}).await
+    }
+
     /// Add a new account to be observed for new emails.
     pub async fn add_account(
         &self,
@@ -145,7 +153,7 @@ impl Observer {
     pub async fn generate_config(
         &self,
         key: Secret<EncryptionKey>,
-    ) -> Result<Box<[u8]>, ObserverRPCError<(), ConfigStoreError>> {
+    ) -> Result<Vec<u8>, ObserverRPCError<(), ConfigStoreError>> {
         self.perform_rpc(GenConfigRequest { key }).await
     }
 
