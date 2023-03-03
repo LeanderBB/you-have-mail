@@ -79,7 +79,7 @@ class MainActivity : ComponentActivity(), ServiceConnection {
         val binder = service as ObserverService.LocalBinder
 
         try {
-            mServiceState.setService(binder.getService().mService!!)
+            mServiceState.setService(binder.getService())
             mBound = true
         } catch (e: ServiceException) {
             Toast.makeText(this, "Failed to bind to service: $e", Toast.LENGTH_SHORT).show()

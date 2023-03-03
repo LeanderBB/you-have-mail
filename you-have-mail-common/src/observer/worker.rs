@@ -96,6 +96,7 @@ impl Worker {
                     .map(|(k, v)| ObserverAccount {
                         email: k.clone(),
                         status: v.status,
+                        backend : v.account.backend().name().to_string()
                     })
                     .collect::<Vec<_>>();
 

@@ -22,7 +22,7 @@ serde = "1"
 secrecy = "0.8"
 
 [dependencies.proton-api-rs]
-version = "0.1.3"
+version = "0.1.4"
 optional = true
 
 [dev-dependencies]

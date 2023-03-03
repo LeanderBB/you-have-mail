@@ -5,9 +5,20 @@
     <string name="add_account_title">Add Account</string>
     <string name="username">Username</string>
     <string name="password">Password</string>
+    <string name="account_login">Log into %1$s</string>
     <string name="login">Login</string>
+    <string name="submit">Submit</string>
     <string name="totp_title">TOTP</string>
     <string name="totp_request">Please type in TOTP verification code</string>
     <string name="account_add_success">Account Successfully added</string>
     <string name="backend_title">Select Backend</string>
+    <string name="login_to_account">Logging into %1$s</string>
+    <string name="status"><b>Status:</b> %1$s</string>
+    <string name="status_online">Online</string>
+    <string name="status_offline">Offline</string>
+    <string name="status_logged_out">Logged Out</string>
+    <string name="submitting_totp">Submitting TOTP</string>
+    <string name="logout">Logout</string>
+    <string name="delete_account">Delete Account</string>
+    <string name="account_title">Account Details</string>
 </resources>

@@ -16,6 +16,9 @@ class ObserverService : Service(), Notifier {
     private val binder = LocalBinder()
     private val notificationChannelId = "YOU_HAVE_MAIL_SERVICE"
 
+    // Have to keep this here or it won't survive activity refreshes
+    private var mInLoginAccount: Account? = null
+
     var mService: dev.lbeernaert.youhavemail.Service? = null
 
     inner class LocalBinder : Binder() {
@@ -66,6 +69,7 @@ class ObserverService : Service(), Notifier {
     override fun onDestroy() {
         super.onDestroy()
         mService?.destroy()
+        mInLoginAccount?.destroy()
         Log.d("The service has been destroyed")
     }
 
@@ -146,4 +150,16 @@ class ObserverService : Service(), Notifier {
         Log.e("Email $email suffered error:$error")
     }
 
+    fun setInLoginAccount(account: Account) {
+        mInLoginAccount?.destroy()
+        mInLoginAccount = account
+    }
+
+    fun getInLoginAccount(): Account? {
+        return mInLoginAccount
+    }
+
+    fun clearInLoginAccount() {
+        mInLoginAccount?.destroy()
+    }
 }

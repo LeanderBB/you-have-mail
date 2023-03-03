@@ -53,11 +53,14 @@ interface Account {
     boolean is_awaiting_totp();
 
     boolean is_logged_out();
+
+    string email();
 };
 
 interface ObserverAccount {
     string email();
     ObserverAccountState state();
+    string backend();
 };
 
 callback interface Notifier {

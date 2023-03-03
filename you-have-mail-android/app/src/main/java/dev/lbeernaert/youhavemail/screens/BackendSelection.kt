@@ -5,18 +5,16 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
-import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontStyle
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
+import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import dev.lbeernaert.youhavemail.Backend
 import dev.lbeernaert.youhavemail.Log
@@ -29,25 +27,21 @@ fun BackendSelection(serviceView: ServiceView, navController: NavController) {
         TopAppBar(title = {
             Text(text = stringResource(id = R.string.backend_title))
         },
-            navigationIcon = if (navController.previousBackStackEntry != null) {
-                {
-                    IconButton(onClick = {
-                        navController.popBackStack()
-                    }) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
+            navigationIcon =
+            {
+                IconButton(onClick = {
+                    navController.popBackStack()
+                }) {
+                    Icon(
+                        imageVector = Icons.Filled.ArrowBack,
+                        contentDescription = "Back"
+                    )
                 }
-            } else {
-                null
             }
         )
     },
         content = { _ ->
-            BackendList(backends = serviceView.getBackend(), onClicked = {
-                Log.e("INDEX=$it")
+            BackendList(backends = serviceView.getBackends(), onClicked = {
                 navController.navigate(Routes.newLoginRoute(it))
             })
         }
@@ -66,8 +60,8 @@ fun BackendListItem(backend: Backend, index: Int, onClicked: (Int) -> Unit) {
         Column(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
-                .size(40.dp)
-                .background(MaterialTheme.colors.primary, MaterialTheme.shapes.small),
+                .size(60.dp)
+                .background(MaterialTheme.colors.primary, MaterialTheme.shapes.large),
         ) {
             Text(
                 modifier = Modifier.fillMaxWidth(),
@@ -75,6 +69,7 @@ fun BackendListItem(backend: Backend, index: Int, onClicked: (Int) -> Unit) {
                 textAlign = TextAlign.Center,
                 style = MaterialTheme.typography.button,
                 fontWeight = FontWeight.Bold,
+                fontSize = 30.sp
             )
         }
         Spacer(modifier = Modifier.width(10.dp))

@@ -30,6 +30,7 @@ pub enum ObserverAccountStatus {
 pub struct ObserverAccount {
     pub email: String,
     pub status: ObserverAccountStatus,
+    pub backend: String,
 }
 
 /// Errors returned during observer RPC calls.

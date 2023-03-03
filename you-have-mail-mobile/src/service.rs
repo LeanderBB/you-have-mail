@@ -29,6 +29,9 @@ impl ObserverAccount {
     pub fn state(&self) -> ObserverAccountState {
         self.0.status
     }
+    pub fn backend(&self) -> String {
+        self.0.backend.clone()
+    }
 }
 
 pub struct Account {
@@ -37,6 +40,11 @@ pub struct Account {
 }
 
 impl Account {
+    pub fn email(&self) -> String {
+        let accessor = self.account.read().unwrap();
+        accessor.email().to_string()
+    }
+
     pub fn is_logged_in(&self) -> bool {
         self.account.read().unwrap().is_logged_in()
     }

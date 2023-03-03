@@ -1,13 +1,15 @@
 package dev.lbeernaert.youhavemail.screens
 
-import android.os.Parcelable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.runtime.*
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -27,28 +29,23 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
-
 @Composable
-fun Login(serviceView: ServiceView, navController: NavController, backendIndex: Int) {
-    val backend = serviceView.getBackends()[backendIndex]
+fun Totp(serviceView: ServiceView, navController: NavController) {
     val service = serviceView.getService()!!
-
-    var email = remember { mutableStateOf(TextFieldValue()) }
-    val password = remember { mutableStateOf(TextFieldValue()) }
+    val account = serviceView.getInLoginAccount()!!
+    val totp = remember { mutableStateOf(TextFieldValue()) }
     val openDialog = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
 
-    val onLoginClicked: () -> Unit = {
+    val onTotpClicked: () -> Unit = {
         openDialog.value = true;
-        var account = service.newAccount(backend, email.value.text)
-        serviceView.setInLoginAccount(account)
 
         coroutineScope.launch {
             val exception: ServiceException? = withContext(Dispatchers.IO) {
                 var exception: ServiceException? = null
                 try {
-                    account.login(password.value.text)
+                    account.submitTotp(totp.value.text)
                 } catch (e: ServiceException) {
                     exception = e
                 } finally {
@@ -59,20 +56,16 @@ fun Login(serviceView: ServiceView, navController: NavController, backendIndex: 
 
             when (exception) {
                 null -> {
-                    if (account.isAwaitingTotp()) {
-                        navController.navigate(Routes.TOTP.route)
-                    } else {
-                        try {
-                            service.addAccount(account)
-                        } catch (e: ServiceException) {
-                            Log.e(e.toString())
-                        } finally {
-                            serviceView.clearInLoginAccount()
-                        }
-
-                        serviceView.requiresAccountRefresh()
-                        navController.popBackStack(Routes.Main.route, false)
+                    try {
+                        service.addAccount(account)
+                    } catch (e: ServiceException) {
+                        Log.e(e.toString())
+                    } finally {
+                        serviceView.clearInLoginAccount()
                     }
+
+                    serviceView.requiresAccountRefresh()
+                    navController.popBackStack(Routes.Main.route, false)
                 }
                 else -> {
                     Log.e(exception.toString())
@@ -85,14 +78,13 @@ fun Login(serviceView: ServiceView, navController: NavController, backendIndex: 
     if (openDialog.value) {
         BackgroundTask(
             text = stringResource(
-                R.string.login_to_account,
-                email.value.text
+                R.string.submitting_totp
             )
         )
     } else {
         Scaffold(topBar = {
             TopAppBar(title = {
-                Text(text = stringResource(id = R.string.add_account_title))
+                Text(text = stringResource(id = R.string.totp_title))
             },
                 navigationIcon = {
                     IconButton(onClick = {
@@ -109,49 +101,34 @@ fun Login(serviceView: ServiceView, navController: NavController, backendIndex: 
             Column(
                 modifier = Modifier
                     .padding(padding)
-                    .padding(20.dp)
                     .fillMaxSize(),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally,
 
                 ) {
-                Text(text = stringResource(R.string.login_to_account, backend.name()))
+                Text(text = stringResource(R.string.totp_request))
 
                 Spacer(modifier = Modifier.height(20.dp))
 
                 TextField(
                     modifier = Modifier.fillMaxWidth(),
-                    label = { Text(text = "Email") },
-                    singleLine = true,
-                    value = email.value,
-                    onValueChange = { email.value = it },
-                    keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Email,
-                        imeAction = ImeAction.Next
-                    ),
-                )
-
-                Spacer(modifier = Modifier.height(20.dp))
-
-                TextField(
-                    modifier = Modifier.fillMaxWidth(),
-                    label = { Text(text = "Password") },
-                    value = password.value,
+                    label = { Text(text = "TOTP") },
+                    value = totp.value,
                     singleLine = true,
                     visualTransformation = PasswordVisualTransformation(),
                     keyboardOptions = KeyboardOptions(
-                        keyboardType = KeyboardType.Password,
+                        keyboardType = KeyboardType.Number,
                         imeAction = ImeAction.Done
                     ),
-                    onValueChange = { password.value = it },
+                    onValueChange = { totp.value = it },
                     keyboardActions = KeyboardActions(onDone = {
-                        onLoginClicked()
+                        onTotpClicked()
                     })
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                ActionButton(text = stringResource(id = R.string.login), onLoginClicked)
+                ActionButton(text = stringResource(id = R.string.submit), onTotpClicked)
             }
         }
     }
