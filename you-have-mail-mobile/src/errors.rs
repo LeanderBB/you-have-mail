@@ -7,6 +7,8 @@ use you_have_mail_common as yhm;
 pub enum ServiceError {
     #[error("RPC failed: {msg}")]
     RPCFailed { msg: String },
+    #[error("Account {email} not found")]
+    AccountNotFound { email: String },
     #[error("The account {email} is already active")]
     AccountAlreadyActive { email: String },
     #[error("The account can't complete this operation in its current state")]
@@ -72,6 +74,7 @@ impl From<yhm::ObserverError> for ServiceError {
             yhm::ObserverError::AccountAlreadyActive(a) => ServiceError::AccountAlreadyActive {
                 email: a.email().to_string(),
             },
+            yhm::ObserverError::NoSuchAccount(e) => ServiceError::AccountNotFound { email: e },
         }
     }
 }

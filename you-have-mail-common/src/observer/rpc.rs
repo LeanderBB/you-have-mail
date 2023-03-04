@@ -6,6 +6,7 @@ use secrecy::Secret;
 pub enum ObserverRequest {
     Exit,
     AddAccount(Account, Sender<Result<(), ObserverError>>),
+    LogoutAccount(String, Sender<Result<(), ObserverError>>),
     RemoveAccount(String, Sender<Result<(), ObserverError>>),
     GetAccounts(Sender<Result<Vec<ObserverAccount>, ObserverError>>),
     Pause,
@@ -43,6 +44,29 @@ impl ObserverPRC for RemoveAccountRequest {
     fn recover_send_value(r: ObserverRequest) -> Option<Self::SendFailedValue> {
         match r {
             ObserverRequest::RemoveAccount(s, _) => Some(s),
+            _ => None,
+        }
+    }
+}
+
+#[doc(hidden)]
+pub struct LogoutAccountRequest {
+    pub email: String,
+}
+
+#[doc(hidden)]
+impl ObserverPRC for LogoutAccountRequest {
+    type Output = ();
+    type Error = ObserverError;
+    type SendFailedValue = String;
+
+    fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
+        ObserverRequest::LogoutAccount(self.email, reply)
+    }
+
+    fn recover_send_value(r: ObserverRequest) -> Option<Self::SendFailedValue> {
+        match r {
+            ObserverRequest::LogoutAccount(s, _) => Some(s),
             _ => None,
         }
     }

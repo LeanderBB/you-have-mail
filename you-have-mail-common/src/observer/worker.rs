@@ -60,7 +60,17 @@ impl Worker {
         match request {
             ObserverRequest::AddAccount(account, reply) => {
                 let result = match self.accounts.entry(account.email().to_string()) {
-                    Entry::Occupied(_) => Err(ObserverError::AccountAlreadyActive(account)),
+                    Entry::Occupied(mut v) => {
+                        if v.get().status == ObserverAccountStatus::LoggedOut {
+                            v.insert(WorkerAccount {
+                                account,
+                                status: ObserverAccountStatus::Online,
+                            });
+                            Ok(())
+                        } else {
+                            Err(ObserverError::AccountAlreadyActive(account))
+                        }
+                    }
                     Entry::Vacant(v) => {
                         v.insert(WorkerAccount {
                             account,
@@ -68,6 +78,23 @@ impl Worker {
                         });
                         Ok(())
                     }
+                };
+
+                if reply.send(result).await.is_err() {
+                    error!("Failed to send reply for remove account request");
+                }
+
+                false
+            }
+            ObserverRequest::LogoutAccount(email, reply) => {
+                let result = if let Some(account) = self.accounts.get_mut(&email) {
+                    let r = account.account.logout().await.map_err(|e| e.into());
+                    if r.is_ok() {
+                        account.status = ObserverAccountStatus::LoggedOut;
+                    }
+                    r
+                } else {
+                    Err(ObserverError::NoSuchAccount(email))
                 };
 
                 if reply.send(result).await.is_err() {
@@ -96,7 +123,7 @@ impl Worker {
                     .map(|(k, v)| ObserverAccount {
                         email: k.clone(),
                         status: v.status,
-                        backend : v.account.backend().name().to_string()
+                        backend: v.account.backend().name().to_string(),
                     })
                     .collect::<Vec<_>>();
 

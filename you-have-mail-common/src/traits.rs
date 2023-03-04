@@ -13,3 +13,13 @@ pub trait Notifier: Send + Sync {
     /// Notifications for when account status changes.
     fn notify_error(&self, email: &str, error: AccountError);
 }
+
+/// All reports as consumed and ignored.
+#[derive(Copy, Clone)]
+pub struct NullNotifier {}
+
+impl Notifier for NullNotifier {
+    fn notify(&self, _: &Account, _: usize) {}
+
+    fn notify_error(&self, _: &str, _: AccountError) {}
+}

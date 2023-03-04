@@ -1,6 +1,6 @@
 use crate::observer::rpc::{
-    AddAccountRequest, GenConfigRequest, GetAccountListRequest, ObserverPRC, ObserverRequest,
-    RemoveAccountRequest,
+    AddAccountRequest, GenConfigRequest, GetAccountListRequest, LogoutAccountRequest, ObserverPRC,
+    ObserverRequest, RemoveAccountRequest,
 };
 use crate::observer::worker::Worker;
 use crate::{Account, AccountError, ConfigStoreError, EncryptionKey, Notifier};
@@ -53,6 +53,8 @@ pub enum ObserverError {
     AccountAlreadyActive(Account),
     #[error("{0}")]
     AccountError(#[from] AccountError),
+    #[error("Account {0} not found")]
+    NoSuchAccount(String),
     #[error("Unknown error occurred: {0}")]
     Unknown(
         #[from]
@@ -110,6 +112,17 @@ impl Observer {
         }
 
         self.perform_rpc(AddAccountRequest { account }).await
+    }
+
+    /// Logout an account, but do not remove it from the observer list
+    pub async fn logout_account<T: Into<String>>(
+        &self,
+        email: T,
+    ) -> Result<(), ObserverRPCError<String, ObserverError>> {
+        self.perform_rpc(LogoutAccountRequest {
+            email: email.into(),
+        })
+        .await
     }
 
     /// Remove an account with the following email from the observer list.
