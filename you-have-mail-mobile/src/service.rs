@@ -3,6 +3,7 @@
 use crate::{ConfigError, Notifier, NotifierWrapper, ServiceError, ServiceFromConfigCallback};
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use you_have_mail_common as yhm;
 use you_have_mail_common::ExposeSecret;
 
@@ -128,6 +129,12 @@ impl Service {
 
     pub fn logout_account(&self, email: String) -> Result<(), ServiceError> {
         self.runtime
+            .block_on(async { self.observer.logout_account(email).await })?;
+        Ok(())
+    }
+
+    pub fn remove_account(&self, email: String) -> Result<(), ServiceError> {
+        self.runtime
             .block_on(async { self.observer.remove_account(email).await })?;
         Ok(())
     }
@@ -217,11 +224,13 @@ fn get_backends() -> Vec<Arc<Backend>> {
                 email: "foo".to_string(),
                 password: "foo".to_string(),
                 totp: None,
+                wait_time: Some(Duration::from_secs(2)),
             },
             yhm::backend::null::NullTestAccount {
                 email: "bar".to_string(),
                 password: "bar".to_string(),
                 totp: Some("1234".to_string()),
+                wait_time: Some(Duration::from_secs(2)),
             },
         ]),
         yhm::backend::proton::new_backend("bride-linux@20.0.0+yhm"),

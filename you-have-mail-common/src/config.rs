@@ -152,11 +152,13 @@ async fn test_config_store_and_load() {
             email: "foo".to_string(),
             password: "foo".to_string(),
             totp: None,
+            wait_time: None,
         },
         crate::backend::null::NullTestAccount {
             email: "bar".to_string(),
             password: "bar".to_string(),
             totp: None,
+            wait_time: None,
         },
     ]);
 

@@ -91,6 +91,9 @@ interface Service {
     void logout_account(string email);
 
     [Throws=ServiceError]
+    void remove_account(string email);
+
+    [Throws=ServiceError]
     void pause();
 
     [Throws=ServiceError]

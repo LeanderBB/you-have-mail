@@ -12,6 +12,7 @@ async fn new_backend_and_account() -> (Arc<dyn Backend>, Account) {
         email: "foo".to_string(),
         password: "bar".to_string(),
         totp: None,
+        wait_time: None,
     };
     let backend = new_backend(&[accounts]);
     let mut account = Account::new(backend.clone(), "foo");

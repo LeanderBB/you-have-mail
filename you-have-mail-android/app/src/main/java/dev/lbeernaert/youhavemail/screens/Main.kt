@@ -26,6 +26,7 @@ import dev.lbeernaert.youhavemail.ObserverAccount
 import dev.lbeernaert.youhavemail.ObserverAccountState
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.ServiceView
+import dev.lbeernaert.youhavemail.components.BackgroundTask
 
 
 @Composable
@@ -137,52 +138,3 @@ fun ActiveAccount(account: ObserverAccount, index: Int, onClicked: (Int) -> Unit
 }
 
 
-@Composable
-fun MainNavController(service: ServiceView) {
-    val navController = rememberNavController()
-
-    NavHost(navController = navController, startDestination = Routes.Main.route) {
-        composable(
-            Routes.Login.route,
-            arguments = listOf(navArgument("backend") { type = NavType.IntType })
-        ) {
-            val backendIndex = it.arguments?.getInt("backend")
-            if (backendIndex == null) {
-                //TODO:
-            } else {
-                Login(
-                    serviceView = service,
-                    navController = navController,
-                    backendIndex = backendIndex
-                )
-            }
-        }
-        composable(Routes.TOTP.route) {
-            Totp(serviceView = service, navController = navController)
-        }
-        composable(Routes.Main.route) {
-            Main(service, navController)
-        }
-        composable(Routes.Backend.route) {
-            BackendSelection(serviceView = service, navController = navController)
-        }
-
-        composable(
-            Routes.Account.route,
-            arguments = listOf(navArgument("index") { type = NavType.IntType })
-        ) {
-            val accountIndex = it.arguments?.getInt("index")
-            if (accountIndex == null) {
-                //TODO:
-            } else {
-                AccountInfo(
-                    accountIndex = accountIndex,
-                    serviceView = service,
-                    onBackClicked = {
-                        navController.popBackStack(Routes.Main.route, false)
-                    }
-                )
-            }
-        }
-    }
-}

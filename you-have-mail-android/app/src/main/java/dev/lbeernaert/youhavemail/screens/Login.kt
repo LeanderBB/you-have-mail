@@ -1,14 +1,15 @@
 package dev.lbeernaert.youhavemail.screens
 
-import android.os.Parcelable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.runtime.*
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -17,66 +18,42 @@ import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
-import androidx.navigation.NavController
 import dev.lbeernaert.youhavemail.Log
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.ServiceException
-import dev.lbeernaert.youhavemail.ServiceView
 import dev.lbeernaert.youhavemail.components.ActionButton
-import kotlinx.coroutines.Dispatchers
+import dev.lbeernaert.youhavemail.components.BackgroundTask
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 
 @Composable
-fun Login(serviceView: ServiceView, navController: NavController, backendIndex: Int) {
-    val backend = serviceView.getBackends()[backendIndex]
-    val service = serviceView.getService()!!
+fun Login(
+    backendName: String,
+    onBackClicked: () -> Unit,
+    onLoginClicked: suspend (email: String, password: String) -> Unit
+) {
 
     var email = remember { mutableStateOf(TextFieldValue()) }
     val password = remember { mutableStateOf(TextFieldValue()) }
     val openDialog = remember { mutableStateOf(false) }
+    val scaffoldState = rememberScaffoldState()
     val coroutineScope = rememberCoroutineScope()
 
-
-    val onLoginClicked: () -> Unit = {
-        openDialog.value = true;
-        var account = service.newAccount(backend, email.value.text)
-        serviceView.setInLoginAccount(account)
-
+    val onClick: () -> Unit = {
         coroutineScope.launch {
-            val exception: ServiceException? = withContext(Dispatchers.IO) {
-                var exception: ServiceException? = null
-                try {
-                    account.login(password.value.text)
-                } catch (e: ServiceException) {
-                    exception = e
-                } finally {
-                    openDialog.value = false
+            openDialog.value = true;
+            try {
+                onLoginClicked(email.value.text, password.value.text)
+            } catch (err: ServiceException) {
+                Log.e(err.toString())
+                coroutineScope.launch {
+                    scaffoldState.snackbarHostState.showSnackbar(
+                        message = err.message.toString(),
+                        duration = SnackbarDuration.Short,
+                    )
                 }
-                exception
-            }
-
-            when (exception) {
-                null -> {
-                    if (account.isAwaitingTotp()) {
-                        navController.navigate(Routes.TOTP.route)
-                    } else {
-                        try {
-                            service.addAccount(account)
-                        } catch (e: ServiceException) {
-                            Log.e(e.toString())
-                        } finally {
-                            serviceView.clearInLoginAccount()
-                        }
-
-                        serviceView.requiresAccountRefresh()
-                        navController.popBackStack(Routes.Main.route, false)
-                    }
-                }
-                else -> {
-                    Log.e(exception.toString())
-                }
+            } finally {
+                openDialog.value = false
             }
         }
     }
@@ -90,21 +67,21 @@ fun Login(serviceView: ServiceView, navController: NavController, backendIndex: 
             )
         )
     } else {
-        Scaffold(topBar = {
-            TopAppBar(title = {
-                Text(text = stringResource(id = R.string.add_account_title))
-            },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        navController.popBackStack()
-                    }) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                })
-        }
+        Scaffold(
+            scaffoldState = scaffoldState,
+            topBar = {
+                TopAppBar(title = {
+                    Text(text = stringResource(id = R.string.add_account_title))
+                },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClicked) {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
+                    })
+            }
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -115,7 +92,7 @@ fun Login(serviceView: ServiceView, navController: NavController, backendIndex: 
                 horizontalAlignment = Alignment.CenterHorizontally,
 
                 ) {
-                Text(text = stringResource(R.string.login_to_account, backend.name()))
+                Text(text = stringResource(R.string.login_to_account, backendName))
 
                 Spacer(modifier = Modifier.height(20.dp))
 
@@ -145,13 +122,13 @@ fun Login(serviceView: ServiceView, navController: NavController, backendIndex: 
                     ),
                     onValueChange = { password.value = it },
                     keyboardActions = KeyboardActions(onDone = {
-                        onLoginClicked()
+                        onClick()
                     })
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                ActionButton(text = stringResource(id = R.string.login), onLoginClicked)
+                ActionButton(text = stringResource(id = R.string.login), onClick)
             }
         }
     }

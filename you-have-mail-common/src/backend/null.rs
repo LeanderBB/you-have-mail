@@ -5,10 +5,12 @@ use crate::backend::{
 use crate::AccountState;
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
+use proton_api_rs::tokio;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::sync::Arc;
+use std::time::Duration;
 
 #[doc(hidden)]
 #[derive(Debug, Clone)]
@@ -16,6 +18,7 @@ pub struct NullTestAccount {
     pub email: String,
     pub password: String,
     pub totp: Option<String>,
+    pub wait_time: Option<Duration>,
 }
 
 #[doc(hidden)]
@@ -35,6 +38,7 @@ struct NullBacked {
 #[derive(Debug)]
 struct NullAccount {
     email: String,
+    wait_time: Option<Duration>,
 }
 
 #[doc(hidden)]
@@ -42,6 +46,7 @@ struct NullAccount {
 struct NullAwaitTotp {
     email: String,
     totp: String,
+    wait_time: Option<Duration>,
 }
 
 #[doc(hidden)]
@@ -64,6 +69,10 @@ impl Backend for NullBacked {
 
     async fn login(&self, email: &str, password: &str) -> BackendResult<AccountState> {
         if let Some(account) = self.accounts.get(email) {
+            if let Some(d) = account.wait_time {
+                tokio::time::sleep(d).await;
+            }
+
             if account.password != password {
                 return Err(BackendError::Request(anyhow!(
                     "invalid user name or password"
@@ -74,10 +83,12 @@ impl Backend for NullBacked {
                 Ok(AccountState::AwaitingTotp(Box::new(NullAwaitTotp {
                     email: email.to_string(),
                     totp: totp.clone(),
+                    wait_time: account.wait_time,
                 })))
             } else {
                 Ok(AccountState::LoggedIn(Box::new(NullAccount {
                     email: email.to_string(),
+                    wait_time: account.wait_time,
                 })))
             };
         }
@@ -98,6 +109,7 @@ impl AuthRefresher for NullAuthRefresher {
     async fn refresh(self: Box<Self>) -> Result<AccountState, BackendError> {
         Ok(AccountState::LoggedIn(Box::new(NullAccount {
             email: self.email,
+            wait_time: None,
         })))
     }
 }
@@ -114,6 +126,9 @@ impl Account for NullAccount {
     }
 
     async fn logout(&mut self) -> BackendResult<()> {
+        if let Some(d) = self.wait_time {
+            tokio::time::sleep(d).await;
+        }
         Ok(())
     }
 
@@ -131,10 +146,17 @@ impl AwaitTotp for NullAwaitTotp {
         self: Box<NullAwaitTotp>,
         totp: &str,
     ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)> {
+        if let Some(d) = self.wait_time {
+            tokio::time::sleep(d).await;
+        }
+
         if self.totp != totp {
             return Err((self, BackendError::Request(anyhow!("Invalid totp"))));
         }
 
-        Ok(Box::new(NullAccount { email: self.email }))
+        Ok(Box::new(NullAccount {
+            email: self.email,
+            wait_time: self.wait_time,
+        }))
     }
 }

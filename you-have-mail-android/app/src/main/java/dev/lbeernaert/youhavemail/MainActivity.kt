@@ -13,9 +13,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Surface
-import androidx.compose.runtime.mutableStateOf
 import androidx.compose.ui.Modifier
-import dev.lbeernaert.youhavemail.screens.Main
 import dev.lbeernaert.youhavemail.screens.MainNavController
 import dev.lbeernaert.youhavemail.service.Actions
 import dev.lbeernaert.youhavemail.service.ObserverService
@@ -37,7 +35,7 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    MainNavController(service = mServiceState)
+                    MainNavController(serviceView = mServiceState)
                 }
             }
         }

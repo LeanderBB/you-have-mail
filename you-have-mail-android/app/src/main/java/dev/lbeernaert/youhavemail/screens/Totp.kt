@@ -6,11 +6,7 @@ import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.ArrowBack
-import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
-import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -25,78 +21,61 @@ import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.ServiceException
 import dev.lbeernaert.youhavemail.ServiceView
 import dev.lbeernaert.youhavemail.components.ActionButton
+import dev.lbeernaert.youhavemail.components.BackgroundTask
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.withContext
 
 @Composable
-fun Totp(serviceView: ServiceView, navController: NavController) {
-    val service = serviceView.getService()!!
-    val account = serviceView.getInLoginAccount()!!
+fun Totp(
+    onBackClicked: () -> Unit,
+    onTotpClicked: suspend (value: String) -> Unit
+) {
     val totp = remember { mutableStateOf(TextFieldValue()) }
+    val scaffoldState = rememberScaffoldState()
     val openDialog = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
 
-
-    val onTotpClicked: () -> Unit = {
-        openDialog.value = true;
-
+    val onClick: () -> Unit = {
         coroutineScope.launch {
-            val exception: ServiceException? = withContext(Dispatchers.IO) {
-                var exception: ServiceException? = null
-                try {
-                    account.submitTotp(totp.value.text)
-                } catch (e: ServiceException) {
-                    exception = e
-                } finally {
-                    openDialog.value = false
+            openDialog.value = true;
+            try {
+                onTotpClicked(totp.value.text)
+            } catch (err: ServiceException) {
+                openDialog.value = false
+                Log.e(err.toString())
+                coroutineScope.launch {
+                    scaffoldState.snackbarHostState.showSnackbar(
+                        message = err.message.toString(),
+                        duration = SnackbarDuration.Short,
+                    )
                 }
-                exception
-            }
-
-            when (exception) {
-                null -> {
-                    try {
-                        service.addAccount(account)
-                    } catch (e: ServiceException) {
-                        Log.e(e.toString())
-                    } finally {
-                        serviceView.clearInLoginAccount()
-                    }
-
-                    serviceView.requiresAccountRefresh()
-                    navController.popBackStack(Routes.Main.route, false)
-                }
-                else -> {
-                    Log.e(exception.toString())
-                }
+            } finally {
+                openDialog.value = false
             }
         }
     }
 
-
     if (openDialog.value) {
         BackgroundTask(
-            text = stringResource(
-                R.string.submitting_totp
-            )
+            text = stringResource(id = R.string.submitting_totp)
         )
     } else {
-        Scaffold(topBar = {
-            TopAppBar(title = {
-                Text(text = stringResource(id = R.string.totp_title))
-            },
-                navigationIcon = {
-                    IconButton(onClick = {
-                        navController.popBackStack()
-                    }) {
-                        Icon(
-                            imageVector = Icons.Filled.ArrowBack,
-                            contentDescription = "Back"
-                        )
-                    }
-                })
-        }
+        Scaffold(
+            scaffoldState = scaffoldState,
+            topBar = {
+                TopAppBar(title = {
+                    Text(text = stringResource(id = R.string.totp_title))
+                },
+                    navigationIcon = {
+                        IconButton(onClick = onBackClicked) {
+                            Icon(
+                                imageVector = Icons.Filled.ArrowBack,
+                                contentDescription = "Back"
+                            )
+                        }
+                    })
+            }
         ) { padding ->
             Column(
                 modifier = Modifier
@@ -122,13 +101,13 @@ fun Totp(serviceView: ServiceView, navController: NavController) {
                     ),
                     onValueChange = { totp.value = it },
                     keyboardActions = KeyboardActions(onDone = {
-                        onTotpClicked()
+                        onClick()
                     })
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                ActionButton(text = stringResource(id = R.string.submit), onTotpClicked)
+                ActionButton(text = stringResource(id = R.string.submit), onClick = onClick)
             }
         }
     }

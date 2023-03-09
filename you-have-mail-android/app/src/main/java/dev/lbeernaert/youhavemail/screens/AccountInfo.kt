@@ -8,79 +8,72 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.lbeernaert.youhavemail.*
+import dev.lbeernaert.youhavemail.Log
+import dev.lbeernaert.youhavemail.ObserverAccountState
 import dev.lbeernaert.youhavemail.R
+import dev.lbeernaert.youhavemail.ServiceException
 import dev.lbeernaert.youhavemail.components.ActionButton
-import kotlinx.coroutines.Dispatchers
+import dev.lbeernaert.youhavemail.components.BackgroundTask
 import kotlinx.coroutines.launch
-import kotlinx.coroutines.withContext
 
 
 @Composable
-fun AccountInfo(serviceView: ServiceView, accountIndex: Int, onBackClicked: () -> Unit) {
-    val accounts = serviceView.getAccounts()
-    if (accounts.size <= accountIndex) {
-        return
-    }
+fun AccountInfo(
+    accountEmail: String,
+    backendName: String,
+    accountState: ObserverAccountState,
+    onBackClicked: () -> Unit,
+    onLogout: suspend () -> Unit,
+    onLogin: () -> Unit,
+    onDelete: suspend () -> Unit,
+) {
 
-    val account = accounts[accountIndex]
-    val service = serviceView.getService()!!
-    val openDialog = rememberSaveable { mutableStateOf(false) }
+    val openDialog = remember { mutableStateOf(false) }
+    val accountState = remember { mutableStateOf(accountState) }
+    val scaffoldState = rememberScaffoldState()
     val coroutineScope = rememberCoroutineScope()
 
-    val onLogout: () -> Unit = {
+    val onLogoutImpl: () -> Unit = {
         coroutineScope.launch {
-            val exception: ServiceException? = withContext(Dispatchers.IO) {
-                var exception: ServiceException? = null
-                try {
-                    service.logoutAccount(account.email())
-                } catch (e: ServiceException) {
-                    exception = e
-                } finally {
-                    openDialog.value = false
+            openDialog.value = true
+            try {
+                onLogout()
+                accountState.value = ObserverAccountState.LOGGED_OUT
+            } catch (err: ServiceException) {
+                openDialog.value = false;
+                Log.e(err.toString())
+                coroutineScope.launch {
+                    scaffoldState.snackbarHostState.showSnackbar(
+                        message = err.message.toString(),
+                        duration = SnackbarDuration.Short,
+                    )
                 }
-                exception
-            }
-
-            when (exception) {
-                null -> {
-                    serviceView.requiresAccountRefresh()
-                    onBackClicked()
-                }
-                else -> {
-                    Log.e(exception.toString())
-                }
+            } finally {
+                openDialog.value = false
             }
         }
     }
 
-    val onDelete: () -> Unit = {
+    val onDeleteImpl: () -> Unit = {
         coroutineScope.launch {
-            val exception: ServiceException? = withContext(Dispatchers.IO) {
-                var exception: ServiceException? = null
-                try {
-                    service.logoutAccount(account.email())
-                } catch (e: ServiceException) {
-                    exception = e
-                } finally {
-                    openDialog.value = false
+            openDialog.value = true
+            try {
+                onDelete()
+            } catch (err: ServiceException) {
+                openDialog.value = false;
+                Log.e(err.toString())
+                coroutineScope.launch {
+                    scaffoldState.snackbarHostState.showSnackbar(
+                        message = err.message.toString(),
+                        duration = SnackbarDuration.Short,
+                    )
                 }
-                exception
-            }
-
-            when (exception) {
-                null -> {
-                    serviceView.requiresAccountRefresh()
-                    onBackClicked()
-                }
-                else -> {
-                    Log.e(exception.toString())
-                }
+            } finally {
+                openDialog.value = false
             }
         }
     }
@@ -88,7 +81,7 @@ fun AccountInfo(serviceView: ServiceView, accountIndex: Int, onBackClicked: () -
     if (openDialog.value) {
         BackgroundTask(
             text = stringResource(
-                R.string.submitting_totp
+                R.string.logging_out
             )
         )
     } else {
@@ -119,7 +112,7 @@ fun AccountInfo(serviceView: ServiceView, accountIndex: Int, onBackClicked: () -
                 ) {
 
                 Text(
-                    text = account.email(),
+                    text = accountEmail,
                     modifier = Modifier.fillMaxWidth(),
                     style = MaterialTheme.typography.h2,
                 )
@@ -127,13 +120,13 @@ fun AccountInfo(serviceView: ServiceView, accountIndex: Int, onBackClicked: () -
                 Spacer(modifier = Modifier.height(20.dp))
 
                 Text(
-                    text = account.backend(),
+                    text = backendName,
                     modifier = Modifier.fillMaxWidth()
                 )
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                val statusString = when (account.state()) {
+                val statusString = when (accountState.value) {
                     ObserverAccountState.OFFLINE -> stringResource(id = R.string.status_offline)
                     ObserverAccountState.LOGGED_OUT -> stringResource(id = R.string.status_logged_out)
                     ObserverAccountState.ONLINE -> stringResource(id = R.string.status_online)
@@ -145,15 +138,21 @@ fun AccountInfo(serviceView: ServiceView, accountIndex: Int, onBackClicked: () -
 
                 Spacer(modifier = Modifier.height(40.dp))
 
-                ActionButton(
-                    text = stringResource(id = R.string.logout),
-                    onLogout,
-                    enabled = account.state() != ObserverAccountState.LOGGED_OUT
-                )
+                if (accountState.value == ObserverAccountState.LOGGED_OUT) {
+                    ActionButton(
+                        text = stringResource(id = R.string.login),
+                        onClick = onLogin
+                    )
+                } else {
+                    ActionButton(
+                        text = stringResource(id = R.string.logout),
+                        onClick = onLogoutImpl,
+                    )
+                }
 
                 Spacer(modifier = Modifier.height(20.dp))
 
-                ActionButton(text = stringResource(id = R.string.delete_account), onDelete)
+                ActionButton(text = stringResource(id = R.string.delete_account), onDeleteImpl)
             }
         }
     }

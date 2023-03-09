@@ -19,6 +19,7 @@
     <string name="status_logged_out">Logged Out</string>
     <string name="submitting_totp">Submitting TOTP</string>
     <string name="logout">Logout</string>
+    <string name="logging_out">Logging Out</string>
     <string name="delete_account">Delete Account</string>
     <string name="account_title">Account Details</string>
 </resources>

@@ -1,4 +1,4 @@
-package dev.lbeernaert.youhavemail.screens
+package dev.lbeernaert.youhavemail.components
 
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.CircularProgressIndicator

@@ -9,12 +9,16 @@ import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
 import dev.lbeernaert.youhavemail.*
+import kotlinx.coroutines.*
 
 class ObserverService : Service(), Notifier {
     private var wakeLock: PowerManager.WakeLock? = null
     private var isServiceStarted = false
     private val binder = LocalBinder()
     private val notificationChannelId = "YOU_HAVE_MAIL_SERVICE"
+    private val coroutineScope = CoroutineScope(
+        SupervisorJob() + Dispatchers.IO
+    )
 
     // Have to keep this here or it won't survive activity refreshes
     private var mInLoginAccount: Account? = null
@@ -161,5 +165,12 @@ class ObserverService : Service(), Notifier {
 
     fun clearInLoginAccount() {
         mInLoginAccount?.destroy()
+    }
+
+    fun runServiceRequest(req: suspend (service: ObserverService) -> Unit) {
+        val self = this
+        coroutineScope.launch {
+            req(self)
+        }
     }
 }

@@ -1,7 +1,7 @@
 package dev.lbeernaert.youhavemail
 
-import androidx.lifecycle.ViewModel
 import dev.lbeernaert.youhavemail.service.ObserverService
+import kotlinx.coroutines.launch
 
 class ServiceView {
     private var mObserverService: ObserverService? = null
@@ -75,4 +75,7 @@ class ServiceView {
         mObserverService?.clearInLoginAccount()
     }
 
+    fun runServiceRequest(req: (service: ObserverService) -> Unit) {
+        return mObserverService!!.runServiceRequest(req)
+    }
 }
