@@ -27,7 +27,6 @@ fun MainNavController(serviceView: ServiceView) {
             val args = it.arguments
             val backendIndex = args?.getInt("backend")
             var accountEmail = args?.getString("email")!!
-            Log.i("EMAIL=$accountEmail")
             if (backendIndex == null) {
                 Log.e("No backend index selected, returning to main screen")
                 navController.popBackStack(Routes.Main.route, false)
@@ -111,9 +110,7 @@ fun MainNavController(serviceView: ServiceView) {
                         var foundBackend = false
                         for (b in backends.listIterator().withIndex()) {
                             if (b.value.name() == account.backend()) {
-                                val route = Routes.newLoginRoute(b.index, email)
-                                Log.e("ROUTE=${route}")
-                                navController.navigate(route)
+                                navController.navigate(Routes.newLoginRoute(b.index, email))
                                 foundBackend = true
                                 break
                             }
