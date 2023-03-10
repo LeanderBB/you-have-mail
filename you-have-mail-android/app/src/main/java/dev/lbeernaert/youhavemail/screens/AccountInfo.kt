@@ -36,6 +36,7 @@ fun AccountInfo(
         val onLogoutImpl: () -> Unit = {
             runTask(logOutBackgroundLabel) {
                 onLogout()
+                accountState.value = ObserverAccountState.LOGGED_OUT
             }
         }
 

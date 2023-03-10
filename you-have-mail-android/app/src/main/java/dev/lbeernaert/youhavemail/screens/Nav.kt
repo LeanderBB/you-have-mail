@@ -17,15 +17,24 @@ fun MainNavController(serviceView: ServiceView) {
     NavHost(navController = navController, startDestination = Routes.Main.route) {
         composable(
             Routes.Login.route,
-            arguments = listOf(navArgument("backend") { type = NavType.IntType })
+            arguments = listOf(
+                navArgument("backend") { type = NavType.IntType },
+                navArgument("email") {
+                    type = NavType.StringType
+                    defaultValue = ""
+                })
         ) {
-            val backendIndex = it.arguments?.getInt("backend")
+            val args = it.arguments
+            val backendIndex = args?.getInt("backend")
+            var accountEmail = args?.getString("email")!!
+            Log.i("EMAIL=$accountEmail")
             if (backendIndex == null) {
                 Log.e("No backend index selected, returning to main screen")
                 navController.popBackStack(Routes.Main.route, false)
             } else {
                 val backend = serviceView.getBackends()[backendIndex]
                 Login(
+                    accountEmail = accountEmail,
                     backendName = backend.name(),
                     onBackClicked = {
                         navController.popBackStack()
@@ -99,12 +108,19 @@ fun MainNavController(serviceView: ServiceView) {
                     },
                     onLogin = {
                         val backends = service.getBackends()
+                        var foundBackend = false
                         for (b in backends.listIterator().withIndex()) {
                             if (b.value.name() == account.backend()) {
-                                navController.navigate(Routes.newLoginRoute(b.index))
+                                val route = Routes.newLoginRoute(b.index, email)
+                                Log.e("ROUTE=${route}")
+                                navController.navigate(route)
+                                foundBackend = true
+                                break
                             }
                         }
-                        Log.e("Could not find backend named: ${account.backend()}")
+                        if (!foundBackend) {
+                            Log.e("Could not find backend named: ${account.backend()}")
+                        }
                     },
                     onDelete = {
                         withContext(Dispatchers.Default) {

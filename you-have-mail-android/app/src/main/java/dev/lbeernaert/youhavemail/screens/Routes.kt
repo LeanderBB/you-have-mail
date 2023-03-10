@@ -2,13 +2,17 @@ package dev.lbeernaert.youhavemail.screens
 
 sealed class Routes(val route: String) {
     object Account : Routes("Account/{index}")
-    object Login : Routes("Login/{backend}")
+    object Login : Routes("Login/{backend}?email={email}")
     object TOTP : Routes("TOTP")
     object Main : Routes("Main")
     object Backend : Routes("Backend")
 
     companion object {
-        fun newLoginRoute(backendIndex: Int): String {
+        fun newLoginRoute(backendIndex: Int, email: String?): String {
+            if (email != null) {
+                return "Login/$backendIndex?email=$email"
+            }
+
             return "Login/$backendIndex"
         }
 

@@ -23,10 +23,11 @@ import dev.lbeernaert.youhavemail.components.ActionButton
 @Composable
 fun Login(
     backendName: String,
+    accountEmail: String,
     onBackClicked: () -> Unit,
     onLoginClicked: suspend (email: String, password: String) -> Unit
 ) {
-    var email = remember { mutableStateOf(TextFieldValue()) }
+    var email = remember { mutableStateOf(TextFieldValue(accountEmail)) }
     val password = remember { mutableStateOf(TextFieldValue()) }
     val loginBackgroundLabel = stringResource(id = R.string.login_to_account, email.value.text)
 

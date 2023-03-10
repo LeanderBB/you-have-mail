@@ -42,7 +42,7 @@ fun BackendSelection(serviceView: ServiceView, navController: NavController) {
     },
         content = { _ ->
             BackendList(backends = serviceView.getBackends(), onClicked = {
-                navController.navigate(Routes.newLoginRoute(it))
+                navController.navigate(Routes.newLoginRoute(it, null))
             })
         }
     )
