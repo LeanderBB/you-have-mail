@@ -79,13 +79,17 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
             Routes.Account.route,
             arguments = listOf(navArgument("index") { type = NavType.IntType })
         ) {
-            val accounts = serviceWrapper.getAccounts()
             val accountIndex = it.arguments?.getInt("index")
-            if (accountIndex == null || accountIndex >= accounts.size) {
+            if (accountIndex == null) {
                 Log.e("No account index selected, returning to main screen")
                 navController.popBackStack(Routes.Main.route, false)
+            }
+
+            val account = serviceWrapper?.getAccount(accountIndex!!)
+            if (account == null) {
+                Log.e("Account not found, return to main screen")
+                navController.popBackStack(Routes.Main.route, false)
             } else {
-                val account = accounts[accountIndex]
                 val email = account.email
                 AccountInfo(
                     accountEmail = email,

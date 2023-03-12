@@ -31,4 +31,7 @@
     </string>
     <string name="cancel">Cancel</string>
     <string name="ok">Ok</string>
+    <string name="observer_alert">You Have Mail Alert</string>
+    <string name="alert_new_message">%1$s has %2$d new messages</string>
+    <string name="alert_error">%1$s encountered an error "%2$s"</string>
 </resources>

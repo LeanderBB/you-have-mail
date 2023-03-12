@@ -8,7 +8,13 @@ import android.graphics.Color
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
-import dev.lbeernaert.youhavemail.*;
+import dev.lbeernaert.youhavemail.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.cancel
+import kotlinx.coroutines.flow.MutableStateFlow
+import kotlinx.coroutines.flow.StateFlow
+import kotlinx.coroutines.launch
 
 class ObserverService : Service(), Notifier {
     private var wakeLock: PowerManager.WakeLock? = null
@@ -16,6 +22,13 @@ class ObserverService : Service(), Notifier {
     private val binder = LocalBinder()
     private val notificationChannelIdService = "YOU_HAVE_MAIL_SERVICE"
     private val notificationChannelIdAlerter = "YOU_HAVE_MAIL_NOTIFICATION"
+    private val coroutineScope = CoroutineScope(
+        Dispatchers.Default
+    )
+    private var _accountListFlow: MutableStateFlow<List<ObserverAccount>> =
+        MutableStateFlow(ArrayList())
+    val accountList: StateFlow<List<ObserverAccount>> get() = _accountListFlow
+
 
     // Have to keep this here or it won't survive activity refreshes
     private var mInLoginAccount: Account? = null
@@ -90,6 +103,7 @@ class ObserverService : Service(), Notifier {
 
     override fun onDestroy() {
         super.onDestroy()
+        coroutineScope.cancel()
         mInLoginAccount?.destroy()
         mBackends.forEach {
             it.destroy()
@@ -195,7 +209,7 @@ class ObserverService : Service(), Notifier {
 
         return builder
             .setContentTitle("You Have Mail")
-            .setContentText("Email $email has $messageCount new message(s)")
+            .setContentText("$email has $messageCount new message(s)")
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -216,7 +230,7 @@ class ObserverService : Service(), Notifier {
 
         return builder
             .setContentTitle("You Have Mail")
-            .setContentText("Email $email has encountered an error ${err.message}")
+            .setContentText("$email has encountered an error $err")
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -225,6 +239,7 @@ class ObserverService : Service(), Notifier {
     }
 
     override fun newEmail(account: String, backend: String, count: UInt) {
+        Log.d("New Mail: $account ($backend) num=$count")
         val notification = createAlertNotification(account, count)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
@@ -234,25 +249,49 @@ class ObserverService : Service(), Notifier {
     }
 
     override fun accountAdded(email: String) {
+        Log.d("Account added: $email")
+        updateAccountList()
     }
 
     override fun accountLoggedOut(email: String) {
+        Log.d("Account Logged Out: $email")
+        updateAccountList()
     }
 
     override fun accountRemoved(email: String) {
+        Log.d("Account Removed: $email")
+        updateAccountList()
     }
 
     override fun accountOffline(email: String) {
+        Log.d("Account Offline: $email")
+        updateAccountList()
     }
 
     override fun accountOnline(email: String) {
+        Log.d("Account Online: $email")
+        updateAccountList()
     }
 
     override fun accountError(email: String, error: ServiceException) {
+        Log.e("Account Error: $email => $error")
         val notification = createAccountErrorNotification(email, error)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
                 notify(1, notification)
+            }
+        }
+    }
+
+    private fun updateAccountList() {
+        coroutineScope.launch {
+            if (mService != null) {
+                try {
+                    val accounts = mService!!.getObservedAccounts()
+                    _accountListFlow.value = accounts
+                } catch (e: ServiceException) {
+                    Log.e("Failed to refresh account list")
+                }
             }
         }
     }

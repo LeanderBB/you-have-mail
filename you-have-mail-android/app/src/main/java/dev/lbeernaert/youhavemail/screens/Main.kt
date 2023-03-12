@@ -9,6 +9,8 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -20,13 +22,13 @@ import androidx.navigation.NavController
 import dev.lbeernaert.youhavemail.ObserverAccount
 import dev.lbeernaert.youhavemail.ObserverAccountStatus
 import dev.lbeernaert.youhavemail.R
-import dev.lbeernaert.youhavemail.service.ServiceWrapper
 import dev.lbeernaert.youhavemail.components.BackgroundTask
+import dev.lbeernaert.youhavemail.service.ServiceWrapper
 
 
 @Composable
-fun Main(service: ServiceWrapper?, navController: NavController, requestPermissions: () -> Unit) {
-    if (service == null) {
+fun Main(service: ServiceWrapper, navController: NavController, requestPermissions: () -> Unit) {
+    if (!service.isReady()) {
         BackgroundTask(text = stringResource(id = R.string.connecting_to_service))
     } else {
         AccountList(
@@ -44,7 +46,7 @@ fun AccountList(
     navController: NavController,
     requestPermissions: () -> Unit
 ) {
-    val accounts = service.getAccounts()
+    val accounts by service.getAccountsStateFlow().collectAsState()
 
     Scaffold(topBar = {
         TopAppBar(title = { Text(text = stringResource(id = R.string.app_name)) })

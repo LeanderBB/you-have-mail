@@ -1,51 +1,32 @@
 package dev.lbeernaert.youhavemail.service
 
-import dev.lbeernaert.youhavemail.Account
-import dev.lbeernaert.youhavemail.Backend
-import dev.lbeernaert.youhavemail.ObserverAccount
-import dev.lbeernaert.youhavemail.Service
+import dev.lbeernaert.youhavemail.*
+import kotlinx.coroutines.flow.StateFlow
 
 class ServiceWrapper {
     private var mObserverService: ObserverService? = null
     private var mService: Service? = null
-    private var mAccounts: ArrayList<ObserverAccount> = ArrayList()
-    private var mRefreshAccounts = false
+
+    fun isReady(): Boolean {
+        return mObserverService != null
+    }
 
     fun setService(service: ObserverService) {
         mObserverService = service
         mService = mObserverService!!.mService
-        mAccounts.addAll(mService!!.getObservedAccounts())
     }
 
     fun removeService() {
         mObserverService = null
         mService = null
-        clearAccounts()
     }
 
-    fun getAccounts(): List<ObserverAccount> {
-        refreshAccounts();
-        return mAccounts
+    fun getAccountsStateFlow(): StateFlow<List<ObserverAccount>> {
+        return mObserverService!!.accountList
     }
 
     fun getBackends(): List<Backend> {
         return mObserverService!!.getBackends()
-    }
-
-    private fun clearAccounts() {
-        mAccounts.clear()
-    }
-
-    private fun refreshAccounts() {
-        if (mRefreshAccounts) {
-            clearAccounts()
-
-            if (mService != null) {
-                mAccounts.addAll(mService!!.getObservedAccounts())
-            }
-
-            mRefreshAccounts = false
-        }
     }
 
     fun getInLoginAccount(): Account? {
@@ -60,17 +41,14 @@ class ServiceWrapper {
 
     fun addAccount(account: Account) {
         mService!!.addAccount(account)
-        mRefreshAccounts = true
     }
 
     fun logoutAccount(email: String) {
         mService!!.logoutAccount(email)
-        mRefreshAccounts = true
     }
 
     fun removeAccount(email: String) {
         mService!!.removeAccount(email)
-        mRefreshAccounts = true
     }
 
     fun backendIndexByName(name: String): Int? {
@@ -81,5 +59,19 @@ class ServiceWrapper {
         }
 
         return null
+    }
+
+    fun getAccount(index: Int): ObserverAccount? {
+        try {
+            val accounts = mService!!.getObservedAccounts()
+            if (index < accounts.size) {
+                return accounts[index]
+            }
+
+            return null
+        } catch (e: ServiceException) {
+            Log.e("Failed to get account by index: $e")
+            return null
+        }
     }
 }
