@@ -1,21 +1,29 @@
 package dev.lbeernaert.youhavemail.service
 
+import android.Manifest
 import android.app.*
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Binder
+import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
+import androidx.core.app.ActivityCompat
 import dev.lbeernaert.youhavemail.*
-import kotlinx.coroutines.*
+import kotlinx.coroutines.CoroutineScope
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.SupervisorJob
+import kotlinx.coroutines.launch
 
 class ObserverService : Service(), Notifier {
     private var wakeLock: PowerManager.WakeLock? = null
     private var isServiceStarted = false
     private val binder = LocalBinder()
-    private val notificationChannelId = "YOU_HAVE_MAIL_SERVICE"
+    private val notificationChannelIdService = "YOU_HAVE_MAIL_SERVICE"
+    private val notificationChannelIdAlerter = "YOU_HAVE_MAIL_NOTIFICATION"
     private val coroutineScope = CoroutineScope(
         SupervisorJob() + Dispatchers.IO
     )
@@ -112,18 +120,29 @@ class ObserverService : Service(), Notifier {
     private fun createNotificationChannel() {
         val notificationManager =
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
-        val channel = NotificationChannel(
-            notificationChannelId,
+        val channelService = NotificationChannel(
+            notificationChannelIdService,
             "You Have Mail Background Service",
+            NotificationManager.IMPORTANCE_LOW
+        ).let {
+            it.description = "You Have Mail Background Service"
+            it.enableLights(false)
+            it.enableVibration(false)
+            it
+        }
+        notificationManager.createNotificationChannel(channelService)
+        val channelAlerter = NotificationChannel(
+            notificationChannelIdAlerter,
+            "You Have Mail Alerter",
             NotificationManager.IMPORTANCE_HIGH
         ).let {
-            it.description = "You Have Mail Background Notifications"
+            it.description = "You Have Mail Notifications"
             it.enableLights(true)
-            it.lightColor = Color.RED
+            it.lightColor = Color.WHITE
             it.enableVibration(true)
             it
         }
-        notificationManager.createNotificationChannel(channel)
+        notificationManager.createNotificationChannel(channelAlerter)
     }
 
     private fun createServiceNotification(): Notification {
@@ -134,20 +153,60 @@ class ObserverService : Service(), Notifier {
 
         val builder: Notification.Builder = Notification.Builder(
             this,
-            notificationChannelId
+            notificationChannelIdService
         )
 
         return builder
             .setContentTitle("You Have Mail Service")
-            .setContentText("This is your favorite endless service working")
+            .setContentText("You have Mail Background Service")
             .setContentIntent(pendingIntent)
             .setSmallIcon(R.mipmap.ic_launcher)
-            .setTicker("Ticker text")
+            .setVisibility(Notification.VISIBILITY_SECRET)
+            .setCategory(Notification.CATEGORY_SERVICE)
+            .setOngoing(true)
+            .setTicker("You Have Mail Service")
+            .build()
+    }
+
+    private fun createAlertNotification(email: String, messageCount: ULong): Notification {
+        val pendingIntent: PendingIntent =
+            Intent(this, MainActivity::class.java).let { notificationIntent ->
+                PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
+            }
+
+        val builder: Notification.Builder = Notification.Builder(
+            this,
+            notificationChannelIdAlerter
+        )
+
+        return builder
+            .setContentTitle("You Have Mail")
+            .setContentText("Email $email has $messageCount new message(s)")
+            .setContentIntent(pendingIntent)
+            .setVisibility(Notification.VISIBILITY_SECRET)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setTicker("You Have Mail Alert")
             .build()
     }
 
     override fun notify(email: String, messageCount: ULong) {
-        Log.i("Email $email has $messageCount new message(s)")
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+            if (ActivityCompat.checkSelfPermission(
+                    this,
+                    Manifest.permission.POST_NOTIFICATIONS
+                ) != PackageManager.PERMISSION_GRANTED
+            ) {
+                Log.e("Notifications not granted")
+                return
+            }
+        }
+
+        val notification = createAlertNotification(email, messageCount)
+        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+            if (this.areNotificationsEnabled()) {
+                notify(1, notification)
+            }
+        }
     }
 
     override fun notifyError(email: String, error: ServiceException) {

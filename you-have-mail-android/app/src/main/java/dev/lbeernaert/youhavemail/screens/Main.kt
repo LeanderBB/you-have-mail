@@ -9,19 +9,14 @@ import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.runtime.Composable
-import androidx.navigation.compose.rememberNavController
-import androidx.navigation.compose.composable
-import androidx.navigation.compose.NavHost
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.unit.dp
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.style.TextAlign
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import androidx.navigation.NavType
-import androidx.navigation.navArgument
 import dev.lbeernaert.youhavemail.ObserverAccount
 import dev.lbeernaert.youhavemail.ObserverAccountState
 import dev.lbeernaert.youhavemail.R
@@ -30,17 +25,25 @@ import dev.lbeernaert.youhavemail.components.BackgroundTask
 
 
 @Composable
-fun Main(service: ServiceView?, navController: NavController) {
+fun Main(service: ServiceView?, navController: NavController, requestPermissions: () -> Unit) {
     if (service == null) {
         BackgroundTask(text = stringResource(id = R.string.connecting_to_service))
     } else {
-        AccountList(service = service, navController = navController)
+        AccountList(
+            service = service,
+            navController = navController,
+            requestPermissions = requestPermissions
+        )
     }
 }
 
 
 @Composable
-fun AccountList(service: ServiceView, navController: NavController) {
+fun AccountList(
+    service: ServiceView,
+    navController: NavController,
+    requestPermissions: () -> Unit
+) {
     val accounts = service.getAccounts()
 
     Scaffold(topBar = {
@@ -49,6 +52,7 @@ fun AccountList(service: ServiceView, navController: NavController) {
         floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {
             FloatingActionButton(onClick = {
+                requestPermissions()
                 navController.navigate(Routes.Backend.route)
             }) {
                 Icon(Icons.Filled.Add, "")

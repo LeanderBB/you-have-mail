@@ -1,19 +1,30 @@
 package dev.lbeernaert.youhavemail
 
+import android.Manifest
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.pm.PackageManager
+import android.net.Uri
 import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
+import android.provider.Settings
 import android.widget.Toast
 import androidx.activity.ComponentActivity
+import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
+import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.foundation.layout.*
+import androidx.compose.material.*
+import androidx.compose.runtime.*
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.unit.dp
+import androidx.core.content.ContextCompat
+import androidx.core.content.ContextCompat.startActivity
 import dev.lbeernaert.youhavemail.screens.MainNavController
 import dev.lbeernaert.youhavemail.service.Actions
 import dev.lbeernaert.youhavemail.service.ObserverService
@@ -25,6 +36,7 @@ class MainActivity : ComponentActivity(), ServiceConnection {
     private var mBound: Boolean = false
     private var mServiceState = ServiceView()
 
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         actionOnService(Actions.START)
@@ -35,7 +47,58 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                     modifier = Modifier.fillMaxSize(),
                     color = MaterialTheme.colors.background
                 ) {
-                    MainNavController(serviceView = mServiceState)
+
+                    val permissionOpenDialog = remember { mutableStateOf(false) }
+                    val rationalPermissionOpenDialog = remember { mutableStateOf(false) }
+
+                    if (permissionOpenDialog.value) {
+                        ShowSettingDialog(context = this, openDialog = permissionOpenDialog)
+                    }
+
+                    var hasNotificationPermission by remember {
+                        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                            mutableStateOf(
+                                ContextCompat.checkSelfPermission(
+                                    this,
+                                    Manifest.permission.POST_NOTIFICATIONS
+                                ) == PackageManager.PERMISSION_GRANTED
+                            )
+                        } else mutableStateOf(true)
+                    }
+
+                    val launcher = rememberLauncherForActivityResult(
+                        contract = ActivityResultContracts.RequestPermission(),
+                        onResult = { isGranted ->
+                            if (!isGranted) {
+                                Log.d("Notification permission not granted")
+                                if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
+                                    Log.d("Show request permission rational")
+                                    rationalPermissionOpenDialog.value = true
+                                } else {
+                                    Log.d("Show request permission")
+                                    permissionOpenDialog.value = true
+                                }
+                            } else {
+                                Log.d("Notification permission granted")
+                                hasNotificationPermission = isGranted
+                            }
+                        }
+                    )
+                    if (rationalPermissionOpenDialog.value) {
+                        ShowRationalPermissionDialog(openDialog = rationalPermissionOpenDialog) {
+                            rationalPermissionOpenDialog.value = false
+                            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
+                                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        }
+                    }
+
+
+                    MainNavController(serviceView = mServiceState, requestPermissions = {
+                        if (!hasNotificationPermission) {
+                            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                        }
+                    })
                 }
             }
         }
@@ -89,4 +152,90 @@ class MainActivity : ComponentActivity(), ServiceConnection {
         mBound = false
         mServiceState.removeService()
     }
+}
+
+@Composable
+fun ShowRationalPermissionDialog(openDialog: MutableState<Boolean>, onclick: () -> Unit) {
+    if (openDialog.value) {
+        AlertDialog(
+            onDismissRequest = {
+                openDialog.value = false
+            },
+            title = {
+                Text(text = stringResource(id = R.string.notification_permission))
+            },
+            text = {
+                Text(stringResource(id = R.string.notification_permission_text2))
+            },
+
+            buttons = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(
+                        onClick = {
+                            openDialog.value = false
+                        }
+                    ) {
+                        Text(stringResource(id = R.string.notification_permission))
+                    }
+                    Spacer(modifier = Modifier.width(20.dp))
+                    TextButton(
+                        onClick = onclick,
+                    ) {
+                        Text(stringResource(id = R.string.ok))
+                    }
+                }
+
+            },
+        )
+    }
+}
+
+@Composable
+fun ShowSettingDialog(context: Context, openDialog: MutableState<Boolean>) {
+    if (openDialog.value) {
+        AlertDialog(
+            onDismissRequest = {
+                openDialog.value = false
+            },
+            title = {
+                Text(text = stringResource(id = R.string.notification_permission))
+            },
+            text = {
+                Text(stringResource(id = R.string.notification_permission_text))
+            },
+
+            buttons = {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.End,
+                    verticalAlignment = Alignment.CenterVertically,
+                ) {
+                    TextButton(
+                        onClick = {
+                            openDialog.value = false
+                        }
+                    ) {
+                        Text(stringResource(id = R.string.cancel))
+                    }
+                    Spacer(modifier = Modifier.width(20.dp))
+                    TextButton(
+                        onClick = {
+                            openDialog.value = false
+                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                            intent.data = Uri.parse("package:${context.packageName}")
+                            startActivity(context, intent, Bundle())
+                        },
+                    ) {
+                        Text(stringResource(id = R.string.ok))
+                    }
+                }
+
+            },
+        )
+    }
+
 }

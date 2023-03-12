@@ -22,4 +22,13 @@
     <string name="logging_out">Logging Out</string>
     <string name="delete_account">Delete Account</string>
     <string name="account_title">Account Details</string>
+    <string name="notification_permission">Notification Permission</string>
+    <string name="notification_permission_text2">
+        Notification permission is required, to show notification.
+    </string>
+    <string name="notification_permission_text">
+        Notification permission is required, Please allow notification permission from settings.
+    </string>
+    <string name="cancel">Cancel</string>
+    <string name="ok">Ok</string>
 </resources>

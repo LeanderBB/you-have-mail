@@ -12,7 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun MainNavController(serviceView: ServiceView) {
+fun MainNavController(serviceView: ServiceView, requestPermissions: () -> Unit) {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = Routes.Main.route) {
         composable(
@@ -73,7 +73,7 @@ fun MainNavController(serviceView: ServiceView) {
             }, onTotpClicked = onTotpClicked)
         }
         composable(Routes.Main.route) {
-            Main(serviceView, navController)
+            Main(serviceView, navController, requestPermissions)
         }
         composable(Routes.Backend.route) {
             BackendSelection(serviceView = serviceView, navController = navController)
@@ -95,7 +95,7 @@ fun MainNavController(serviceView: ServiceView) {
                 AccountInfo(
                     accountEmail = email,
                     backendName = account.backend(),
-                    accountState = account.state(),
+                    accountStateIn = account.state(),
                     onBackClicked = {
                         navController.popBackStack(Routes.Main.route, false)
                     },

@@ -19,13 +19,13 @@ import dev.lbeernaert.youhavemail.components.ActionButton
 fun AccountInfo(
     accountEmail: String,
     backendName: String,
-    accountState: ObserverAccountState,
+    accountStateIn: ObserverAccountState,
     onBackClicked: () -> Unit,
     onLogout: suspend () -> Unit,
     onLogin: () -> Unit,
     onDelete: suspend () -> Unit,
 ) {
-    val accountState = remember { mutableStateOf(accountState) }
+    val accountState = remember { mutableStateOf(accountStateIn) }
 
     AsyncScreen(
         title = stringResource(id = R.string.account_title),
