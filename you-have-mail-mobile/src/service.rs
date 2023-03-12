@@ -7,7 +7,7 @@ use std::time::Duration;
 use you_have_mail_common as yhm;
 use you_have_mail_common::ExposeSecret;
 
-pub type ObserverAccountState = yhm::ObserverAccountStatus;
+pub type ObserverAccountStatus = yhm::ObserverAccountStatus;
 
 pub struct Backend(Arc<dyn yhm::backend::Backend>);
 
@@ -21,19 +21,7 @@ impl Backend {
     }
 }
 
-pub struct ObserverAccount(yhm::ObserverAccount);
-
-impl ObserverAccount {
-    pub fn email(&self) -> String {
-        self.0.email.clone()
-    }
-    pub fn state(&self) -> ObserverAccountState {
-        self.0.status
-    }
-    pub fn backend(&self) -> String {
-        self.0.backend.clone()
-    }
-}
+pub type ObserverAccount = yhm::ObserverAccount;
 
 pub struct Account {
     service: Arc<Service>,
@@ -105,15 +93,12 @@ impl Service {
         self.backends.clone()
     }
 
-    pub fn get_observed_accounts(&self) -> Result<Vec<Arc<ObserverAccount>>, ServiceError> {
+    pub fn get_observed_accounts(&self) -> Result<Vec<ObserverAccount>, ServiceError> {
         let accounts = self
             .runtime
             .block_on(async { self.observer.get_accounts().await })?;
 
-        Ok(accounts
-            .into_iter()
-            .map(|x| Arc::new(ObserverAccount(x)))
-            .collect())
+        Ok(accounts)
     }
 
     pub fn add_account(&self, account: Arc<Account>) -> Result<(), ServiceError> {

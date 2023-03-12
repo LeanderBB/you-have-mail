@@ -7,12 +7,12 @@ import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.lbeernaert.youhavemail.Log
-import dev.lbeernaert.youhavemail.ServiceView
+import dev.lbeernaert.youhavemail.service.ServiceWrapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
 
 @Composable
-fun MainNavController(serviceView: ServiceView, requestPermissions: () -> Unit) {
+fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> Unit) {
     val navController = rememberNavController()
     NavHost(navController = navController, startDestination = Routes.Main.route) {
         composable(
@@ -31,7 +31,7 @@ fun MainNavController(serviceView: ServiceView, requestPermissions: () -> Unit) 
                 Log.e("No backend index selected, returning to main screen")
                 navController.popBackStack(Routes.Main.route, false)
             } else {
-                val backend = serviceView.getBackends()[backendIndex]
+                val backend = serviceWrapper.getBackends()[backendIndex]
                 Login(
                     accountEmail = accountEmail,
                     backendName = backend.name(),
@@ -40,17 +40,14 @@ fun MainNavController(serviceView: ServiceView, requestPermissions: () -> Unit) 
                     },
                     onLoginClicked = { email, password ->
                         val account = withContext(Dispatchers.Default) {
-                            val service = serviceView.getService()!!
-                            var account = service.newAccount(backend, email)
-                            serviceView.setInLoginAccount(account)
+                            var account = serviceWrapper.newAccount(backend, email)
                             account.login(password)
                             account
                         }
                         if (account.isAwaitingTotp()) {
                             navController.navigate(Routes.TOTP.route)
                         } else {
-                            serviceView.getService()!!.addAccount(account)
-                            serviceView.requiresAccountRefresh()
+                            serviceWrapper.addAccount(account)
                             navController.popBackStack(Routes.Main.route, false)
                         }
                     }
@@ -61,10 +58,9 @@ fun MainNavController(serviceView: ServiceView, requestPermissions: () -> Unit) 
             val onTotpClicked: suspend (value: String) -> Unit =
                 { totp ->
                     withContext(Dispatchers.Default) {
-                        val account = serviceView.getInLoginAccount()!!
+                        val account = serviceWrapper.getInLoginAccount()!!
                         account.submitTotp(totp)
-                        serviceView.getService()!!.addAccount(account)
-                        serviceView.requiresAccountRefresh()
+                        serviceWrapper.addAccount(account)
                     }
                     navController.popBackStack(Routes.Main.route, false)
                 }
@@ -73,56 +69,47 @@ fun MainNavController(serviceView: ServiceView, requestPermissions: () -> Unit) 
             }, onTotpClicked = onTotpClicked)
         }
         composable(Routes.Main.route) {
-            Main(serviceView, navController, requestPermissions)
+            Main(serviceWrapper, navController, requestPermissions)
         }
         composable(Routes.Backend.route) {
-            BackendSelection(serviceView = serviceView, navController = navController)
+            BackendSelection(serviceWrapper = serviceWrapper, navController = navController)
         }
 
         composable(
             Routes.Account.route,
             arguments = listOf(navArgument("index") { type = NavType.IntType })
         ) {
-            val accounts = serviceView.getAccounts()
+            val accounts = serviceWrapper.getAccounts()
             val accountIndex = it.arguments?.getInt("index")
             if (accountIndex == null || accountIndex >= accounts.size) {
                 Log.e("No account index selected, returning to main screen")
                 navController.popBackStack(Routes.Main.route, false)
             } else {
                 val account = accounts[accountIndex]
-                val email = account.email()
-                val service = serviceView.getService()!!
+                val email = account.email
                 AccountInfo(
                     accountEmail = email,
-                    backendName = account.backend(),
-                    accountStateIn = account.state(),
+                    backendName = account.backend,
+                    accountStatus = account.status,
                     onBackClicked = {
                         navController.popBackStack(Routes.Main.route, false)
                     },
                     onLogout = {
                         withContext(Dispatchers.Default) {
-                            service.logoutAccount(email)
-                            serviceView.requiresAccountRefresh()
+                            serviceWrapper.logoutAccount(email)
                         }
                     },
                     onLogin = {
-                        val backends = service.getBackends()
-                        var foundBackend = false
-                        for (b in backends.listIterator().withIndex()) {
-                            if (b.value.name() == account.backend()) {
-                                navController.navigate(Routes.newLoginRoute(b.index, email))
-                                foundBackend = true
-                                break
-                            }
-                        }
-                        if (!foundBackend) {
-                            Log.e("Could not find backend named: ${account.backend()}")
+                        val backendIndex = serviceWrapper.backendIndexByName(account.backend)
+                        if (backendIndex != null) {
+                            navController.navigate(Routes.newLoginRoute(backendIndex, email))
+                        } else {
+                            Log.e("Could not find backend named: ${account.backend}")
                         }
                     },
                     onDelete = {
                         withContext(Dispatchers.Default) {
-                            service.removeAccount(email)
-                            serviceView.requiresAccountRefresh()
+                            serviceWrapper.removeAccount(email)
                         }
                         navController.popBackStack(Routes.Main.route, false)
                     }

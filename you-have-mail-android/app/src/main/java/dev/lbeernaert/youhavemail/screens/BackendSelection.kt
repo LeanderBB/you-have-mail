@@ -17,12 +17,11 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import dev.lbeernaert.youhavemail.Backend
-import dev.lbeernaert.youhavemail.Log
 import dev.lbeernaert.youhavemail.R
-import dev.lbeernaert.youhavemail.ServiceView
+import dev.lbeernaert.youhavemail.service.ServiceWrapper
 
 @Composable
-fun BackendSelection(serviceView: ServiceView, navController: NavController) {
+fun BackendSelection(serviceWrapper: ServiceWrapper, navController: NavController) {
     Scaffold(topBar = {
         TopAppBar(title = {
             Text(text = stringResource(id = R.string.backend_title))
@@ -41,7 +40,7 @@ fun BackendSelection(serviceView: ServiceView, navController: NavController) {
         )
     },
         content = { _ ->
-            BackendList(backends = serviceView.getBackends(), onClicked = {
+            BackendList(backends = serviceWrapper.getBackends(), onClicked = {
                 navController.navigate(Routes.newLoginRoute(it, null))
             })
         }

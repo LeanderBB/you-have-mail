@@ -18,14 +18,14 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import dev.lbeernaert.youhavemail.ObserverAccount
-import dev.lbeernaert.youhavemail.ObserverAccountState
+import dev.lbeernaert.youhavemail.ObserverAccountStatus
 import dev.lbeernaert.youhavemail.R
-import dev.lbeernaert.youhavemail.ServiceView
+import dev.lbeernaert.youhavemail.service.ServiceWrapper
 import dev.lbeernaert.youhavemail.components.BackgroundTask
 
 
 @Composable
-fun Main(service: ServiceView?, navController: NavController, requestPermissions: () -> Unit) {
+fun Main(service: ServiceWrapper?, navController: NavController, requestPermissions: () -> Unit) {
     if (service == null) {
         BackgroundTask(text = stringResource(id = R.string.connecting_to_service))
     } else {
@@ -40,7 +40,7 @@ fun Main(service: ServiceView?, navController: NavController, requestPermissions
 
 @Composable
 fun AccountList(
-    service: ServiceView,
+    service: ServiceWrapper,
     navController: NavController,
     requestPermissions: () -> Unit
 ) {
@@ -105,7 +105,7 @@ fun ActiveAccount(account: ObserverAccount, index: Int, onClicked: (Int) -> Unit
             .fillMaxWidth()
             .clickable { onClicked(index) },
     ) {
-        val email = account.email()
+        val email = account.email
         Column(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
@@ -128,10 +128,10 @@ fun ActiveAccount(account: ObserverAccount, index: Int, onClicked: (Int) -> Unit
                 style = MaterialTheme.typography.subtitle1,
                 fontWeight = FontWeight.Bold
             )
-            val statusString = when (account.state()) {
-                ObserverAccountState.OFFLINE -> stringResource(id = R.string.status_offline)
-                ObserverAccountState.LOGGED_OUT -> stringResource(id = R.string.status_logged_out)
-                ObserverAccountState.ONLINE -> stringResource(id = R.string.status_online)
+            val statusString = when (account.status) {
+                ObserverAccountStatus.OFFLINE -> stringResource(id = R.string.status_offline)
+                ObserverAccountStatus.LOGGED_OUT -> stringResource(id = R.string.status_logged_out)
+                ObserverAccountStatus.ONLINE -> stringResource(id = R.string.status_online)
             }
             Text(
                 text = stringResource(id = R.string.status, statusString),

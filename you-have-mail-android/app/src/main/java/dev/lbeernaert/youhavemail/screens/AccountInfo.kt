@@ -10,7 +10,7 @@ import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import dev.lbeernaert.youhavemail.ObserverAccountState
+import dev.lbeernaert.youhavemail.ObserverAccountStatus
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.ActionButton
 
@@ -19,13 +19,13 @@ import dev.lbeernaert.youhavemail.components.ActionButton
 fun AccountInfo(
     accountEmail: String,
     backendName: String,
-    accountStateIn: ObserverAccountState,
+    accountStatus: ObserverAccountStatus,
     onBackClicked: () -> Unit,
     onLogout: suspend () -> Unit,
     onLogin: () -> Unit,
     onDelete: suspend () -> Unit,
 ) {
-    val accountState = remember { mutableStateOf(accountStateIn) }
+    val accountState = remember { mutableStateOf(accountStatus) }
 
     AsyncScreen(
         title = stringResource(id = R.string.account_title),
@@ -36,7 +36,7 @@ fun AccountInfo(
         val onLogoutImpl: () -> Unit = {
             runTask(logOutBackgroundLabel) {
                 onLogout()
-                accountState.value = ObserverAccountState.LOGGED_OUT
+                accountState.value = ObserverAccountStatus.LOGGED_OUT
             }
         }
 
@@ -72,9 +72,9 @@ fun AccountInfo(
             Spacer(modifier = Modifier.height(20.dp))
 
             val statusString = when (accountState.value) {
-                ObserverAccountState.OFFLINE -> stringResource(id = R.string.status_offline)
-                ObserverAccountState.LOGGED_OUT -> stringResource(id = R.string.status_logged_out)
-                ObserverAccountState.ONLINE -> stringResource(id = R.string.status_online)
+                ObserverAccountStatus.OFFLINE -> stringResource(id = R.string.status_offline)
+                ObserverAccountStatus.LOGGED_OUT -> stringResource(id = R.string.status_logged_out)
+                ObserverAccountStatus.ONLINE -> stringResource(id = R.string.status_online)
             }
             Text(
                 text = stringResource(id = R.string.status, statusString),
@@ -83,7 +83,7 @@ fun AccountInfo(
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            if (accountState.value == ObserverAccountState.LOGGED_OUT) {
+            if (accountState.value == ObserverAccountStatus.LOGGED_OUT) {
                 ActionButton(
                     text = stringResource(id = R.string.login),
                     onClick = onLogin

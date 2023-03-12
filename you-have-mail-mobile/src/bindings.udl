@@ -28,7 +28,7 @@ interface ConfigError {
     RPCFailed(string msg);
 };
 
-enum ObserverAccountState {
+enum ObserverAccountStatus {
     "Offline",
     "LoggedOut",
     "Online",
@@ -58,10 +58,10 @@ interface Account {
     string email();
 };
 
-interface ObserverAccount {
-    string email();
-    ObserverAccountState state();
-    string backend();
+dictionary ObserverAccount {
+    string email;
+    ObserverAccountStatus status;
+    string backend;
 };
 
 callback interface Notifier {

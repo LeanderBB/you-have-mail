@@ -26,15 +26,12 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
 import dev.lbeernaert.youhavemail.screens.MainNavController
-import dev.lbeernaert.youhavemail.service.Actions
-import dev.lbeernaert.youhavemail.service.ObserverService
-import dev.lbeernaert.youhavemail.service.ServiceState
-import dev.lbeernaert.youhavemail.service.getServiceState
+import dev.lbeernaert.youhavemail.service.*
 import dev.lbeernaert.youhavemail.ui.theme.YouHaveMailTheme
 
 class MainActivity : ComponentActivity(), ServiceConnection {
     private var mBound: Boolean = false
-    private var mServiceState = ServiceView()
+    private var mServiceState = ServiceWrapper()
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -94,7 +91,7 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                     }
 
 
-                    MainNavController(serviceView = mServiceState, requestPermissions = {
+                    MainNavController(serviceWrapper = mServiceState, requestPermissions = {
                         if (!hasNotificationPermission) {
                             launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }

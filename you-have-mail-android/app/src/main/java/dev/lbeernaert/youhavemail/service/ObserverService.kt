@@ -13,10 +13,6 @@ import android.os.IBinder
 import android.os.PowerManager
 import androidx.core.app.ActivityCompat
 import dev.lbeernaert.youhavemail.*
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.SupervisorJob
-import kotlinx.coroutines.launch
 
 class ObserverService : Service(), Notifier {
     private var wakeLock: PowerManager.WakeLock? = null
@@ -24,12 +20,10 @@ class ObserverService : Service(), Notifier {
     private val binder = LocalBinder()
     private val notificationChannelIdService = "YOU_HAVE_MAIL_SERVICE"
     private val notificationChannelIdAlerter = "YOU_HAVE_MAIL_NOTIFICATION"
-    private val coroutineScope = CoroutineScope(
-        SupervisorJob() + Dispatchers.IO
-    )
 
     // Have to keep this here or it won't survive activity refreshes
     private var mInLoginAccount: Account? = null
+    private var mBackends: ArrayList<Backend> = ArrayList()
 
     var mService: dev.lbeernaert.youhavemail.Service? = null
 
@@ -46,6 +40,25 @@ class ObserverService : Service(), Notifier {
         Log.d("Some component unbound from the system")
         return super.onUnbind(intent)
     }
+
+
+    fun setInLoginAccount(account: Account) {
+        mInLoginAccount?.destroy()
+        mInLoginAccount = account
+    }
+
+    fun getInLoginAccount(): Account? {
+        return mInLoginAccount
+    }
+
+    fun clearInLoginAccount() {
+        mInLoginAccount?.destroy()
+    }
+
+    fun getBackends(): List<Backend> {
+        return mBackends
+    }
+
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d("onStartCommand executed with startId: $startId")
@@ -73,6 +86,7 @@ class ObserverService : Service(), Notifier {
         startForeground(1, createServiceNotification())
         try {
             mService = newService(this)
+            mBackends.addAll(mService!!.getBackends())
         } catch (e: ServiceException) {
             Log.e("Failed to create service:$e")
         }
@@ -80,8 +94,12 @@ class ObserverService : Service(), Notifier {
 
     override fun onDestroy() {
         super.onDestroy()
-        mService?.destroy()
         mInLoginAccount?.destroy()
+        mBackends.forEach {
+            it.destroy()
+        }
+        mBackends.clear()
+        mService?.destroy()
         Log.d("The service has been destroyed")
     }
 
@@ -211,25 +229,5 @@ class ObserverService : Service(), Notifier {
 
     override fun notifyError(email: String, error: ServiceException) {
         Log.e("Email $email suffered error:$error")
-    }
-
-    fun setInLoginAccount(account: Account) {
-        mInLoginAccount?.destroy()
-        mInLoginAccount = account
-    }
-
-    fun getInLoginAccount(): Account? {
-        return mInLoginAccount
-    }
-
-    fun clearInLoginAccount() {
-        mInLoginAccount?.destroy()
-    }
-
-    fun runServiceRequest(req: suspend (service: ObserverService) -> Unit) {
-        val self = this
-        coroutineScope.launch {
-            req(self)
-        }
     }
 }
