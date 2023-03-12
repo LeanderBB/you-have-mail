@@ -1,18 +1,14 @@
 package dev.lbeernaert.youhavemail.service
 
-import android.Manifest
 import android.app.*
 import android.app.Service
 import android.content.Context
 import android.content.Intent
-import android.content.pm.PackageManager
 import android.graphics.Color
 import android.os.Binder
-import android.os.Build
 import android.os.IBinder
 import android.os.PowerManager
-import androidx.core.app.ActivityCompat
-import dev.lbeernaert.youhavemail.*
+import dev.lbeernaert.youhavemail.*;
 
 class ObserverService : Service(), Notifier {
     private var wakeLock: PowerManager.WakeLock? = null
@@ -186,7 +182,7 @@ class ObserverService : Service(), Notifier {
             .build()
     }
 
-    private fun createAlertNotification(email: String, messageCount: ULong): Notification {
+    private fun createAlertNotification(email: String, messageCount: UInt): Notification {
         val pendingIntent: PendingIntent =
             Intent(this, MainActivity::class.java).let { notificationIntent ->
                 PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
@@ -207,19 +203,29 @@ class ObserverService : Service(), Notifier {
             .build()
     }
 
-    override fun notify(email: String, messageCount: ULong) {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.TIRAMISU) {
-            if (ActivityCompat.checkSelfPermission(
-                    this,
-                    Manifest.permission.POST_NOTIFICATIONS
-                ) != PackageManager.PERMISSION_GRANTED
-            ) {
-                Log.e("Notifications not granted")
-                return
+    private fun createAccountErrorNotification(email: String, err: ServiceException): Notification {
+        val pendingIntent: PendingIntent =
+            Intent(this, MainActivity::class.java).let { notificationIntent ->
+                PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
             }
-        }
 
-        val notification = createAlertNotification(email, messageCount)
+        val builder: Notification.Builder = Notification.Builder(
+            this,
+            notificationChannelIdAlerter
+        )
+
+        return builder
+            .setContentTitle("You Have Mail")
+            .setContentText("Email $email has encountered an error ${err.message}")
+            .setContentIntent(pendingIntent)
+            .setVisibility(Notification.VISIBILITY_SECRET)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setTicker("You Have Mail Alert")
+            .build()
+    }
+
+    override fun newEmail(account: String, backend: String, count: UInt) {
+        val notification = createAlertNotification(account, count)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
                 notify(1, notification)
@@ -227,7 +233,27 @@ class ObserverService : Service(), Notifier {
         }
     }
 
-    override fun notifyError(email: String, error: ServiceException) {
-        Log.e("Email $email suffered error:$error")
+    override fun accountAdded(email: String) {
+    }
+
+    override fun accountLoggedOut(email: String) {
+    }
+
+    override fun accountRemoved(email: String) {
+    }
+
+    override fun accountOffline(email: String) {
+    }
+
+    override fun accountOnline(email: String) {
+    }
+
+    override fun accountError(email: String, error: ServiceException) {
+        val notification = createAccountErrorNotification(email, error)
+        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+            if (this.areNotificationsEnabled()) {
+                notify(1, notification)
+            }
+        }
     }
 }

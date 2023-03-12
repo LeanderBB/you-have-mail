@@ -1,7 +1,8 @@
 use crate::backend::BackendError;
 use crate::observer::rpc::ObserverRequest;
 use crate::{
-    Account, AccountError, Config, Notifier, ObserverAccount, ObserverAccountStatus, ObserverError,
+    Account, AccountError, Config, Notification, Notifier, ObserverAccount, ObserverAccountStatus,
+    ObserverError,
 };
 use proton_api_rs::log::error;
 use proton_api_rs::tokio;
@@ -62,6 +63,8 @@ impl Worker {
                 let result = match self.accounts.entry(account.email().to_string()) {
                     Entry::Occupied(mut v) => {
                         if v.get().status == ObserverAccountStatus::LoggedOut {
+                            self.notifier
+                                .notify(Notification::AccountOnline(account.email()));
                             v.insert(WorkerAccount {
                                 account,
                                 status: ObserverAccountStatus::Online,
@@ -72,6 +75,8 @@ impl Worker {
                         }
                     }
                     Entry::Vacant(v) => {
+                        self.notifier
+                            .notify(Notification::AccountAdded(account.email()));
                         v.insert(WorkerAccount {
                             account,
                             status: ObserverAccountStatus::Online,
@@ -91,6 +96,7 @@ impl Worker {
                     let r = account.account.logout().await.map_err(|e| e.into());
                     if r.is_ok() {
                         account.status = ObserverAccountStatus::LoggedOut;
+                        self.notifier.notify(Notification::AccountLoggedOut(&email));
                     }
                     r
                 } else {
@@ -105,7 +111,11 @@ impl Worker {
             }
             ObserverRequest::RemoveAccount(email, reply) => {
                 let result = if let Some(mut account) = self.accounts.remove(&email) {
-                    account.account.logout().await
+                    let r = account.account.logout().await;
+                    if r.is_ok() {
+                        self.notifier.notify(Notification::AccountRemoved(&email));
+                    }
+                    r
                 } else {
                     Ok(())
                 };
@@ -162,7 +172,7 @@ impl Worker {
             return;
         }
 
-        for (email, wa) in &mut self.accounts {
+        for wa in &mut self.accounts.values_mut() {
             // Track logged out status if for some reason something slips through.
             if wa.account.is_logged_out() {
                 wa.status = ObserverAccountStatus::LoggedOut;
@@ -175,9 +185,17 @@ impl Worker {
 
             match wa.account.check().await {
                 Ok(check) => {
+                    if wa.status != ObserverAccountStatus::Online {
+                        self.notifier
+                            .notify(Notification::AccountOnline(wa.account.email()))
+                    }
                     wa.status = ObserverAccountStatus::Online;
                     if check.count > 0 {
-                        self.notifier.notify(&wa.account, check.count);
+                        self.notifier.notify(Notification::NewEmail {
+                            account: wa.account.email(),
+                            backend: wa.account.backend().name(),
+                            count: check.count,
+                        });
                     }
                 }
                 Err(e) => {
@@ -187,18 +205,23 @@ impl Worker {
                                 if wa.status == ObserverAccountStatus::LoggedOut {
                                     return;
                                 }
+                                self.notifier
+                                    .notify(Notification::AccountLoggedOut(wa.account.email()));
                                 wa.status = ObserverAccountStatus::LoggedOut;
                             }
                             BackendError::Offline => {
                                 if wa.status == ObserverAccountStatus::Offline {
                                     return;
                                 }
+                                self.notifier
+                                    .notify(Notification::AccountOffline(wa.account.email()));
                                 wa.status = ObserverAccountStatus::Offline;
                             }
-                            _ => {}
+                            _ => self
+                                .notifier
+                                .notify(Notification::AccountError(wa.account.email(), e)),
                         }
                     }
-                    self.notifier.notify_error(email, e);
                 }
             }
         }
@@ -230,7 +253,7 @@ async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequ
 mod tests {
     use crate::backend::{BackendError, MockAccount, NewEmailReply};
     use crate::observer::worker::Worker;
-    use crate::{Account, AccountError, AccountState, MockNotifier};
+    use crate::{Account, AccountState, MockNotifier, Notification};
     use mockall::Sequence;
     use proton_api_rs::tokio;
     use std::time::Duration;
@@ -239,8 +262,8 @@ mod tests {
     async fn worker_notifies_offline_only_once() {
         let mut notifier = MockNotifier::new();
         notifier
-            .expect_notify_error()
-            .withf(|_, e: &AccountError| e.is_offline())
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountOffline(_)))
             .times(1)
             .return_const(());
         let mut mock_account = MockAccount::new();
@@ -267,15 +290,25 @@ mod tests {
     #[tokio::test]
     async fn worker_notifies_offline_only_once_and_continues_once_account_comes_online() {
         let mut notifier = MockNotifier::new();
+
+        let mut notifier_sequence = Sequence::new();
         notifier
-            .expect_notify_error()
-            .withf(|_, e: &AccountError| e.is_offline())
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountOffline(_)))
             .times(1)
+            .in_sequence(&mut notifier_sequence)
             .return_const(());
         notifier
             .expect_notify()
-            .withf(|_, _| true)
+            .withf(|n| matches!(n, Notification::AccountOnline(_)))
             .times(1)
+            .in_sequence(&mut notifier_sequence)
+            .return_const(());
+        notifier
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::NewEmail { .. }))
+            .times(1)
+            .in_sequence(&mut notifier_sequence)
             .return_const(());
         let mut mock_account = MockAccount::new();
         let mut mock_sequence = Sequence::new();
@@ -309,8 +342,8 @@ mod tests {
     async fn worker_notifies_logged_out_only_once_and_continues_offline() {
         let mut notifier = MockNotifier::new();
         notifier
-            .expect_notify_error()
-            .withf(|_, e: &AccountError| e.is_logged_out())
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountLoggedOut(_)))
             .times(1)
             .return_const(());
         notifier.expect_notify().times(0).return_const(());

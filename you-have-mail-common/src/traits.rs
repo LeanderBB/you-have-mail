@@ -1,17 +1,38 @@
 //! Collection of Traits expected to be implemented by the respective application targets.
 
-use crate::{Account, AccountError};
+use crate::AccountError;
 #[cfg(test)]
 use mockall::automock;
+
+/// Notification issued to a [`Notifier`].
+#[derive(Debug)]
+pub enum Notification<'a> {
+    /// New email has arrived for an account.
+    NewEmail {
+        account: &'a str,
+        backend: &'a str,
+        count: usize,
+    },
+    /// A new account was recently added
+    AccountAdded(&'a str),
+    /// An account got logged out
+    AccountLoggedOut(&'a str),
+    /// An Account got removed
+    AccountRemoved(&'a str),
+    /// An Account went offline
+    AccountOffline(&'a str),
+    /// An Account went online
+    AccountOnline(&'a str),
+    /// An error occurred with an account
+    AccountError(&'a str, AccountError),
+}
 
 /// When an email has been received the notifier will be called.
 #[cfg_attr(test, automock)]
 pub trait Notifier: Send + Sync {
     /// The given account has received `email_count` new emails since the last check.
-    fn notify(&self, account: &Account, email_count: usize);
-
-    /// Notifications for when account status changes.
-    fn notify_error(&self, email: &str, error: AccountError);
+    #[allow(clippy::needless_lifetimes)] // Lifetime annotations required for automock.
+    fn notify<'a>(&self, notification: Notification<'a>);
 }
 
 /// All reports as consumed and ignored.
@@ -19,7 +40,5 @@ pub trait Notifier: Send + Sync {
 pub struct NullNotifier {}
 
 impl Notifier for NullNotifier {
-    fn notify(&self, _: &Account, _: usize) {}
-
-    fn notify_error(&self, _: &str, _: AccountError) {}
+    fn notify(&self, _: Notification) {}
 }

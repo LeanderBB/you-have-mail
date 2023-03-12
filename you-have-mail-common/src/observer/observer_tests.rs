@@ -1,7 +1,8 @@
 use crate::backend::null::{new_backend, NullTestAccount};
 use crate::backend::Backend;
-use crate::{Account, Notifier, ObserverBuilder};
+use crate::{Account, Notification, Notifier, ObserverBuilder};
 use crate::{MockNotifier, Observer};
+use mockall::Sequence;
 use proton_api_rs::tokio;
 use std::future::Future;
 use std::sync::Arc;
@@ -29,11 +30,23 @@ async fn notifier_called() {
     let mut notifier = MockNotifier::new();
     notifier
         .expect_notify()
-        .withf(|account: &Account, num: &usize| account.email() == "foo" && *num == 1)
+        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .times(1)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| {
+            matches!(
+                n,
+                Notification::NewEmail {
+                    account: "foo",
+                    count: 1,
+                    ..
+                }
+            )
+        })
         .times(1..)
         .return_const(());
-
-    notifier.expect_notify_error().times(0);
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
@@ -56,11 +69,23 @@ async fn paused_not_call_notifier() {
     let mut notifier = MockNotifier::new();
     notifier
         .expect_notify()
-        .withf(|account: &Account, num: &usize| account.email() == "foo" && *num == 1)
+        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .times(1)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| {
+            matches!(
+                n,
+                Notification::NewEmail {
+                    account: "foo",
+                    count: 1,
+                    ..
+                }
+            )
+        })
         .times(0)
         .return_const(());
-
-    notifier.expect_notify_error().times(0);
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
@@ -83,11 +108,23 @@ async fn resume_after_pause_calls_notifier() {
     let mut notifier = MockNotifier::new();
     notifier
         .expect_notify()
-        .withf(|account: &Account, num: &usize| account.email() == "foo" && *num == 1)
+        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .times(1)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| {
+            matches!(
+                n,
+                Notification::NewEmail {
+                    account: "foo",
+                    count: 1,
+                    ..
+                }
+            )
+        })
         .times(1..)
         .return_const(());
-
-    notifier.expect_notify_error().times(0);
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
@@ -113,11 +150,23 @@ async fn adding_account_with_same_email_twice_is_error() {
     let mut notifier = MockNotifier::new();
     notifier
         .expect_notify()
-        .withf(|account: &Account, num: &usize| account.email() == "foo" && *num == 1)
+        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .times(1)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| {
+            matches!(
+                n,
+                Notification::NewEmail {
+                    account: "foo",
+                    count: 1,
+                    ..
+                }
+            )
+        })
         .times(..)
         .return_const(());
-
-    notifier.expect_notify_error().times(0);
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
@@ -138,13 +187,39 @@ async fn adding_account_after_logout_works() {
     let (_, account2) = new_backend_and_account().await;
 
     let mut notifier = MockNotifier::new();
+    let mut sequence = Sequence::new();
     notifier
         .expect_notify()
-        .withf(|account: &Account, num: &usize| account.email() == "foo" && *num == 1)
-        .times(..)
+        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .times(1)
+        .in_sequence(&mut sequence)
         .return_const(());
-
-    notifier.expect_notify_error().times(0);
+    notifier
+        .expect_notify()
+        .withf(|n| matches!(n, Notification::AccountLoggedOut(_)))
+        .times(1)
+        .in_sequence(&mut sequence)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| matches!(n, Notification::AccountOnline(_)))
+        .times(1)
+        .in_sequence(&mut sequence)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| {
+            matches!(
+                n,
+                Notification::NewEmail {
+                    account: "foo",
+                    count: 1,
+                    ..
+                }
+            )
+        })
+        .times(1..)
+        .return_const(());
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
@@ -156,6 +231,38 @@ async fn adding_account_after_logout_works() {
             observer.logout_account("foo").await.unwrap();
             observer.add_account(account2).await.unwrap();
             tokio::time::sleep(Duration::from_secs(1)).await;
+        },
+    )
+    .await;
+}
+
+#[tokio::test]
+async fn removing_account_produces_remove_notification() {
+    let (_, account) = new_backend_and_account().await;
+
+    let mut notifier = MockNotifier::new();
+    let mut sequence = Sequence::new();
+    notifier
+        .expect_notify()
+        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .times(1)
+        .in_sequence(&mut sequence)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| matches!(n, Notification::AccountRemoved(_)))
+        .times(1)
+        .in_sequence(&mut sequence)
+        .return_const(());
+
+    let notifier: Box<dyn Notifier> = Box::new(notifier);
+
+    with_observer(
+        Duration::from_millis(10),
+        notifier,
+        move |observer| async move {
+            observer.add_account(account).await.unwrap();
+            observer.remove_account("foo").await.unwrap();
         },
     )
     .await;

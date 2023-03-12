@@ -7,7 +7,7 @@ use std::sync::Arc;
 use std::time::Duration;
 use you_have_mail_common::backend::Backend;
 use you_have_mail_common::{
-    Account, AccountError, Config, ConfigAccount, EncryptionKey, Notifier, ObserverBuilder,
+    Account, Config, ConfigAccount, EncryptionKey, Notification, Notifier, ObserverBuilder,
 };
 
 #[cfg(feature = "proton-backend")]
@@ -29,15 +29,8 @@ fn new_backed() -> Arc<dyn Backend> {
 struct StdOutNotifier {}
 
 impl Notifier for StdOutNotifier {
-    fn notify(&self, account: &Account, email_count: usize) {
-        println!(
-            "Account '{}' has {email_count} new message(s)",
-            account.email()
-        );
-    }
-
-    fn notify_error(&self, email: &str, error: AccountError) {
-        eprintln!("Account '{email}' encounter an error {error}");
+    fn notify<'a>(&self, notification: Notification) {
+        println!("{:?}", notification);
     }
 }
 

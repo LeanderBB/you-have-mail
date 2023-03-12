@@ -65,9 +65,13 @@ dictionary ObserverAccount {
 };
 
 callback interface Notifier {
-    void notify(string email, u64 message_count);
-
-    void notify_error(string email, ServiceError error);
+    void new_email (string account, string backend, u32 count);
+    void account_added(string email);
+    void account_logged_out(string email);
+    void account_removed(string email);
+    void account_offline(string email);
+    void account_online(string email);
+    void account_error(string email, ServiceError error);
 };
 
 callback interface ServiceFromConfigCallback {
