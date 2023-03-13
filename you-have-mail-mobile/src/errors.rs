@@ -124,22 +124,20 @@ impl From<yhm::ConfigLoadError> for ConfigError {
                 backend,
                 error: error.to_string(),
             },
-            yhm::ConfigLoadError::Decryption(e) => ConfigError::Crypto { msg: e.to_string() },
             yhm::ConfigLoadError::JSON(e) => ConfigError::JSON { msg: e.to_string() },
         }
     }
 }
 
-impl From<yhm::ConfigStoreError> for ConfigError {
-    fn from(value: yhm::ConfigStoreError) -> Self {
+impl From<yhm::ConfigGenError> for ConfigError {
+    fn from(value: yhm::ConfigGenError) -> Self {
         match value {
-            yhm::ConfigStoreError::BackendConfig { account, error } => ConfigError::BackendConfig {
+            yhm::ConfigGenError::BackendConfig { account, error } => ConfigError::BackendConfig {
                 account,
                 backend: String::new(),
                 error: error.to_string(),
             },
-            yhm::ConfigStoreError::Encryption(e) => ConfigError::Crypto { msg: e.to_string() },
-            yhm::ConfigStoreError::JSON(e) => ConfigError::JSON { msg: e.to_string() },
+            yhm::ConfigGenError::JSON(e) => ConfigError::JSON { msg: e.to_string() },
         }
     }
 }

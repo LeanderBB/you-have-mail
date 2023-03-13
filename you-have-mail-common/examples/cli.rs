@@ -7,7 +7,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use you_have_mail_common::backend::Backend;
 use you_have_mail_common::{
-    Account, Config, ConfigAccount, EncryptionKey, Notification, Notifier, ObserverBuilder,
+    Account, Config, ConfigAccount, DefaultEncryption, Encryption, EncryptionKey, Notification,
+    Notifier, ObserverBuilder,
 };
 
 #[cfg(feature = "proton-backend")]
@@ -37,10 +38,9 @@ impl Notifier for StdOutNotifier {
 #[tokio::main(worker_threads = 1)]
 async fn main() {
     let encryption_key = get_or_create_encryption_key();
+    let encryptor = DefaultEncryption::new(encryption_key);
     let backend = new_backed();
-    let accounts = if let Some(accounts) =
-        load_config(encryption_key.expose_secret(), &[backend.clone()]).await
-    {
+    let accounts = if let Some(accounts) = load_config(&encryptor, &[backend.clone()]).await {
         println!("Previous accounts detected");
         let mut result = Vec::with_capacity(accounts.len());
         for (mut a, refresher) in accounts {
@@ -96,8 +96,8 @@ async fn main() {
     tokio::signal::ctrl_c().await.unwrap();
 
     println!("Saving observer state");
-    let config = observer.generate_config(encryption_key).await.unwrap();
-    write_config_file(&config).await;
+    let config = observer.generate_config().await.unwrap();
+    write_config_file(&encryptor, config.as_bytes()).await;
 
     h.abort();
     let _ = h.await;
@@ -105,11 +105,13 @@ async fn main() {
 }
 
 async fn load_config(
-    key: &EncryptionKey,
+    decryptor: &DefaultEncryption,
     backends: &[Arc<dyn Backend>],
 ) -> Option<Vec<ConfigAccount>> {
     if let Some(bytes) = load_config_file().await {
-        return Some(Config::load(key, &backends, &bytes).unwrap());
+        let decrypted = decryptor.decrypt(&bytes).unwrap();
+
+        return Some(Config::load(&backends, &decrypted).unwrap());
     }
     None
 }
@@ -152,9 +154,10 @@ async fn load_config_file() -> Option<Vec<u8>> {
     }
 }
 
-async fn write_config_file(data: &[u8]) {
+async fn write_config_file(encryptor: &DefaultEncryption, data: &[u8]) {
+    let encrypted = encryptor.encrypt(data).unwrap();
     let config_path = get_config_file_dir();
     tokio::fs::create_dir_all(&config_path).await.unwrap();
     let config_file = config_path.join(CONFIG_FILE_NAME);
-    tokio::fs::write(config_file, data).await.unwrap();
+    tokio::fs::write(config_file, &encrypted).await.unwrap();
 }

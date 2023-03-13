@@ -1,6 +1,5 @@
 use crate::backend::{AuthRefresher, Backend};
-use crate::encryption::{decrypt, encrypt};
-use crate::{Account, EncryptionKey};
+use crate::Account;
 use anyhow::anyhow;
 use proton_api_rs::tokio;
 use serde::{Deserialize, Serialize};
@@ -24,21 +23,17 @@ pub enum ConfigLoadError {
         backend: String,
         error: anyhow::Error,
     },
-    #[error("An decryption occurred: {0}")]
-    Decryption(#[source] anyhow::Error),
     #[error("A JSON deserialization error occurred: {0}")]
     JSON(#[source] anyhow::Error),
 }
 
 #[derive(Debug, Error)]
-pub enum ConfigStoreError {
+pub enum ConfigGenError {
     #[error("An error occurred while serializing auth info account '{account}'")]
     BackendConfig {
         account: String,
         error: anyhow::Error,
     },
-    #[error("An encryption occurred: {0}")]
-    Encryption(#[source] anyhow::Error),
     #[error("A JSON serialization error occurred: {0}")]
     JSON(#[source] anyhow::Error),
 }
@@ -47,12 +42,10 @@ pub type ConfigAccount = (Account, Option<Box<dyn AuthRefresher>>);
 
 impl Config {
     pub fn load(
-        key: &EncryptionKey,
         backends: &[Arc<dyn Backend>],
         data: &[u8],
     ) -> Result<Vec<ConfigAccount>, ConfigLoadError> {
-        let decrypted = decrypt(key, data).map_err(ConfigLoadError::Decryption)?;
-        let config = serde_json::from_slice::<ConfigJSON>(decrypted.as_ref())
+        let config = serde_json::from_slice::<ConfigJSON>(data)
             .map_err(|e| ConfigLoadError::JSON(anyhow!(e)))?;
 
         let mut result = Vec::with_capacity(config.accounts.len());
@@ -95,16 +88,15 @@ impl Config {
     }
 
     pub fn store<'a>(
-        key: &EncryptionKey,
         accounts: impl Iterator<Item = &'a Account>,
-    ) -> Result<Vec<u8>, ConfigStoreError> {
+    ) -> Result<String, ConfigGenError> {
         let mut json_accounts = Vec::<ConfigJSONAccount>::new();
 
         for account in accounts {
             let value = if account.is_logged_in() {
                 let account_impl = account.get_impl().unwrap();
                 Some(account_impl.auth_refresher_config().map_err(|e| {
-                    ConfigStoreError::BackendConfig {
+                    ConfigGenError::BackendConfig {
                         account: account.email().to_string(),
                         error: anyhow!(e),
                     }
@@ -124,10 +116,7 @@ impl Config {
             accounts: json_accounts,
         };
 
-        let json =
-            serde_json::to_vec(&config_json).map_err(|e| ConfigStoreError::JSON(anyhow!(e)))?;
-
-        encrypt(key, &json).map_err(ConfigStoreError::Encryption)
+        serde_json::to_string(&config_json).map_err(|e| ConfigGenError::JSON(anyhow!(e)))
     }
 }
 
@@ -145,8 +134,6 @@ struct ConfigJSON {
 
 #[tokio::test]
 async fn test_config_store_and_load() {
-    use secrecy::ExposeSecret;
-
     let null_backed = crate::backend::null::new_backend(&[
         crate::backend::null::NullTestAccount {
             email: "foo".to_string(),
@@ -162,7 +149,6 @@ async fn test_config_store_and_load() {
         },
     ]);
 
-    let key = EncryptionKey::new();
     let account1 = {
         let mut a = Account::new(null_backed.clone(), "foo");
         a.login("foo").await.unwrap();
@@ -170,9 +156,9 @@ async fn test_config_store_and_load() {
     };
     let account2 = Account::new(null_backed.clone(), "bar");
 
-    let config_encrypted = Config::store(key.expose_secret(), [account1, account2].iter()).unwrap();
+    let config_encrypted = Config::store([account1, account2].iter()).unwrap();
 
-    let accounts = Config::load(key.expose_secret(), &[null_backed], &config_encrypted).unwrap();
+    let accounts = Config::load(&[null_backed], config_encrypted.as_bytes()).unwrap();
 
     assert_eq!(accounts.len(), 2);
     assert_eq!(accounts[0].0.email(), "foo");

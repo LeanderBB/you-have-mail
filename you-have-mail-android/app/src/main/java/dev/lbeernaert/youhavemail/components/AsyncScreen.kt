@@ -63,7 +63,7 @@ fun AsyncScreen(
                         Log.e(err.toString())
                         coroutineScope.launch {
                             scaffoldState.snackbarHostState.showSnackbar(
-                                message = err.message.toString(),
+                                message = err.toString(),
                                 duration = SnackbarDuration.Short,
                             )
                         }

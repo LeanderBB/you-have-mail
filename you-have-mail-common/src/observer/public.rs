@@ -3,9 +3,8 @@ use crate::observer::rpc::{
     ObserverRequest, RemoveAccountRequest,
 };
 use crate::observer::worker::Worker;
-use crate::{Account, AccountError, ConfigStoreError, EncryptionKey, Notifier};
+use crate::{Account, AccountError, ConfigGenError, Notifier};
 use proton_api_rs::tokio::sync::mpsc::Sender;
-use secrecy::Secret;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -164,11 +163,8 @@ impl Observer {
     }
 
     /// Generate configuration data for the currently active account list.
-    pub async fn generate_config(
-        &self,
-        key: Secret<EncryptionKey>,
-    ) -> Result<Vec<u8>, ObserverRPCError<(), ConfigStoreError>> {
-        self.perform_rpc(GenConfigRequest { key }).await
+    pub async fn generate_config(&self) -> Result<String, ObserverRPCError<(), ConfigGenError>> {
+        self.perform_rpc(GenConfigRequest {}).await
     }
 
     async fn perform_rpc<T: ObserverPRC>(

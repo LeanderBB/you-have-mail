@@ -5,7 +5,6 @@ use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
 use you_have_mail_common as yhm;
-use you_have_mail_common::ExposeSecret;
 
 pub type ObserverAccountStatus = yhm::ObserverAccountStatus;
 
@@ -141,15 +140,10 @@ impl Service {
         Ok(())
     }
 
-    pub fn get_config(&self, encryption_key: &[u8]) -> Result<Vec<u8>, ConfigError> {
-        let key = yhm::EncryptionKey::try_from(encryption_key)
-            .map_err(|_| ConfigError::Crypto {
-                msg: "Invalid Key".to_string(),
-            })
-            .map(yhm::Secret::new)?;
+    pub fn get_config(&self) -> Result<String, ConfigError> {
         let config = self
             .runtime
-            .block_on(async { self.observer.generate_config(key).await })?;
+            .block_on(async { self.observer.generate_config().await })?;
         Ok(config)
     }
 }
@@ -161,21 +155,13 @@ pub fn new_service(notifier: Box<dyn Notifier>) -> Result<Arc<Service>, ServiceE
 pub fn new_service_from_config(
     notifier: Box<dyn Notifier>,
     from_config_cb: Box<dyn ServiceFromConfigCallback>,
-    encryption_key: &[u8],
     bytes: &[u8],
 ) -> Result<Arc<Service>, ServiceError> {
-    let key = yhm::EncryptionKey::try_from(encryption_key)
-        .map_err(|_| ConfigError::Crypto {
-            msg: "Invalid Key".to_string(),
-        })
-        .map(yhm::Secret::new)?;
-
     let backends = get_backends();
 
     let config_backends = backends.iter().map(|x| x.0.clone()).collect::<Vec<_>>();
 
-    let accounts = yhm::Config::load(key.expose_secret(), &config_backends, bytes)
-        .map_err(ConfigError::from)?;
+    let accounts = yhm::Config::load(&config_backends, bytes).map_err(ConfigError::from)?;
 
     let service = new_service_with_backends(notifier, backends)?;
 
@@ -218,7 +204,7 @@ fn get_backends() -> Vec<Arc<Backend>> {
                 wait_time: Some(Duration::from_secs(2)),
             },
         ]),
-        yhm::backend::proton::new_backend("bride-linux@20.0.0+yhm"),
+        yhm::backend::proton::new_backend("web-mail-yhm@20.0.0+yhm"),
     ]
     .into_iter()
     .map(|x| Arc::new(Backend(x)))

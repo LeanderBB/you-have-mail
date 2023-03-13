@@ -6,7 +6,6 @@ use crate::{
 };
 use proton_api_rs::log::error;
 use proton_api_rs::tokio;
-use secrecy::ExposeSecret;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
 use std::future::Future;
@@ -152,11 +151,8 @@ impl Worker {
                 self.paused = false;
                 false
             }
-            ObserverRequest::GenConfig(key, reply) => {
-                let r = Config::store(
-                    key.expose_secret(),
-                    self.accounts.values().map(|a| &a.account),
-                );
+            ObserverRequest::GenConfig(reply) => {
+                let r = Config::store(self.accounts.values().map(|a| &a.account));
 
                 if reply.send(r).await.is_err() {
                     error!("Failed to send reply for gen config request");

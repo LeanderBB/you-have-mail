@@ -38,7 +38,7 @@ mod traits;
 
 pub use account::*;
 pub use config::*;
-pub use encryption::EncryptionKey;
+pub use encryption::*;
 pub use observer::*;
 pub use traits::*;
 

@@ -3,7 +3,7 @@ namespace youhavemail {
     Service new_service(Notifier notifier);
 
     [Throws=ServiceError]
-    Service new_service_from_config(Notifier notifier, ServiceFromConfigCallback cb, [ByRef]sequence<u8> encryption_key, [ByRef]sequence<u8> bytes);
+    Service new_service_from_config(Notifier notifier, ServiceFromConfigCallback cb, [ByRef]sequence<u8> bytes);
 };
 
 [Error]
@@ -107,6 +107,5 @@ interface Service {
     void shutdown();
 
     [Throws=ConfigError]
-    sequence<u8> get_config([ByRef]sequence<u8> encryption_key);
-
+    string get_config();
 };

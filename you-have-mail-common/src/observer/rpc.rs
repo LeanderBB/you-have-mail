@@ -1,6 +1,5 @@
-use crate::{Account, ConfigStoreError, EncryptionKey, ObserverAccount, ObserverError};
+use crate::{Account, ConfigGenError, ObserverAccount, ObserverError};
 use proton_api_rs::tokio::sync::mpsc::Sender;
-use secrecy::Secret;
 
 /// RPC Requests for the `Observer`.
 pub enum ObserverRequest {
@@ -11,10 +10,7 @@ pub enum ObserverRequest {
     GetAccounts(Sender<Result<Vec<ObserverAccount>, ObserverError>>),
     Pause,
     Resume,
-    GenConfig(
-        Secret<EncryptionKey>,
-        Sender<Result<Vec<u8>, ConfigStoreError>>,
-    ),
+    GenConfig(Sender<Result<String, ConfigGenError>>),
 }
 
 #[doc(hidden)]
@@ -112,17 +108,15 @@ impl ObserverPRC for GetAccountListRequest {
 }
 
 #[doc(hidden)]
-pub struct GenConfigRequest {
-    pub key: Secret<EncryptionKey>,
-}
+pub struct GenConfigRequest {}
 
 impl ObserverPRC for GenConfigRequest {
-    type Output = Vec<u8>;
-    type Error = ConfigStoreError;
+    type Output = String;
+    type Error = ConfigGenError;
     type SendFailedValue = ();
 
     fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
-        ObserverRequest::GenConfig(self.key, reply)
+        ObserverRequest::GenConfig(reply)
     }
 
     fn recover_send_value(_: ObserverRequest) -> Option<Self::SendFailedValue> {
