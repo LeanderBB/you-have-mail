@@ -5,6 +5,7 @@ use crate::observer::rpc::{
 use crate::observer::worker::Worker;
 use crate::{Account, AccountError, ConfigGenError, Notifier};
 use proton_api_rs::tokio::sync::mpsc::Sender;
+use std::fmt::Formatter;
 use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
@@ -22,6 +23,22 @@ pub enum ObserverAccountStatus {
     Online,
     /// The account is logged out or the session expired.
     LoggedOut,
+}
+
+impl std::fmt::Display for ObserverAccountStatus {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        match self {
+            ObserverAccountStatus::Offline => {
+                write!(f, "Offline")
+            }
+            ObserverAccountStatus::Online => {
+                write!(f, "Online")
+            }
+            ObserverAccountStatus::LoggedOut => {
+                write!(f, "LoggedOut")
+            }
+        }
+    }
 }
 
 /// Account info for active accounts in the [Observer](struct@Observer).

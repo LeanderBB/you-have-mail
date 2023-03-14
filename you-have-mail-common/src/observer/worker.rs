@@ -4,7 +4,7 @@ use crate::{
     Account, AccountError, Config, Notification, Notifier, ObserverAccount, ObserverAccountStatus,
     ObserverError,
 };
-use proton_api_rs::log::error;
+use proton_api_rs::log::{debug, error};
 use proton_api_rs::tokio;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
@@ -60,6 +60,11 @@ impl Worker {
         match request {
             ObserverRequest::AddAccount(account, reply) => {
                 let account_status = account_status_to_observer_account_status(&account);
+                debug!(
+                    "Add account request: account {} Status={}",
+                    account.email(),
+                    account_status
+                );
                 let result = match self.accounts.entry(account.email().to_string()) {
                     Entry::Occupied(mut v) => {
                         if v.get().status == ObserverAccountStatus::LoggedOut {
@@ -92,6 +97,7 @@ impl Worker {
                 false
             }
             ObserverRequest::LogoutAccount(email, reply) => {
+                debug!("Logout account request: account {email}");
                 let result = if let Some(account) = self.accounts.get_mut(&email) {
                     let r = account.account.logout().await.map_err(|e| e.into());
                     if r.is_ok() {
@@ -110,6 +116,7 @@ impl Worker {
                 false
             }
             ObserverRequest::RemoveAccount(email, reply) => {
+                debug!("Remove account request: account {email}");
                 let result = if let Some(mut account) = self.accounts.remove(&email) {
                     let r = account.account.logout().await;
                     if r.is_ok() {
@@ -127,6 +134,7 @@ impl Worker {
                 false
             }
             ObserverRequest::GetAccounts(reply) => {
+                debug!("Get accounts request");
                 let accounts = self
                     .accounts
                     .iter()
@@ -145,14 +153,17 @@ impl Worker {
             }
             ObserverRequest::Exit => true,
             ObserverRequest::Pause => {
+                debug!("Pause request");
                 self.paused = true;
                 false
             }
             ObserverRequest::Resume => {
+                debug!("Resume request");
                 self.paused = false;
                 false
             }
             ObserverRequest::GenConfig(reply) => {
+                debug!("Gen config request");
                 let r = Config::store(self.accounts.values().map(|a| &a.account));
 
                 if reply.send(r).await.is_err() {
@@ -180,6 +191,11 @@ impl Worker {
                 continue;
             }
 
+            debug!(
+                "Polling account={} backend={}",
+                wa.account.email(),
+                wa.account.backend().name()
+            );
             match wa.account.check().await {
                 Ok(check) => {
                     if wa.status != ObserverAccountStatus::Online {
@@ -196,6 +212,12 @@ impl Worker {
                     }
                 }
                 Err(e) => {
+                    error!(
+                        "Poll failed account={} backend={}: {}",
+                        wa.account.email(),
+                        wa.account.backend().name(),
+                        e
+                    );
                     if let AccountError::Backend(be) = &e {
                         match be {
                             BackendError::LoggedOut => {
@@ -226,6 +248,7 @@ impl Worker {
 }
 
 async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequest>) {
+    debug!("Starting observer loop");
     let sleep = tokio::time::interval(observer.poll_interval);
     tokio::pin!(sleep);
     loop {
@@ -244,6 +267,7 @@ async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequ
 
         }
     }
+    debug!("Exiting observer loop")
 }
 
 #[cfg(test)]

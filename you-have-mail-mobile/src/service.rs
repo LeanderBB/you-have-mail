@@ -4,6 +4,7 @@ use crate::{ConfigError, Notifier, NotifierWrapper, ServiceError, ServiceFromCon
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
+use uniffi::deps::log::{debug, error};
 use you_have_mail_common as yhm;
 
 pub type ObserverAccountStatus = yhm::ObserverAccountStatus;
@@ -149,6 +150,8 @@ impl Service {
 }
 
 pub fn new_service(notifier: Box<dyn Notifier>) -> Result<Arc<Service>, ServiceError> {
+    #[cfg(target_os = "android")]
+    init_android_logger();
     new_service_with_backends(notifier, get_backends()).map(Arc::new)
 }
 
@@ -157,6 +160,9 @@ pub fn new_service_from_config(
     from_config_cb: Box<dyn ServiceFromConfigCallback>,
     bytes: &String,
 ) -> Result<Arc<Service>, ServiceError> {
+    #[cfg(target_os = "android")]
+    init_android_logger();
+
     let backends = get_backends();
 
     let config_backends = backends.iter().map(|x| x.0.clone()).collect::<Vec<_>>();
@@ -166,13 +172,25 @@ pub fn new_service_from_config(
 
     let service = new_service_with_backends(notifier, backends)?;
 
+    debug!("Found {} account(s) in config file", accounts.len());
+
     for account in accounts {
+        debug!(
+            "Refreshing account={} backend={}",
+            account.0.email(),
+            account.0.backend().name()
+        );
         if let Some(refresher) = account.1 {
             let mut account_owned = account.0;
             if let Err(e) = service
                 .runtime
                 .block_on(async { account_owned.refresh(refresher).await })
             {
+                error!(
+                    "Refresh failed account={} backend={}: {e}",
+                    account_owned.email(),
+                    account_owned.backend().name()
+                );
                 from_config_cb.notify_error(account_owned.email().to_string(), e.into());
             }
 
@@ -181,6 +199,7 @@ pub fn new_service_from_config(
                 .runtime
                 .block_on(async { service.observer.add_account(account_owned).await })
             {
+                error!("Failed to add refreshed account={account_email} to observer");
                 from_config_cb.notify_error(account_email, e.into());
             }
         }
@@ -205,7 +224,7 @@ fn get_backends() -> Vec<Arc<Backend>> {
                 wait_time: Some(Duration::from_secs(2)),
             },
         ]),
-        yhm::backend::proton::new_backend("web-mail-yhm@20.0.0+yhm"),
+        yhm::backend::proton::new_backend("web-mail@5.0.17.9"),
     ]
     .into_iter()
     .map(|x| Arc::new(Backend(x)))
@@ -233,4 +252,22 @@ fn new_service_with_backends(
         join_handle,
         backends,
     })
+}
+
+#[cfg(target_os = "android")]
+fn init_android_logger() {
+    use android_logger::{Config, FilterBuilder};
+    use uniffi::deps::log::LevelFilter;
+    android_logger::init_once(
+        Config::default()
+            .with_max_level(LevelFilter::Debug) // limit log level
+            .with_tag("yhm-rs")
+            .with_filter(
+                FilterBuilder::new()
+                    .filter(None, LevelFilter::Error)
+                    .filter(Some("you_have_mail_common"), LevelFilter::Debug)
+                    .filter(Some("youhavemail::service"), LevelFilter::Debug)
+                    .build(),
+            ),
+    );
 }
