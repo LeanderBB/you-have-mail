@@ -104,12 +104,6 @@ impl Observer {
         &self,
         account: Account,
     ) -> Result<(), ObserverRPCError<Account, ObserverError>> {
-        if !account.is_logged_in() {
-            return Err(ObserverRPCError::Error(ObserverError::AccountError(
-                AccountError::InvalidState,
-            )));
-        }
-
         self.perform_rpc(AddAccountRequest { account }).await
     }
 

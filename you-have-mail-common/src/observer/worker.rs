@@ -59,6 +59,7 @@ impl Worker {
     async fn handle_request(&mut self, request: ObserverRequest) -> bool {
         match request {
             ObserverRequest::AddAccount(account, reply) => {
+                let account_status = account_status_to_observer_account_status(&account);
                 let result = match self.accounts.entry(account.email().to_string()) {
                     Entry::Occupied(mut v) => {
                         if v.get().status == ObserverAccountStatus::LoggedOut {
@@ -66,7 +67,7 @@ impl Worker {
                                 .notify(Notification::AccountOnline(account.email()));
                             v.insert(WorkerAccount {
                                 account,
-                                status: ObserverAccountStatus::Online,
+                                status: account_status,
                             });
                             Ok(())
                         } else {
@@ -78,7 +79,7 @@ impl Worker {
                             .notify(Notification::AccountAdded(account.email()));
                         v.insert(WorkerAccount {
                             account,
-                            status: ObserverAccountStatus::Online,
+                            status: account_status,
                         });
                         Ok(())
                     }
@@ -369,5 +370,15 @@ mod tests {
         // Next calls are noop.
         worker.poll_accounts().await;
         worker.poll_accounts().await;
+    }
+}
+
+fn account_status_to_observer_account_status(account: &Account) -> ObserverAccountStatus {
+    if account.is_logged_in() {
+        ObserverAccountStatus::Online
+    } else if account.is_logged_out() {
+        ObserverAccountStatus::LoggedOut
+    } else {
+        ObserverAccountStatus::Offline
     }
 }

@@ -3,7 +3,7 @@ namespace youhavemail {
     Service new_service(Notifier notifier);
 
     [Throws=ServiceError]
-    Service new_service_from_config(Notifier notifier, ServiceFromConfigCallback cb, [ByRef]sequence<u8> bytes);
+    Service new_service_from_config(Notifier notifier, ServiceFromConfigCallback cb, [ByRef]string bytes);
 };
 
 [Error]

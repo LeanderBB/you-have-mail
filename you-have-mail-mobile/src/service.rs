@@ -155,13 +155,14 @@ pub fn new_service(notifier: Box<dyn Notifier>) -> Result<Arc<Service>, ServiceE
 pub fn new_service_from_config(
     notifier: Box<dyn Notifier>,
     from_config_cb: Box<dyn ServiceFromConfigCallback>,
-    bytes: &[u8],
+    bytes: &String,
 ) -> Result<Arc<Service>, ServiceError> {
     let backends = get_backends();
 
     let config_backends = backends.iter().map(|x| x.0.clone()).collect::<Vec<_>>();
 
-    let accounts = yhm::Config::load(&config_backends, bytes).map_err(ConfigError::from)?;
+    let accounts =
+        yhm::Config::load(&config_backends, bytes.as_bytes()).map_err(ConfigError::from)?;
 
     let service = new_service_with_backends(notifier, backends)?;
 
