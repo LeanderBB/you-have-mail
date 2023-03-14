@@ -56,14 +56,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
     override fun onUnbind(intent: Intent?): Boolean {
         if (mService != null) {
-            try {
-                val config = mService!!.getConfig()
-                storeConfig(this, config)
-            } catch (e: ServiceException) {
-                Log.e(serviceLogTag, "Failed to store config: $e")
-            } catch (e: java.lang.Exception) {
-                Log.e(serviceLogTag, "Failed to store config: $e")
-            }
         }
         Log.d(serviceLogTag, "Some component unbound from the system")
         return super.onUnbind(intent)
@@ -115,8 +107,10 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         try {
             val config = loadConfig(this)
             mService = if (config == null) {
+                Log.d(serviceLogTag, "No config found, starting fresh")
                 newService(this)
             } else {
+                Log.d(serviceLogTag, "Starting service with config")
                 newServiceFromConfig(this, this, config)
             }
             mBackends.addAll(mService!!.getBackends())
@@ -213,7 +207,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setContentTitle("You Have Mail Service")
             .setContentText("You have Mail Background Service")
             .setContentIntent(pendingIntent)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_markunread_mailbox)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
@@ -238,7 +232,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setCategory(Notification.CATEGORY_STATUS)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_markunread_mailbox)
             .setTicker("You Have Mail Alert")
             .build()
     }
@@ -261,7 +255,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setContentText("$email error: $errorString")
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_markunread_mailbox)
             .setTicker("You Have Mail Alert")
             .build()
     }
@@ -282,7 +276,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setContentText(text)
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
-            .setSmallIcon(R.mipmap.ic_launcher)
+            .setSmallIcon(R.drawable.ic_markunread_mailbox)
             .setTicker("You Have Mail Alert")
             .build()
     }
@@ -339,8 +333,10 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     }
 
     private fun updateAccountList() {
+        val context = this
         coroutineScope.launch {
             if (mService != null) {
+                storeConfig(context)
                 try {
                     val accounts = mService!!.getObservedAccounts()
                     _accountListFlow.value = accounts
@@ -357,11 +353,18 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         return preferences.getString("CONFIG", null)
     }
 
-    private fun storeConfig(context: Context, config: String) {
-        Log.d(serviceLogTag, "Saving Config")
-        val preferences = getSharedPreferences(context)
-        if (!preferences.edit().putString("CONFIG", config).commit()) {
-            Log.e(serviceLogTag, "Failed to write config to disk")
+    private fun storeConfig(context: Context) {
+        if (mService != null) {
+            try {
+                Log.d(serviceLogTag, "Saving Config")
+                val config = mService!!.getConfig()
+                val preferences = getSharedPreferences(context)
+                preferences.edit().putString("CONFIG", config).apply()
+            } catch (e: ServiceException) {
+                Log.e(serviceLogTag, "Failed to store config: $e")
+            } catch (e: java.lang.Exception) {
+                Log.e(serviceLogTag, "Failed to store config: $e")
+            }
         }
     }
 
