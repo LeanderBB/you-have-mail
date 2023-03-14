@@ -9,6 +9,7 @@ import android.graphics.Color
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
+import android.util.Log
 import android.widget.Toast
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -19,6 +20,9 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+
+
+const val serviceLogTag = "observer"
 
 
 class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
@@ -45,8 +49,8 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         fun getService(): ObserverService = this@ObserverService
     }
 
-    override fun onBind(intent: Intent?): IBinder? {
-        Log.d("Some component wants to bind with the service")
+    override fun onBind(intent: Intent?): IBinder {
+        Log.d(serviceLogTag, "Some component wants to bind with the service")
         return binder
     }
 
@@ -56,12 +60,12 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
                 val config = mService!!.getConfig()
                 storeConfig(this, config)
             } catch (e: ServiceException) {
-                Log.e("Failed to store config: $e")
+                Log.e(serviceLogTag, "Failed to store config: $e")
             } catch (e: java.lang.Exception) {
-                Log.e("Failed to store config: $e")
+                Log.e(serviceLogTag, "Failed to store config: $e")
             }
         }
-        Log.d("Some component unbound from the system")
+        Log.d(serviceLogTag, "Some component unbound from the system")
         return super.onUnbind(intent)
     }
 
@@ -85,17 +89,17 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        Log.d("onStartCommand executed with startId: $startId")
+        Log.d(serviceLogTag, "onStartCommand executed with startId: $startId")
         if (intent != null) {
             val action = intent.action
-            Log.d("Using intent with action $action")
+            Log.d(serviceLogTag, "Using intent with action $action")
             when (action) {
                 Actions.START.name -> startService()
                 Actions.STOP.name -> stopService()
-                else -> Log.e("Unknown action:  $action")
+                else -> Log.e(serviceLogTag, "Unknown action:  $action")
             }
         } else {
-            Log.d("Null intent, probably restarted by the system")
+            Log.d(serviceLogTag, "Null intent, probably restarted by the system")
         }
 
         return START_STICKY
@@ -106,7 +110,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
         createNotificationChannel()
 
-        Log.d("Service has been created")
+        Log.d(serviceLogTag, "Service has been created")
         startForeground(1, createServiceNotification())
         try {
             val config = loadConfig(this)
@@ -118,7 +122,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             mBackends.addAll(mService!!.getBackends())
             updateAccountList()
         } catch (e: ServiceException) {
-            Log.e("Failed to create service:$e")
+            Log.e(serviceLogTag, "Failed to create service:$e")
         }
     }
 
@@ -131,12 +135,12 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         }
         mBackends.clear()
         mService?.destroy()
-        Log.d("The service has been destroyed")
+        Log.d(serviceLogTag, "The service has been destroyed")
     }
 
     private fun startService() {
         if (isServiceStarted) return
-        Log.d("Starting foreground service task")
+        Log.d(serviceLogTag, "Starting foreground service task")
 
         isServiceStarted = true
         setServiceState(this, ServiceState.STARTED)
@@ -150,7 +154,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     }
 
     private fun stopService() {
-        Log.d("Stopping foreground service")
+        Log.d(serviceLogTag, "Stopping foreground service")
         try {
             wakeLock?.let {
                 if (it.isHeld) {
@@ -160,7 +164,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } catch (e: java.lang.Exception) {
-            Log.e("Service stopped without being started: ${e.message}")
+            Log.e(serviceLogTag, "Service stopped without being started: ${e.message}")
         }
         isServiceStarted = false
         setServiceState(this, ServiceState.STOPPED)
@@ -284,7 +288,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     }
 
     override fun newEmail(account: String, backend: String, count: UInt) {
-        Log.d("New Mail: $account ($backend) num=$count")
+        Log.d(serviceLogTag, "New Mail: $account ($backend) num=$count")
         val notification = createAlertNotification(account, count)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
@@ -294,12 +298,12 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     }
 
     override fun accountAdded(email: String) {
-        Log.d("Account added: $email")
+        Log.d(serviceLogTag, "Account added: $email")
         updateAccountList()
     }
 
     override fun accountLoggedOut(email: String) {
-        Log.d("Account Logged Out: $email")
+        Log.d(serviceLogTag, "Account Logged Out: $email")
         updateAccountList()
         val notification = createAccountStatusNotification("Account $email session expired")
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
@@ -310,22 +314,22 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     }
 
     override fun accountRemoved(email: String) {
-        Log.d("Account Removed: $email")
+        Log.d(serviceLogTag, "Account Removed: $email")
         updateAccountList()
     }
 
     override fun accountOffline(email: String) {
-        Log.d("Account Offline: $email")
+        Log.d(serviceLogTag, "Account Offline: $email")
         updateAccountList()
     }
 
     override fun accountOnline(email: String) {
-        Log.d("Account Online: $email")
+        Log.d(serviceLogTag, "Account Online: $email")
         updateAccountList()
     }
 
     override fun accountError(email: String, error: ServiceException) {
-        Log.e("Account Error: $email => $error")
+        Log.e(serviceLogTag, "Account Error: $email => $error")
         val notification = createAccountErrorNotification(email, error)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
@@ -341,23 +345,23 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
                     val accounts = mService!!.getObservedAccounts()
                     _accountListFlow.value = accounts
                 } catch (e: ServiceException) {
-                    Log.e("Failed to refresh account list")
+                    Log.e(serviceLogTag, "Failed to refresh account list")
                 }
             }
         }
     }
 
     private fun loadConfig(context: Context): String? {
-        Log.d("Loading Config")
+        Log.d(serviceLogTag, "Loading Config")
         val preferences = getSharedPreferences(context)
         return preferences.getString("CONFIG", null)
     }
 
     private fun storeConfig(context: Context, config: String) {
-        Log.d("Saving Config")
+        Log.d(serviceLogTag, "Saving Config")
         val preferences = getSharedPreferences(context)
         if (!preferences.edit().putString("CONFIG", config).commit()) {
-            Log.e("Failed to write config to disk")
+            Log.e(serviceLogTag, "Failed to write config to disk")
         }
     }
 
@@ -378,6 +382,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
     override fun notifyError(email: String, error: ServiceException) {
         Toast.makeText(this, serviceExceptionToErrorStr(error, email), Toast.LENGTH_SHORT).show()
-        Log.e("Failed to load '$email' from config: $error")
+        Log.e(serviceLogTag, "Failed to load '$email' from config: $error")
     }
 }

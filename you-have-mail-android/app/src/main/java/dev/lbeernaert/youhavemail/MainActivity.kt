@@ -11,6 +11,7 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.provider.Settings
+import android.util.Log
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
@@ -28,6 +29,9 @@ import androidx.core.content.ContextCompat.startActivity
 import dev.lbeernaert.youhavemail.screens.MainNavController
 import dev.lbeernaert.youhavemail.service.*
 import dev.lbeernaert.youhavemail.ui.theme.YouHaveMailTheme
+
+
+const val activityLogTag = "activity"
 
 class MainActivity : ComponentActivity(), ServiceConnection {
     private var mBound: Boolean = false
@@ -67,16 +71,16 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                         contract = ActivityResultContracts.RequestPermission(),
                         onResult = { isGranted ->
                             if (!isGranted) {
-                                Log.d("Notification permission not granted")
+                                Log.d(activityLogTag, "Notification permission not granted")
                                 if (shouldShowRequestPermissionRationale(Manifest.permission.POST_NOTIFICATIONS)) {
-                                    Log.d("Show request permission rational")
+                                    Log.d(activityLogTag, "Show request permission rational")
                                     rationalPermissionOpenDialog.value = true
                                 } else {
-                                    Log.d("Show request permission")
+                                    Log.d(activityLogTag, "Show request permission")
                                     permissionOpenDialog.value = true
                                 }
                             } else {
-                                Log.d("Notification permission granted")
+                                Log.d(activityLogTag, "Notification permission granted")
                                 hasNotificationPermission = isGranted
                             }
                         }
@@ -121,11 +125,11 @@ class MainActivity : ComponentActivity(), ServiceConnection {
         Intent(this, ObserverService::class.java).also {
             it.action = action.name
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Log.i("App Starting the service in >= 26 Mode")
+                Log.i(activityLogTag, "App Starting the service in >= 26 Mode")
                 startForegroundService(it)
                 return
             }
-            Log.i("App Starting the service in <= 26 Mode")
+            Log.i(activityLogTag, "App Starting the service in <= 26 Mode")
             startService(it)
         }
 
@@ -133,7 +137,7 @@ class MainActivity : ComponentActivity(), ServiceConnection {
 
     override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
         // We've bound to LocalService, cast the IBinder and get LocalService instance
-        Log.i("App Bound to service")
+        Log.i(activityLogTag, "App Bound to service")
         val binder = service as ObserverService.LocalBinder
 
         try {
@@ -146,7 +150,7 @@ class MainActivity : ComponentActivity(), ServiceConnection {
     }
 
     override fun onServiceDisconnected(name: ComponentName?) {
-        Log.i("App disconnected from service")
+        Log.i(activityLogTag, "App disconnected from service")
         mBound = false
         mServiceState.removeService()
     }

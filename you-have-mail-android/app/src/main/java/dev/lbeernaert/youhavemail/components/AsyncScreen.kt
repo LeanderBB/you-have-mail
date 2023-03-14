@@ -1,5 +1,6 @@
-package dev.lbeernaert.youhavemail.screens
+package dev.lbeernaert.youhavemail.components
 
+import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
@@ -8,12 +9,11 @@ import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import dev.lbeernaert.youhavemail.Log
 import dev.lbeernaert.youhavemail.ServiceException
-import dev.lbeernaert.youhavemail.components.BackgroundTask
 import dev.lbeernaert.youhavemail.serviceExceptionToErrorStr
 import kotlinx.coroutines.launch
 
+const val asyncScreenLogTag = "async"
 
 @Composable
 fun AsyncScreen(
@@ -61,7 +61,7 @@ fun AsyncScreen(
                         run()
                     } catch (err: ServiceException) {
                         openDialog.value = false
-                        Log.e(err.toString())
+                        Log.e(asyncScreenLogTag, err.toString())
                         coroutineScope.launch {
                             scaffoldState.snackbarHostState.showSnackbar(
                                 message = serviceExceptionToErrorStr(err, null),
@@ -70,7 +70,7 @@ fun AsyncScreen(
                         }
                     } catch (err: Exception) {
                         openDialog.value = false
-                        Log.e(err.toString())
+                        Log.e(asyncScreenLogTag, err.toString())
                         coroutineScope.launch {
                             scaffoldState.snackbarHostState.showSnackbar(
                                 message = "Unknown Error",

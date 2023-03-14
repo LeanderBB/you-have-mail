@@ -1,15 +1,17 @@
 package dev.lbeernaert.youhavemail.screens
 
+import android.util.Log
 import androidx.compose.runtime.Composable
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
-import dev.lbeernaert.youhavemail.Log
 import dev.lbeernaert.youhavemail.service.ServiceWrapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
+
+const val navLogTag = "nav"
 
 @Composable
 fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> Unit) {
@@ -28,7 +30,7 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
             val backendIndex = args?.getInt("backend")
             var accountEmail = args?.getString("email")!!
             if (backendIndex == null) {
-                Log.e("No backend index selected, returning to main screen")
+                Log.e(navLogTag, "No backend index selected, returning to main screen")
                 navController.popBackStack(Routes.Main.route, false)
             } else {
                 val backend = serviceWrapper.getBackends()[backendIndex]
@@ -81,13 +83,13 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
         ) {
             val accountIndex = it.arguments?.getInt("index")
             if (accountIndex == null) {
-                Log.e("No account index selected, returning to main screen")
+                Log.e(navLogTag, "No account index selected, returning to main screen")
                 navController.popBackStack(Routes.Main.route, false)
             }
 
-            val account = serviceWrapper?.getAccount(accountIndex!!)
+            val account = serviceWrapper.getAccount(accountIndex!!)
             if (account == null) {
-                Log.e("Account not found, return to main screen")
+                Log.e(navLogTag, "Account not found, return to main screen")
                 navController.popBackStack(Routes.Main.route, false)
             } else {
                 val email = account.email
@@ -108,7 +110,7 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                         if (backendIndex != null) {
                             navController.navigate(Routes.newLoginRoute(backendIndex, email))
                         } else {
-                            Log.e("Could not find backend named: ${account.backend}")
+                            Log.e(navLogTag, "Could not find backend named: ${account.backend}")
                         }
                     },
                     onDelete = {

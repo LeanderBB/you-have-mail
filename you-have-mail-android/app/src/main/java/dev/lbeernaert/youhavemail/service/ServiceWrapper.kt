@@ -1,5 +1,6 @@
 package dev.lbeernaert.youhavemail.service
 
+import android.util.Log
 import dev.lbeernaert.youhavemail.*
 import kotlinx.coroutines.flow.StateFlow
 
@@ -70,7 +71,7 @@ class ServiceWrapper {
 
             return null
         } catch (e: ServiceException) {
-            Log.e("Failed to get account by index: $e")
+            Log.e(serviceLogTag, "Failed to get account by index: $e")
             return null
         }
     }
