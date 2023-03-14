@@ -25,8 +25,6 @@ import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.BackgroundTask
 import dev.lbeernaert.youhavemail.service.ServiceWrapper
 
-TODO: Proper exception to error string conversion function
-Interface to write encrypted file instead of encrypting in the Lib
 @Composable
 fun Main(service: ServiceWrapper, navController: NavController, requestPermissions: () -> Unit) {
     if (!service.isReady()) {

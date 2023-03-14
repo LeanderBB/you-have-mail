@@ -140,7 +140,8 @@ class MainActivity : ComponentActivity(), ServiceConnection {
             mServiceState.setService(binder.getService())
             mBound = true
         } catch (e: ServiceException) {
-            Toast.makeText(this, "Failed to bind to service: $e", Toast.LENGTH_SHORT).show()
+            val errorText = serviceExceptionToErrorStr(e, null)
+            Toast.makeText(this, "Failed to bind to service: $errorText", Toast.LENGTH_SHORT).show()
         }
     }
 

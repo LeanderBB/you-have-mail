@@ -4,10 +4,14 @@ import android.app.*
 import android.app.Service
 import android.content.Context
 import android.content.Intent
+import android.content.SharedPreferences
 import android.graphics.Color
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
+import android.widget.Toast
+import androidx.security.crypto.EncryptedSharedPreferences
+import androidx.security.crypto.MasterKey
 import dev.lbeernaert.youhavemail.*
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
@@ -16,7 +20,8 @@ import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
 
-class ObserverService : Service(), Notifier {
+
+class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private var wakeLock: PowerManager.WakeLock? = null
     private var isServiceStarted = false
     private val binder = LocalBinder()
@@ -46,6 +51,16 @@ class ObserverService : Service(), Notifier {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
+        if (mService != null) {
+            try {
+                val config = mService!!.getConfig()
+                storeConfig(this, config)
+            } catch (e: ServiceException) {
+                Log.e("Failed to store config: $e")
+            } catch (e: java.lang.Exception) {
+                Log.e("Failed to store config: $e")
+            }
+        }
         Log.d("Some component unbound from the system")
         return super.onUnbind(intent)
     }
@@ -94,8 +109,14 @@ class ObserverService : Service(), Notifier {
         Log.d("Service has been created")
         startForeground(1, createServiceNotification())
         try {
-            mService = newService(this)
+            val config = loadConfig(this)
+            mService = if (config == null) {
+                newService(this)
+            } else {
+                newServiceFromConfig(this, this, config)
+            }
             mBackends.addAll(mService!!.getBackends())
+            updateAccountList()
         } catch (e: ServiceException) {
             Log.e("Failed to create service:$e")
         }
@@ -212,6 +233,7 @@ class ObserverService : Service(), Notifier {
             .setContentText("$email has $messageCount new message(s)")
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
+            .setCategory(Notification.CATEGORY_STATUS)
             .setSmallIcon(R.mipmap.ic_launcher)
             .setTicker("You Have Mail Alert")
             .build()
@@ -228,9 +250,32 @@ class ObserverService : Service(), Notifier {
             notificationChannelIdAlerter
         )
 
+        val errorString = serviceExceptionToErrorStr(err, email)
+
         return builder
             .setContentTitle("You Have Mail")
-            .setContentText("$email has encountered an error $err")
+            .setContentText("$email error: $errorString")
+            .setContentIntent(pendingIntent)
+            .setVisibility(Notification.VISIBILITY_SECRET)
+            .setSmallIcon(R.mipmap.ic_launcher)
+            .setTicker("You Have Mail Alert")
+            .build()
+    }
+
+    private fun createAccountStatusNotification(text: String): Notification {
+        val pendingIntent: PendingIntent =
+            Intent(this, MainActivity::class.java).let { notificationIntent ->
+                PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
+            }
+
+        val builder: Notification.Builder = Notification.Builder(
+            this,
+            notificationChannelIdAlerter
+        )
+
+        return builder
+            .setContentTitle("You Have Mail")
+            .setContentText(text)
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setSmallIcon(R.mipmap.ic_launcher)
@@ -243,7 +288,7 @@ class ObserverService : Service(), Notifier {
         val notification = createAlertNotification(account, count)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
-                notify(1, notification)
+                notify(2, notification)
             }
         }
     }
@@ -256,6 +301,12 @@ class ObserverService : Service(), Notifier {
     override fun accountLoggedOut(email: String) {
         Log.d("Account Logged Out: $email")
         updateAccountList()
+        val notification = createAccountStatusNotification("Account $email session expired")
+        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+            if (this.areNotificationsEnabled()) {
+                notify(6, notification)
+            }
+        }
     }
 
     override fun accountRemoved(email: String) {
@@ -278,7 +329,7 @@ class ObserverService : Service(), Notifier {
         val notification = createAccountErrorNotification(email, error)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
-                notify(1, notification)
+                notify(3, notification)
             }
         }
     }
@@ -294,5 +345,39 @@ class ObserverService : Service(), Notifier {
                 }
             }
         }
+    }
+
+    private fun loadConfig(context: Context): String? {
+        Log.d("Loading Config")
+        val preferences = getSharedPreferences(context)
+        return preferences.getString("CONFIG", null)
+    }
+
+    private fun storeConfig(context: Context, config: String) {
+        Log.d("Saving Config")
+        val preferences = getSharedPreferences(context)
+        if (!preferences.edit().putString("CONFIG", config).commit()) {
+            Log.e("Failed to write config to disk")
+        }
+    }
+
+    private fun getSharedPreferences(context: Context): SharedPreferences {
+        val masterKey = MasterKey.Builder(context, MasterKey.DEFAULT_MASTER_KEY_ALIAS)
+            .setKeyScheme(MasterKey.KeyScheme.AES256_GCM)
+            .build()
+
+        return EncryptedSharedPreferences.create(
+            context,
+            // passing a file name to share a preferences
+            "preferences",
+            masterKey,
+            EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
+            EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
+        )
+    }
+
+    override fun notifyError(email: String, error: ServiceException) {
+        Toast.makeText(this, serviceExceptionToErrorStr(error, email), Toast.LENGTH_SHORT).show()
+        Log.e("Failed to load '$email' from config: $error")
     }
 }

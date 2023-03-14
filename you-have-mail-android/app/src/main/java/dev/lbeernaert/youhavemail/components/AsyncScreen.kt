@@ -11,6 +11,7 @@ import androidx.compose.runtime.rememberCoroutineScope
 import dev.lbeernaert.youhavemail.Log
 import dev.lbeernaert.youhavemail.ServiceException
 import dev.lbeernaert.youhavemail.components.BackgroundTask
+import dev.lbeernaert.youhavemail.serviceExceptionToErrorStr
 import kotlinx.coroutines.launch
 
 
@@ -63,7 +64,16 @@ fun AsyncScreen(
                         Log.e(err.toString())
                         coroutineScope.launch {
                             scaffoldState.snackbarHostState.showSnackbar(
-                                message = err.toString(),
+                                message = serviceExceptionToErrorStr(err, null),
+                                duration = SnackbarDuration.Short,
+                            )
+                        }
+                    } catch (err: Exception) {
+                        openDialog.value = false
+                        Log.e(err.toString())
+                        coroutineScope.launch {
+                            scaffoldState.snackbarHostState.showSnackbar(
+                                message = "Unknown Error",
                                 duration = SnackbarDuration.Short,
                             )
                         }
