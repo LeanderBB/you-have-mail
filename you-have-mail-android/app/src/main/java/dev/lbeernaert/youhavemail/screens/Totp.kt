@@ -41,6 +41,7 @@ fun Totp(
         Column(
             modifier = Modifier
                 .padding(padding)
+                .padding(20.dp)
                 .fillMaxSize(),
             verticalArrangement = Arrangement.Center,
             horizontalAlignment = Alignment.CenterHorizontally,
