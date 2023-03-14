@@ -180,8 +180,8 @@ pub fn new_service_from_config(
             account.0.email(),
             account.0.backend().name()
         );
+        let mut account_owned = account.0;
         if let Some(refresher) = account.1 {
-            let mut account_owned = account.0;
             if let Err(e) = service
                 .runtime
                 .block_on(async { account_owned.refresh(refresher).await })
@@ -193,15 +193,15 @@ pub fn new_service_from_config(
                 );
                 from_config_cb.notify_error(account_owned.email().to_string(), e.into());
             }
+        }
 
-            let account_email = account_owned.email().to_string();
-            if let Err(e) = service
-                .runtime
-                .block_on(async { service.observer.add_account(account_owned).await })
-            {
-                error!("Failed to add refreshed account={account_email} to observer");
-                from_config_cb.notify_error(account_email, e.into());
-            }
+        let account_email = account_owned.email().to_string();
+        if let Err(e) = service
+            .runtime
+            .block_on(async { service.observer.add_account(account_owned).await })
+        {
+            error!("Failed to add refreshed account={account_email} to observer");
+            from_config_cb.notify_error(account_email, e.into());
         }
     }
 

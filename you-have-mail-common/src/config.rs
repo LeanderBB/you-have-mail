@@ -93,7 +93,7 @@ impl Config {
         let mut json_accounts = Vec::<ConfigJSONAccount>::new();
 
         for account in accounts {
-            let value = if account.is_logged_in() {
+            let value = if !account.is_logged_out() {
                 let account_impl = account.get_impl().unwrap();
                 Some(account_impl.auth_refresher_config().map_err(|e| {
                     ConfigGenError::BackendConfig {
