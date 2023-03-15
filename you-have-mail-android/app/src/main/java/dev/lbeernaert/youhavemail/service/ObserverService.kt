@@ -204,10 +204,10 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         )
 
         return builder
-            .setContentTitle("You Have Mail Service")
-            .setContentText("You have Mail Background Service")
+            .setContentTitle("You Have Mail")
+            .setContentText("Background Service Running")
             .setContentIntent(pendingIntent)
-            .setSmallIcon(R.drawable.ic_markunread_mailbox)
+            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
@@ -232,7 +232,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setCategory(Notification.CATEGORY_STATUS)
-            .setSmallIcon(R.drawable.ic_markunread_mailbox)
+            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
             .setTicker("You Have Mail Alert")
             .build()
     }
@@ -255,7 +255,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setContentText("$email error: $errorString")
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
-            .setSmallIcon(R.drawable.ic_markunread_mailbox)
+            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
             .setTicker("You Have Mail Alert")
             .build()
     }
@@ -276,7 +276,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setContentText(text)
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
-            .setSmallIcon(R.drawable.ic_markunread_mailbox)
+            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
             .setTicker("You Have Mail Alert")
             .build()
     }
