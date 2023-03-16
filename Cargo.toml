@@ -3,3 +3,9 @@ members = [
     "you-have-mail-common",
     "you-have-mail-mobile",
 ]
+
+[profile.release]
+strip = true
+opt-level = "z"  # Optimize for size.
+lto = true
+codegen-units = 1
