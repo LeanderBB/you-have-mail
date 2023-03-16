@@ -18,6 +18,10 @@ you-have-mail-common = {path = "../you-have-mail-common", version = "0.1.0" }
 thiserror = "1"
 tokio = "1"
 
+[features]
+default = []
+null_backend =[]
+
 [target.'cfg(target_os = "android")'.dependencies]
 android_logger = "0.13.1"
 

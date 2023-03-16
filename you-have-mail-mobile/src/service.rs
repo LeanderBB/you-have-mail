@@ -211,6 +211,7 @@ pub fn new_service_from_config(
 fn get_backends() -> Vec<Arc<Backend>> {
     [
         yhm::backend::null::new_backend(&[
+            #[cfg(feature = "null_backend")]
             yhm::backend::null::NullTestAccount {
                 email: "foo".to_string(),
                 password: "foo".to_string(),
