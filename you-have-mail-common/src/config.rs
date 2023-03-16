@@ -1,6 +1,7 @@
 use crate::backend::{AuthRefresher, Backend};
 use crate::Account;
 use anyhow::anyhow;
+use proton_api_rs::log::error;
 use proton_api_rs::tokio;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
@@ -64,7 +65,8 @@ impl Config {
 
         for account in config.accounts {
             let Some(b) = find_backend_with_tag(backends, &account.backend) else {
-                return Err(ConfigLoadError::BackendNotFound {account:account.email,backend:account.backend });
+                error!("Could not locate backend '{}' for account '{}' skipping...", account.backend, account.email);
+                continue
             };
 
             let refresher = if let Some(value) = account.value {
