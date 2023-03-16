@@ -3,7 +3,6 @@
 use crate::{ConfigError, Notifier, NotifierWrapper, ServiceError, ServiceFromConfigCallback};
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
-use std::time::Duration;
 use uniffi::deps::log::{debug, error};
 use you_have_mail_common as yhm;
 
@@ -209,22 +208,27 @@ pub fn new_service_from_config(
 }
 
 fn get_backends() -> Vec<Arc<Backend>> {
+    #[cfg(feature = "null_backend")]
+    use std::time::Duration;
+
     [
-        yhm::backend::null::new_backend(&[
-            #[cfg(feature = "null_backend")]
-            yhm::backend::null::NullTestAccount {
-                email: "foo".to_string(),
-                password: "foo".to_string(),
-                totp: None,
-                wait_time: Some(Duration::from_secs(2)),
-            },
-            yhm::backend::null::NullTestAccount {
-                email: "bar".to_string(),
-                password: "bar".to_string(),
-                totp: Some("1234".to_string()),
-                wait_time: Some(Duration::from_secs(2)),
-            },
-        ]),
+        #[cfg(feature = "null_backend")]
+        {
+            yhm::backend::null::new_backend(&[
+                yhm::backend::null::NullTestAccount {
+                    email: "foo".to_string(),
+                    password: "foo".to_string(),
+                    totp: None,
+                    wait_time: Some(Duration::from_secs(2)),
+                },
+                yhm::backend::null::NullTestAccount {
+                    email: "bar".to_string(),
+                    password: "bar".to_string(),
+                    totp: Some("1234".to_string()),
+                    wait_time: Some(Duration::from_secs(2)),
+                },
+            ])
+        },
         yhm::backend::proton::new_backend("web-mail@5.0.17.9"),
     ]
     .into_iter()
