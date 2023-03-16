@@ -60,7 +60,7 @@ fun AccountInfo(
             Text(
                 text = accountEmail,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.h2,
+                style = MaterialTheme.typography.h4,
             )
 
             Spacer(modifier = Modifier.height(20.dp))
