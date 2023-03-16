@@ -3,7 +3,7 @@
 
 @file:Suppress("NAME_SHADOWING")
 
-package dev.lbeernaert.youhavemail;
+package dev.lbeernaert.youhavemail
 
 // Common helper code.
 //
@@ -36,8 +36,10 @@ import kotlin.concurrent.withLock
 open class RustBuffer : Structure() {
     @JvmField
     var capacity: Int = 0
+
     @JvmField
     var len: Int = 0
+
     @JvmField
     var data: Pointer? = null
 
@@ -45,7 +47,7 @@ open class RustBuffer : Structure() {
     class ByReference : RustBuffer(), Structure.ByReference
 
     companion object {
-        internal fun alloc(size: Int = 0) = rustCall() { status ->
+        internal fun alloc(size: Int = 0) = rustCall { status ->
             _UniFFILib.INSTANCE.ffi_youhavemail_a6b5_rustbuffer_alloc(size, status).also {
                 if (it.data == null) {
                     throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
@@ -53,7 +55,7 @@ open class RustBuffer : Structure() {
             }
         }
 
-        internal fun free(buf: RustBuffer.ByValue) = rustCall() { status ->
+        internal fun free(buf: ByValue) = rustCall { status ->
             _UniFFILib.INSTANCE.ffi_youhavemail_a6b5_rustbuffer_free(buf, status)
         }
     }
@@ -77,7 +79,7 @@ class RustBufferByReference : ByReference(16) {
      */
     fun setValue(value: RustBuffer.ByValue) {
         // NOTE: The offsets are as they are in the C-like struct.
-        val pointer = getPointer()
+        val pointer = pointer
         pointer.setInt(0, value.capacity)
         pointer.setInt(4, value.len)
         pointer.setPointer(8, value.data)
@@ -94,6 +96,7 @@ class RustBufferByReference : ByReference(16) {
 open class ForeignBytes : Structure() {
     @JvmField
     var len: Int = 0
+
     @JvmField
     var data: Pointer? = null
 
@@ -104,7 +107,7 @@ open class ForeignBytes : Structure() {
 //
 // All implementing objects should be public to support external types.  When a
 // type is external we need to import it's FfiConverter.
-public interface FfiConverter<KotlinType, FfiType> {
+interface FfiConverter<KotlinType, FfiType> {
     // Convert an FFI type to a Kotlin type
     fun lift(value: FfiType): KotlinType
 
@@ -167,7 +170,7 @@ public interface FfiConverter<KotlinType, FfiType> {
 }
 
 // FfiConverter that uses `RustBuffer` as the FfiType
-public interface FfiConverterRustBuffer<KotlinType> : FfiConverter<KotlinType, RustBuffer.ByValue> {
+interface FfiConverterRustBuffer<KotlinType> : FfiConverter<KotlinType, RustBuffer.ByValue> {
     override fun lift(value: RustBuffer.ByValue) = liftFromRustBuffer(value)
     override fun lower(value: KotlinType) = lowerIntoRustBuffer(value)
 }
@@ -179,6 +182,7 @@ public interface FfiConverterRustBuffer<KotlinType> : FfiConverter<KotlinType, R
 internal open class RustCallStatus : Structure() {
     @JvmField
     var code: Int = 0
+
     @JvmField
     var error_buf: RustBuffer.ByValue = RustBuffer.ByValue()
 
@@ -199,7 +203,7 @@ class InternalException(message: String) : Exception(message)
 
 // Each top-level error class has a companion object that can lift the error from the call status's rust buffer
 interface CallStatusErrorHandler<E> {
-    fun lift(error_buf: RustBuffer.ByValue): E;
+    fun lift(error_buf: RustBuffer.ByValue): E
 }
 
 // Helpers for calling Rust
@@ -211,7 +215,7 @@ private inline fun <U, E : Exception> rustCallWithError(
     errorHandler: CallStatusErrorHandler<E>,
     callback: (RustCallStatus) -> U
 ): U {
-    var status = RustCallStatus();
+    var status = RustCallStatus()
     val return_value = callback(status)
     if (status.isSuccess()) {
         return return_value
@@ -241,7 +245,7 @@ object NullCallStatusErrorHandler : CallStatusErrorHandler<InternalException> {
 
 // Call a rust function that returns a plain value
 private inline fun <U> rustCall(callback: (RustCallStatus) -> U): U {
-    return rustCallWithError(NullCallStatusErrorHandler, callback);
+    return rustCallWithError(NullCallStatusErrorHandler, callback)
 }
 
 // Contains loading, initialization code,
@@ -432,13 +436,13 @@ internal interface _UniFFILib : Library {
 // Public interface members begin here.
 
 
-public object FfiConverterUInt : FfiConverter<UInt, Int> {
+object FfiConverterUInt : FfiConverter<UInt, Int> {
     override fun lift(value: Int): UInt {
         return value.toUInt()
     }
 
     override fun read(buf: ByteBuffer): UInt {
-        return lift(buf.getInt())
+        return lift(buf.int)
     }
 
     override fun lower(value: UInt): Int {
@@ -452,7 +456,7 @@ public object FfiConverterUInt : FfiConverter<UInt, Int> {
     }
 }
 
-public object FfiConverterBoolean : FfiConverter<Boolean, Byte> {
+object FfiConverterBoolean : FfiConverter<Boolean, Byte> {
     override fun lift(value: Byte): Boolean {
         return value.toInt() != 0
     }
@@ -472,7 +476,7 @@ public object FfiConverterBoolean : FfiConverter<Boolean, Byte> {
     }
 }
 
-public object FfiConverterString : FfiConverter<String, RustBuffer.ByValue> {
+object FfiConverterString : FfiConverter<String, RustBuffer.ByValue> {
     // Note: we don't inherit from FfiConverterRustBuffer, because we use a
     // special encoding when lowering/lifting.  We can use `RustBuffer.len` to
     // store our length and avoid writing it out to the buffer.
@@ -487,7 +491,7 @@ public object FfiConverterString : FfiConverter<String, RustBuffer.ByValue> {
     }
 
     override fun read(buf: ByteBuffer): String {
-        val len = buf.getInt()
+        val len = buf.int
         val byteArr = ByteArray(len)
         buf.get(byteArr)
         return byteArr.toString(Charsets.UTF_8)
@@ -638,7 +642,7 @@ abstract class FFIObject(
     private val wasDestroyed = AtomicBoolean(false)
     private val callCounter = AtomicLong(1)
 
-    open protected fun freeRustArcPtr() {
+    protected open fun freeRustArcPtr() {
         // To be overridden in subclasses.
     }
 
@@ -682,7 +686,7 @@ abstract class FFIObject(
     }
 }
 
-public interface AccountInterface {
+interface AccountInterface {
 
     @Throws(ServiceException::class)
     fun `login`(`password`: String)
@@ -715,8 +719,8 @@ class Account(
      *
      * Clients **must** call this method once done with the object, or cause a memory leak.
      */
-    override protected fun freeRustArcPtr() {
-        rustCall() { status ->
+    override fun freeRustArcPtr() {
+        rustCall { status ->
             _UniFFILib.INSTANCE.ffi_youhavemail_a6b5_Account_object_free(this.pointer, status)
         }
     }
@@ -758,7 +762,7 @@ class Account(
 
     override fun `isLoggedIn`(): Boolean =
         callWithPointer {
-            rustCall() { _status ->
+            rustCall { _status ->
                 _UniFFILib.INSTANCE.youhavemail_a6b5_Account_is_logged_in(it, _status)
             }
         }.let {
@@ -767,7 +771,7 @@ class Account(
 
     override fun `isAwaitingTotp`(): Boolean =
         callWithPointer {
-            rustCall() { _status ->
+            rustCall { _status ->
                 _UniFFILib.INSTANCE.youhavemail_a6b5_Account_is_awaiting_totp(it, _status)
             }
         }.let {
@@ -776,7 +780,7 @@ class Account(
 
     override fun `isLoggedOut`(): Boolean =
         callWithPointer {
-            rustCall() { _status ->
+            rustCall { _status ->
                 _UniFFILib.INSTANCE.youhavemail_a6b5_Account_is_logged_out(it, _status)
             }
         }.let {
@@ -785,7 +789,7 @@ class Account(
 
     override fun `email`(): String =
         callWithPointer {
-            rustCall() { _status ->
+            rustCall { _status ->
                 _UniFFILib.INSTANCE.youhavemail_a6b5_Account_email(it, _status)
             }
         }.let {
@@ -795,7 +799,7 @@ class Account(
 
 }
 
-public object FfiConverterTypeAccount : FfiConverter<Account, Pointer> {
+object FfiConverterTypeAccount : FfiConverter<Account, Pointer> {
     override fun lower(value: Account): Pointer = value.callWithPointer { it }
 
     override fun lift(value: Pointer): Account {
@@ -805,7 +809,7 @@ public object FfiConverterTypeAccount : FfiConverter<Account, Pointer> {
     override fun read(buf: ByteBuffer): Account {
         // The Rust code always writes pointers as 8 bytes, and will
         // fail to compile if they don't fit.
-        return lift(Pointer(buf.getLong()))
+        return lift(Pointer(buf.long))
     }
 
     override fun allocationSize(value: Account) = 8
@@ -818,7 +822,7 @@ public object FfiConverterTypeAccount : FfiConverter<Account, Pointer> {
 }
 
 
-public interface BackendInterface {
+interface BackendInterface {
 
     fun `name`(): String
 
@@ -838,15 +842,15 @@ class Backend(
      *
      * Clients **must** call this method once done with the object, or cause a memory leak.
      */
-    override protected fun freeRustArcPtr() {
-        rustCall() { status ->
+    override fun freeRustArcPtr() {
+        rustCall { status ->
             _UniFFILib.INSTANCE.ffi_youhavemail_a6b5_Backend_object_free(this.pointer, status)
         }
     }
 
     override fun `name`(): String =
         callWithPointer {
-            rustCall() { _status ->
+            rustCall { _status ->
                 _UniFFILib.INSTANCE.youhavemail_a6b5_Backend_name(it, _status)
             }
         }.let {
@@ -855,7 +859,7 @@ class Backend(
 
     override fun `description`(): String =
         callWithPointer {
-            rustCall() { _status ->
+            rustCall { _status ->
                 _UniFFILib.INSTANCE.youhavemail_a6b5_Backend_description(it, _status)
             }
         }.let {
@@ -865,7 +869,7 @@ class Backend(
 
 }
 
-public object FfiConverterTypeBackend : FfiConverter<Backend, Pointer> {
+object FfiConverterTypeBackend : FfiConverter<Backend, Pointer> {
     override fun lower(value: Backend): Pointer = value.callWithPointer { it }
 
     override fun lift(value: Pointer): Backend {
@@ -875,7 +879,7 @@ public object FfiConverterTypeBackend : FfiConverter<Backend, Pointer> {
     override fun read(buf: ByteBuffer): Backend {
         // The Rust code always writes pointers as 8 bytes, and will
         // fail to compile if they don't fit.
-        return lift(Pointer(buf.getLong()))
+        return lift(Pointer(buf.long))
     }
 
     override fun allocationSize(value: Backend) = 8
@@ -888,7 +892,7 @@ public object FfiConverterTypeBackend : FfiConverter<Backend, Pointer> {
 }
 
 
-public interface ServiceInterface {
+interface ServiceInterface {
 
     fun `getBackends`(): List<Backend>
 
@@ -932,15 +936,15 @@ class Service(
      *
      * Clients **must** call this method once done with the object, or cause a memory leak.
      */
-    override protected fun freeRustArcPtr() {
-        rustCall() { status ->
+    override fun freeRustArcPtr() {
+        rustCall { status ->
             _UniFFILib.INSTANCE.ffi_youhavemail_a6b5_Service_object_free(this.pointer, status)
         }
     }
 
     override fun `getBackends`(): List<Backend> =
         callWithPointer {
-            rustCall() { _status ->
+            rustCall { _status ->
                 _UniFFILib.INSTANCE.youhavemail_a6b5_Service_get_backends(it, _status)
             }
         }.let {
@@ -949,7 +953,7 @@ class Service(
 
     override fun `newAccount`(`backend`: Backend, `email`: String): Account =
         callWithPointer {
-            rustCall() { _status ->
+            rustCall { _status ->
                 _UniFFILib.INSTANCE.youhavemail_a6b5_Service_new_account(
                     it,
                     FfiConverterTypeBackend.lower(`backend`),
@@ -1050,7 +1054,7 @@ class Service(
 
 }
 
-public object FfiConverterTypeService : FfiConverter<Service, Pointer> {
+object FfiConverterTypeService : FfiConverter<Service, Pointer> {
     override fun lower(value: Service): Pointer = value.callWithPointer { it }
 
     override fun lift(value: Pointer): Service {
@@ -1060,7 +1064,7 @@ public object FfiConverterTypeService : FfiConverter<Service, Pointer> {
     override fun read(buf: ByteBuffer): Service {
         // The Rust code always writes pointers as 8 bytes, and will
         // fail to compile if they don't fit.
-        return lift(Pointer(buf.getLong()))
+        return lift(Pointer(buf.long))
     }
 
     override fun allocationSize(value: Service) = 8
@@ -1077,11 +1081,9 @@ data class ObserverAccount(
     var `email`: String,
     var `status`: ObserverAccountStatus,
     var `backend`: String
-) {
+)
 
-}
-
-public object FfiConverterTypeObserverAccount : FfiConverterRustBuffer<ObserverAccount> {
+object FfiConverterTypeObserverAccount : FfiConverterRustBuffer<ObserverAccount> {
     override fun read(buf: ByteBuffer): ObserverAccount {
         return ObserverAccount(
             FfiConverterString.read(buf),
@@ -1108,10 +1110,10 @@ enum class ObserverAccountStatus {
     OFFLINE, LOGGED_OUT, ONLINE;
 }
 
-public object FfiConverterTypeObserverAccountStatus :
+object FfiConverterTypeObserverAccountStatus :
     FfiConverterRustBuffer<ObserverAccountStatus> {
     override fun read(buf: ByteBuffer) = try {
-        ObserverAccountStatus.values()[buf.getInt() - 1]
+        ObserverAccountStatus.values()[buf.int - 1]
     } catch (e: IndexOutOfBoundsException) {
         throw RuntimeException("invalid enum value, something is very wrong!!", e)
     }
@@ -1174,11 +1176,11 @@ sealed class ConfigException : Exception() {
 
 }
 
-public object FfiConverterTypeConfigError : FfiConverterRustBuffer<ConfigException> {
+object FfiConverterTypeConfigError : FfiConverterRustBuffer<ConfigException> {
     override fun read(buf: ByteBuffer): ConfigException {
 
 
-        return when (buf.getInt()) {
+        return when (buf.int) {
             1 -> ConfigException.BackendNotFound(
                 FfiConverterString.read(buf),
                 FfiConverterString.read(buf),
@@ -1240,29 +1242,24 @@ public object FfiConverterTypeConfigError : FfiConverterRustBuffer<ConfigExcepti
                 buf.putInt(1)
                 FfiConverterString.write(value.`account`, buf)
                 FfiConverterString.write(value.`backend`, buf)
-                Unit
             }
             is ConfigException.BackendConfig -> {
                 buf.putInt(2)
                 FfiConverterString.write(value.`account`, buf)
                 FfiConverterString.write(value.`backend`, buf)
                 FfiConverterString.write(value.`error`, buf)
-                Unit
             }
             is ConfigException.Crypto -> {
                 buf.putInt(3)
                 FfiConverterString.write(value.`msg`, buf)
-                Unit
             }
             is ConfigException.Json -> {
                 buf.putInt(4)
                 FfiConverterString.write(value.`msg`, buf)
-                Unit
             }
             is ConfigException.RpcFailed -> {
                 buf.putInt(5)
                 FfiConverterString.write(value.`msg`, buf)
-                Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
@@ -1287,8 +1284,7 @@ sealed class ServiceException : Exception() {
             get() = "email=${`email`}"
     }
 
-    class InvalidAccountState(
-    ) : ServiceException() {
+    class InvalidAccountState : ServiceException() {
         override val message
             get() = ""
     }
@@ -1300,14 +1296,12 @@ sealed class ServiceException : Exception() {
             get() = "msg=${`msg`}"
     }
 
-    class LoggedOut(
-    ) : ServiceException() {
+    class LoggedOut : ServiceException() {
         override val message
             get() = ""
     }
 
-    class Offline(
-    ) : ServiceException() {
+    class Offline : ServiceException() {
         override val message
             get() = ""
     }
@@ -1342,11 +1336,11 @@ sealed class ServiceException : Exception() {
 
 }
 
-public object FfiConverterTypeServiceError : FfiConverterRustBuffer<ServiceException> {
+object FfiConverterTypeServiceError : FfiConverterRustBuffer<ServiceException> {
     override fun read(buf: ByteBuffer): ServiceException {
 
 
-        return when (buf.getInt()) {
+        return when (buf.int) {
             1 -> ServiceException.RpcFailed(
                 FfiConverterString.read(buf),
             )
@@ -1424,12 +1418,10 @@ public object FfiConverterTypeServiceError : FfiConverterRustBuffer<ServiceExcep
             is ServiceException.RpcFailed -> {
                 buf.putInt(1)
                 FfiConverterString.write(value.`msg`, buf)
-                Unit
             }
             is ServiceException.AccountAlreadyActive -> {
                 buf.putInt(2)
                 FfiConverterString.write(value.`email`, buf)
-                Unit
             }
             is ServiceException.InvalidAccountState -> {
                 buf.putInt(3)
@@ -1438,7 +1430,6 @@ public object FfiConverterTypeServiceError : FfiConverterRustBuffer<ServiceExcep
             is ServiceException.RequestException -> {
                 buf.putInt(4)
                 FfiConverterString.write(value.`msg`, buf)
-                Unit
             }
             is ServiceException.LoggedOut -> {
                 buf.putInt(5)
@@ -1451,17 +1442,14 @@ public object FfiConverterTypeServiceError : FfiConverterRustBuffer<ServiceExcep
             is ServiceException.Unknown -> {
                 buf.putInt(7)
                 FfiConverterString.write(value.`msg`, buf)
-                Unit
             }
             is ServiceException.Config -> {
                 buf.putInt(8)
                 FfiConverterTypeConfigError.write(value.`error`, buf)
-                Unit
             }
             is ServiceException.AccountNotFound -> {
                 buf.putInt(9)
                 FfiConverterString.write(value.`email`, buf)
-                Unit
             }
         }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
     }
@@ -1506,7 +1494,7 @@ internal class ConcurrentHandleMap<T>(
 }
 
 interface ForeignCallback : com.sun.jna.Callback {
-    public fun invoke(
+    fun invoke(
         handle: Handle,
         method: Int,
         args: RustBuffer.ByValue,
@@ -1518,7 +1506,7 @@ interface ForeignCallback : com.sun.jna.Callback {
 // to free the callback once it's dropped by Rust.
 internal const val IDX_CALLBACK_FREE = 0
 
-public abstract class FfiConverterCallbackInterface<CallbackInterface>(
+abstract class FfiConverterCallbackInterface<CallbackInterface>(
     protected val foreignCallback: ForeignCallback
 ) : FfiConverter<CallbackInterface, Handle> {
     private val handleMap = ConcurrentHandleMap<CallbackInterface>()
@@ -1536,7 +1524,7 @@ public abstract class FfiConverterCallbackInterface<CallbackInterface>(
             ?: throw InternalException("No callback in handlemap; this is a Uniffi bug")
     }
 
-    override fun read(buf: ByteBuffer) = lift(buf.getLong())
+    override fun read(buf: ByteBuffer) = lift(buf.long)
 
     override fun lower(value: CallbackInterface) =
         handleMap.insert(value).also {
@@ -1552,7 +1540,7 @@ public abstract class FfiConverterCallbackInterface<CallbackInterface>(
 
 // Declaration and FfiConverters for Notifier Callback Interface
 
-public interface Notifier {
+interface Notifier {
     fun `newEmail`(`account`: String, `backend`: String, `count`: UInt)
     fun `accountAdded`(`email`: String)
     fun `accountLoggedOut`(`email`: String)
@@ -1861,11 +1849,11 @@ internal class ForeignCallbackTypeNotifier : ForeignCallback {
 }
 
 // The ffiConverter which transforms the Callbacks in to Handles to pass to Rust.
-public object FfiConverterTypeNotifier : FfiConverterCallbackInterface<Notifier>(
+object FfiConverterTypeNotifier : FfiConverterCallbackInterface<Notifier>(
     foreignCallback = ForeignCallbackTypeNotifier()
 ) {
     override fun register(lib: _UniFFILib) {
-        rustCall() { status ->
+        rustCall { status ->
             lib.ffi_youhavemail_a6b5_Notifier_init_callback(this.foreignCallback, status)
         }
     }
@@ -1874,7 +1862,7 @@ public object FfiConverterTypeNotifier : FfiConverterCallbackInterface<Notifier>
 
 // Declaration and FfiConverters for ServiceFromConfigCallback Callback Interface
 
-public interface ServiceFromConfigCallback {
+interface ServiceFromConfigCallback {
     fun `notifyError`(`email`: String, `error`: ServiceException)
 
 }
@@ -1953,12 +1941,12 @@ internal class ForeignCallbackTypeServiceFromConfigCallback : ForeignCallback {
 }
 
 // The ffiConverter which transforms the Callbacks in to Handles to pass to Rust.
-public object FfiConverterTypeServiceFromConfigCallback :
+object FfiConverterTypeServiceFromConfigCallback :
     FfiConverterCallbackInterface<ServiceFromConfigCallback>(
         foreignCallback = ForeignCallbackTypeServiceFromConfigCallback()
     ) {
     override fun register(lib: _UniFFILib) {
-        rustCall() { status ->
+        rustCall { status ->
             lib.ffi_youhavemail_a6b5_ServiceFromConfigCallback_init_callback(
                 this.foreignCallback,
                 status
@@ -1968,9 +1956,9 @@ public object FfiConverterTypeServiceFromConfigCallback :
 }
 
 
-public object FfiConverterSequenceTypeBackend : FfiConverterRustBuffer<List<Backend>> {
+object FfiConverterSequenceTypeBackend : FfiConverterRustBuffer<List<Backend>> {
     override fun read(buf: ByteBuffer): List<Backend> {
-        val len = buf.getInt()
+        val len = buf.int
         return List<Backend>(len) {
             FfiConverterTypeBackend.read(buf)
         }
@@ -1991,10 +1979,10 @@ public object FfiConverterSequenceTypeBackend : FfiConverterRustBuffer<List<Back
 }
 
 
-public object FfiConverterSequenceTypeObserverAccount :
+object FfiConverterSequenceTypeObserverAccount :
     FfiConverterRustBuffer<List<ObserverAccount>> {
     override fun read(buf: ByteBuffer): List<ObserverAccount> {
-        val len = buf.getInt()
+        val len = buf.int
         return List<ObserverAccount>(len) {
             FfiConverterTypeObserverAccount.read(buf)
         }

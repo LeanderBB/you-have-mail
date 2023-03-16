@@ -41,6 +41,9 @@ class MainActivity : ComponentActivity(), ServiceConnection {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         actionOnService(Actions.START)
+
+        onNewIntent(this.intent)
+
         setContent {
             YouHaveMailTheme {
                 // A surface container using the 'background' color from the theme
@@ -153,6 +156,41 @@ class MainActivity : ComponentActivity(), ServiceConnection {
         Log.i(activityLogTag, "App disconnected from service")
         mBound = false
         mServiceState.removeService()
+    }
+
+    override fun onNewIntent(intent: Intent?) {
+        super.onNewIntent(intent)
+        if (intent == null) {
+            return
+        }
+
+        val action = intent.action ?: return
+
+        if (action == notificationActionClicked) {
+            val backend = intent.getStringExtra(notificationIntentBackendKey)!!
+            val email = intent.getStringExtra(notificationIntentEmailKey)!!
+            val appName = intent.getStringExtra(notificationIntentAppNameKey)!!
+
+            // Launch the app for this backend
+            Log.d(activityLogTag, "Receive click request for '$email' backend='$backend'")
+            try {
+                Log.d(serviceLogTag, "Attempting to launch $appName")
+                val appIntent =
+                    packageManager.getLaunchIntentForPackage(appName)
+                if (appIntent != null) {
+                    appIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
+                    appIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    appIntent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
+                    appIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
+                    startActivity(appIntent)
+                } else {
+                    Log.e(activityLogTag, "Could not find package $appName")
+                }
+            } catch (e: Exception) {
+                Log.e(activityLogTag, "Failed to launch $appName for backend $backend: $e")
+            }
+        }
+
     }
 }
 

@@ -36,4 +36,7 @@
         </activity>
     </application>
 
+    <queries>
+        <package android:name="ch.protonmail.android" />
+    </queries>
 </manifest>

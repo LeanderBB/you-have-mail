@@ -6,6 +6,8 @@ import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
 import android.graphics.Color
+import android.media.AudioAttributes
+import android.media.RingtoneManager
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
@@ -20,10 +22,13 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.util.concurrent.locks.Lock
+import java.util.concurrent.locks.ReentrantLock
 
 
 const val serviceLogTag = "observer"
 
+data class NotificationIds(val newMessages: Int, val statusUpdate: Int, val errors: Int)
 
 class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private var wakeLock: PowerManager.WakeLock? = null
@@ -38,6 +43,10 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         MutableStateFlow(ArrayList())
     val accountList: StateFlow<List<ObserverAccount>> get() = _accountListFlow
 
+    private var notificationIDCounter: Int = 2
+    private var notificationMap: HashMap<String, NotificationIds> = HashMap()
+    private var unreadMessageCounts: HashMap<String, UInt> = HashMap()
+    private var unreadMessageCountMutex: Lock = ReentrantLock()
 
     // Have to keep this here or it won't survive activity refreshes
     private var mInLoginAccount: Account? = null
@@ -55,8 +64,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     }
 
     override fun onUnbind(intent: Intent?): Boolean {
-        if (mService != null) {
-        }
         Log.d(serviceLogTag, "Some component unbound from the system")
         return super.onUnbind(intent)
     }
@@ -71,14 +78,9 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         return mInLoginAccount
     }
 
-    fun clearInLoginAccount() {
-        mInLoginAccount?.destroy()
-    }
-
     fun getBackends(): List<Backend> {
         return mBackends
     }
-
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(serviceLogTag, "onStartCommand executed with startId: $startId")
@@ -121,7 +123,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
         coroutineScope.cancel()
         mInLoginAccount?.destroy()
         mBackends.forEach {
@@ -130,6 +131,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         mBackends.clear()
         mService?.destroy()
         Log.d(serviceLogTag, "The service has been destroyed")
+        super.onDestroy()
     }
 
     private fun startService() {
@@ -187,17 +189,18 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             it.enableLights(true)
             it.lightColor = Color.WHITE
             it.enableVibration(true)
+            it.setSound(
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_ASSISTANCE_SONIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
             it
         }
         notificationManager.createNotificationChannel(channelAlerter)
     }
 
     private fun createServiceNotification(): Notification {
-        val pendingIntent: PendingIntent =
-            Intent(this, MainActivity::class.java).let { notificationIntent ->
-                PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
-            }
-
         val builder: Notification.Builder = Notification.Builder(
             this,
             notificationChannelIdService
@@ -206,7 +209,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         return builder
             .setContentTitle("You Have Mail")
             .setContentText("Background Service Running")
-            .setContentIntent(pendingIntent)
             .setSmallIcon(R.mipmap.ic_launcher_monochrome)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setCategory(Notification.CATEGORY_SERVICE)
@@ -215,21 +217,69 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .build()
     }
 
-    private fun createAlertNotification(email: String, messageCount: UInt): Notification {
-        val pendingIntent: PendingIntent =
-            Intent(this, MainActivity::class.java).let { notificationIntent ->
-                PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
+    private fun createAlertNotification(
+        email: String,
+        backend: String,
+        messageCount: UInt
+    ): Notification {
+
+        val appName = getAppNameForBackend(backend)
+
+        val clickIntent: PendingIntent? =
+            if (appName != null) {
+                Intent(this, MainActivity::class.java).let { intent ->
+                    intent.action = notificationActionClicked
+                    intent.putExtra(
+                        notificationIntentEmailKey, email
+                    )
+                    intent.putExtra(
+                        notificationIntentBackendKey, backend
+                    )
+                    intent.putExtra(
+                        notificationIntentAppNameKey,
+                        appName
+                    )
+                    intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    PendingIntent.getActivity(
+                        this,
+                        0,
+                        intent,
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                    )
+                }
+            } else {
+                Log.d(serviceLogTag, "No app found for backed '$backend'. No notification action")
+                null
             }
+
+        val dismissIntent: PendingIntent =
+            Intent().let { intent ->
+                intent.action = notificationActionDismissed
+                intent.putExtra(
+                    notificationIntentEmailKey, email
+                )
+                intent.putExtra(
+                    notificationIntentBackendKey, backend
+                )
+                PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+            }
+
 
         val builder: Notification.Builder = Notification.Builder(
             this,
             notificationChannelIdAlerter
         )
 
+        if (clickIntent != null) {
+            builder.setContentIntent(clickIntent)
+        }
+
         return builder
             .setContentTitle("You Have Mail")
             .setContentText("$email has $messageCount new message(s)")
-            .setContentIntent(pendingIntent)
+            .setDeleteIntent(dismissIntent)
+            .setAutoCancel(true)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setCategory(Notification.CATEGORY_STATUS)
             .setSmallIcon(R.mipmap.ic_launcher_monochrome)
@@ -254,6 +304,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setContentTitle("You Have Mail")
             .setContentText("$email error: $errorString")
             .setContentIntent(pendingIntent)
+            .setAutoCancel(true)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setSmallIcon(R.mipmap.ic_launcher_monochrome)
             .setTicker("You Have Mail Alert")
@@ -263,7 +314,12 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private fun createAccountStatusNotification(text: String): Notification {
         val pendingIntent: PendingIntent =
             Intent(this, MainActivity::class.java).let { notificationIntent ->
-                PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
+                PendingIntent.getActivity(
+                    this,
+                    0,
+                    notificationIntent,
+                    PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+                )
             }
 
         val builder: Notification.Builder = Notification.Builder(
@@ -274,6 +330,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         return builder
             .setContentTitle("You Have Mail")
             .setContentText(text)
+            .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setSmallIcon(R.mipmap.ic_launcher_monochrome)
@@ -281,12 +338,73 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .build()
     }
 
+
+    private fun getOrCreateNotificationIDs(email: String): NotificationIds {
+        val ids = notificationMap[email]
+        if (ids != null) {
+            return ids
+        }
+
+        var newIds = NotificationIds(
+            newMessages = notificationIDCounter++,
+            statusUpdate = notificationIDCounter++,
+            errors = notificationIDCounter++
+        )
+
+        notificationMap[email] = newIds
+        return newIds
+    }
+
+    private fun getAndUpdateUnreadMessageCount(
+        email: String,
+        newMessageCount: UInt,
+        reset: Boolean
+    ): UInt {
+        var result = 0u
+        unreadMessageCountMutex.lock()
+        if (reset) {
+            unreadMessageCounts[email] = newMessageCount
+            result = newMessageCount
+        } else {
+            var count = unreadMessageCounts.getOrDefault(email, 0u)
+            count += newMessageCount
+            unreadMessageCounts[email] = count
+            result = count
+        }
+        unreadMessageCountMutex.unlock()
+        return result
+    }
+
+    private fun resetUnreadMessageCount(email: String) {
+        unreadMessageCountMutex.lock()
+        Log.d(serviceLogTag, "Resetting message count $email current=${unreadMessageCounts[email]}")
+        unreadMessageCounts[email] = 0u
+        unreadMessageCountMutex.unlock()
+    }
+
+
+    private fun isNotificationVisible(id: Int): Boolean {
+        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+            for (n in this.activeNotifications) {
+                if (n.id == id) {
+                    return true
+                }
+            }
+        }
+
+        return false
+    }
+
+
     override fun newEmail(account: String, backend: String, count: UInt) {
         Log.d(serviceLogTag, "New Mail: $account ($backend) num=$count")
-        val notification = createAlertNotification(account, count)
+        val ids = getOrCreateNotificationIDs(account)
+        val isNotificationActive = isNotificationVisible(ids.newMessages)
+        val unreadCount = getAndUpdateUnreadMessageCount(account, count, !isNotificationActive)
+        val notification = createAlertNotification(account, backend, unreadCount)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
-                notify(2, notification)
+                notify(ids.newMessages, notification)
             }
         }
     }
@@ -300,9 +418,10 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         Log.d(serviceLogTag, "Account Logged Out: $email")
         updateAccountList()
         val notification = createAccountStatusNotification("Account $email session expired")
+        val ids = getOrCreateNotificationIDs(email)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
-                notify(6, notification)
+                notify(ids.statusUpdate, notification)
             }
         }
     }
@@ -325,9 +444,10 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     override fun accountError(email: String, error: ServiceException) {
         Log.e(serviceLogTag, "Account Error: $email => $error")
         val notification = createAccountErrorNotification(email, error)
+        val ids = getOrCreateNotificationIDs(email)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
-                notify(3, notification)
+                notify(ids.errors, notification)
             }
         }
     }
@@ -386,5 +506,14 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     override fun notifyError(email: String, error: ServiceException) {
         Toast.makeText(this, serviceExceptionToErrorStr(error, email), Toast.LENGTH_SHORT).show()
         Log.e(serviceLogTag, "Failed to load '$email' from config: $error")
+    }
+}
+
+
+fun getAppNameForBackend(backend: String): String? {
+    return when (backend) {
+        "Proton Mail" -> "ch.protonmail.android"
+
+        else -> null
     }
 }
