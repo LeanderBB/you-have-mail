@@ -14,7 +14,7 @@ android {
         minSdk 29
         targetSdk 33
         versionCode 1
-        versionName "0.1"
+        versionName "0.1.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -78,6 +78,7 @@ cargo {
     targets = ["x86_64", "arm64"]
     targetIncludes = ["libyouhavemail.so", "libgo-srp.so"]
     targetDirectory = "../../target"
+    profile = "release"
 }
 
 afterEvaluate {
