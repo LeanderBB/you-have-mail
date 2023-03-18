@@ -223,9 +223,6 @@ pub fn new_service_from_config(
 }
 
 fn get_backends() -> Vec<Arc<Backend>> {
-    #[cfg(feature = "null_backend")]
-    use std::time::Duration;
-
     [
         #[cfg(feature = "null_backend")]
         {

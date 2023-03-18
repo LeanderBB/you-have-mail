@@ -261,7 +261,16 @@ async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequ
     debug!("Starting observer loop");
     let sleep = tokio::time::interval(observer.poll_interval);
     tokio::pin!(sleep);
+    let mut last_poll_interval = observer.poll_interval;
     loop {
+        // Update poll interval
+        if last_poll_interval != observer.poll_interval {
+            debug!("Updating observer poll interval old={:?} new={:?}", last_poll_interval, observer.poll_interval);
+            let new_interval= tokio::time::interval(observer.poll_interval);
+            *sleep = new_interval;
+            last_poll_interval = observer.poll_interval;
+        }
+
         tokio::select! {
             _ = sleep.tick() => {
                 observer.poll_accounts().await;
