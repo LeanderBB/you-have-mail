@@ -171,7 +171,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
         val channelService = NotificationChannel(
             notificationChannelIdService,
-            "You Have Mail Background Service",
+            "Background Service ",
             NotificationManager.IMPORTANCE_LOW
         ).let {
             it.description = "You Have Mail Background Service"
@@ -182,7 +182,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         notificationManager.createNotificationChannel(channelService)
         val channelAlerter = NotificationChannel(
             notificationChannelIdAlerter,
-            "You Have Mail Alerter",
+            "Alerts",
             NotificationManager.IMPORTANCE_HIGH
         ).let {
             it.description = "You Have Mail Notifications"
@@ -209,7 +209,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         return builder
             .setContentTitle("You Have Mail")
             .setContentText("Background Service Running")
-            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_stat_sync)
             .setVisibility(Notification.VISIBILITY_SECRET)
             .setCategory(Notification.CATEGORY_SERVICE)
             .setOngoing(true)
@@ -281,7 +281,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setDeleteIntent(dismissIntent)
             .setAutoCancel(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE)
-            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_stat_alert)
             .setTicker("You Have Mail Alert")
             .build()
     }
@@ -305,7 +305,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setContentIntent(pendingIntent)
             .setAutoCancel(true)
             .setVisibility(Notification.VISIBILITY_PRIVATE)
-            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_stat_err)
             .setTicker("You Have Mail Alert")
             .build()
     }
@@ -332,7 +332,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .setAutoCancel(true)
             .setContentIntent(pendingIntent)
             .setVisibility(Notification.VISIBILITY_PRIVATE)
-            .setSmallIcon(R.mipmap.ic_launcher_monochrome)
+            .setSmallIcon(R.drawable.ic_stat_alert)
             .setTicker("You Have Mail Alert")
             .build()
     }

@@ -1,5 +1,5 @@
 <resources>
-    <string name="app_name">YouHaveMail</string>
+    <string name="app_name">You Have Mail</string>
     <string name="connecting_to_service">Connecting to Service...</string>
     <string name="no_accounts">No active accounts.</string>
     <string name="add_account_title">Add Account</string>
