@@ -1,6 +1,6 @@
 use crate::backend::null::{new_backend, NullTestAccount};
 use crate::backend::Backend;
-use crate::{Account, Notification, Notifier, ObserverBuilder};
+use crate::{Account, Notification, Notifier, NullNotifier, ObserverBuilder};
 use crate::{MockNotifier, Observer};
 use mockall::Sequence;
 use proton_api_rs::tokio;
@@ -265,6 +265,26 @@ async fn removing_account_produces_remove_notification() {
             observer.remove_account("foo").await.unwrap();
         },
     )
+    .await;
+}
+
+#[tokio::test]
+async fn test_get_set_poll_interval() {
+    let notifier: Box<dyn Notifier> = Box::new(NullNotifier {});
+    let start_poll_interval = Duration::from_millis(10);
+
+    with_observer(start_poll_interval, notifier, move |observer| async move {
+        {
+            let current_interval = observer.get_poll_interval().await.unwrap();
+            assert_eq!(current_interval, start_poll_interval);
+        }
+        {
+            let new_poll_interval = Duration::from_secs(20);
+            observer.set_poll_interval(new_poll_interval).await.unwrap();
+            let current_interval = observer.get_poll_interval().await.unwrap();
+            assert_eq!(current_interval, new_poll_interval);
+        }
+    })
     .await;
 }
 

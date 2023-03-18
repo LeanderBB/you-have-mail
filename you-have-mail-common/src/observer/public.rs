@@ -1,6 +1,6 @@
 use crate::observer::rpc::{
-    AddAccountRequest, GenConfigRequest, GetAccountListRequest, LogoutAccountRequest, ObserverPRC,
-    ObserverRequest, RemoveAccountRequest,
+    AddAccountRequest, GenConfigRequest, GetAccountListRequest, GetPollIntervalRequest,
+    LogoutAccountRequest, ObserverPRC, ObserverRequest, RemoveAccountRequest,
 };
 use crate::observer::worker::Worker;
 use crate::{Account, AccountError, ConfigGenError, Notifier};
@@ -176,6 +176,26 @@ impl Observer {
     /// Generate configuration data for the currently active account list.
     pub async fn generate_config(&self) -> Result<String, ObserverRPCError<(), ConfigGenError>> {
         self.perform_rpc(GenConfigRequest {}).await
+    }
+
+    pub async fn set_poll_interval(
+        &self,
+        duration: Duration,
+    ) -> Result<(), ObserverRPCError<(), ()>> {
+        if self
+            .0
+            .send(ObserverRequest::SetPollInterval(duration))
+            .await
+            .is_err()
+        {
+            return Err(ObserverRPCError::SendFailed(()));
+        }
+
+        Ok(())
+    }
+
+    pub async fn get_poll_interval(&self) -> Result<Duration, ObserverRPCError<(), ()>> {
+        self.perform_rpc(GetPollIntervalRequest {}).await
     }
 
     async fn perform_rpc<T: ObserverPRC>(

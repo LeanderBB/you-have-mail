@@ -3,6 +3,7 @@
 use crate::{ConfigError, Notifier, NotifierWrapper, ServiceError, ServiceFromConfigCallback};
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
+use std::time::Duration;
 use uniffi::deps::log::{debug, error};
 use you_have_mail_common as yhm;
 
@@ -145,6 +146,20 @@ impl Service {
             .runtime
             .block_on(async { self.observer.generate_config().await })?;
         Ok(config)
+    }
+
+    pub fn get_poll_interval(&self) -> Result<u64, ServiceError> {
+        let interval = self
+            .runtime
+            .block_on(async { self.observer.get_poll_interval().await })?;
+        Ok(interval.as_secs())
+    }
+
+    pub fn set_poll_interval(&self, seconds: u64) -> Result<(), ServiceError> {
+        let duration = Duration::from_secs(seconds);
+        self.runtime
+            .block_on(async { self.observer.set_poll_interval(duration).await })?;
+        Ok(())
     }
 }
 

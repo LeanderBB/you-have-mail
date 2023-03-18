@@ -172,6 +172,16 @@ impl Worker {
 
                 false
             }
+            ObserverRequest::SetPollInterval(d) => {
+                self.poll_interval = d;
+                false
+            }
+            ObserverRequest::GetPollInterval(reply) => {
+                if reply.send(Ok(self.poll_interval)).await.is_err() {
+                    error!("Failed to send reply for poll interval request");
+                }
+                false
+            }
         }
     }
 

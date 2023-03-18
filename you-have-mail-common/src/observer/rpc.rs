@@ -1,5 +1,6 @@
 use crate::{Account, ConfigGenError, ObserverAccount, ObserverError};
 use proton_api_rs::tokio::sync::mpsc::Sender;
+use std::time::Duration;
 
 /// RPC Requests for the `Observer`.
 pub enum ObserverRequest {
@@ -11,6 +12,8 @@ pub enum ObserverRequest {
     Pause,
     Resume,
     GenConfig(Sender<Result<String, ConfigGenError>>),
+    SetPollInterval(Duration),
+    GetPollInterval(Sender<Result<Duration, ()>>),
 }
 
 #[doc(hidden)]
@@ -121,5 +124,23 @@ impl ObserverPRC for GenConfigRequest {
 
     fn recover_send_value(_: ObserverRequest) -> Option<Self::SendFailedValue> {
         Some(())
+    }
+}
+
+#[doc(hidden)]
+pub struct GetPollIntervalRequest {}
+
+#[doc(hidden)]
+impl ObserverPRC for GetPollIntervalRequest {
+    type Output = Duration;
+    type Error = ();
+    type SendFailedValue = ();
+
+    fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
+        ObserverRequest::GetPollInterval(reply)
+    }
+
+    fn recover_send_value(_: ObserverRequest) -> Option<Self::SendFailedValue> {
+        None
     }
 }

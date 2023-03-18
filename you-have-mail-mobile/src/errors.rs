@@ -94,6 +94,14 @@ impl<T, E: Into<ServiceError>> From<yhm::ObserverRPCError<T, E>> for ServiceErro
     }
 }
 
+impl From<()> for ServiceError {
+    fn from(_: ()) -> Self {
+        ServiceError::Unknown {
+            msg: "Unknown error occurred".to_string(),
+        }
+    }
+}
+
 impl<T, E: Into<ConfigError>> From<yhm::ObserverRPCError<T, E>> for ConfigError {
     fn from(value: yhm::ObserverRPCError<T, E>) -> Self {
         match value {

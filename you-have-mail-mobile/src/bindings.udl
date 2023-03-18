@@ -108,4 +108,10 @@ interface Service {
 
     [Throws=ConfigError]
     string get_config();
+
+    [Throws=ServiceError]
+    u64 get_poll_interval();
+
+    [Throws=ServiceError]
+    void set_poll_interval(u64 interval);
 };
