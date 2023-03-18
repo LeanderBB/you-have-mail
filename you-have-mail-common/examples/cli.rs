@@ -40,7 +40,7 @@ async fn main() {
     let encryption_key = get_or_create_encryption_key();
     let encryptor = DefaultEncryption::new(encryption_key);
     let backend = new_backed();
-    let accounts = if let Some(accounts) = load_config(&encryptor, &[backend.clone()]).await {
+    let accounts = if let Some((_, accounts)) = load_config(&encryptor, &[backend.clone()]).await {
         println!("Previous accounts detected");
         let mut result = Vec::with_capacity(accounts.len());
         for (mut a, refresher) in accounts {
@@ -107,7 +107,7 @@ async fn main() {
 async fn load_config(
     decryptor: &DefaultEncryption,
     backends: &[Arc<dyn Backend>],
-) -> Option<Vec<ConfigAccount>> {
+) -> Option<(Duration, Vec<ConfigAccount>)> {
     if let Some(bytes) = load_config_file().await {
         let decrypted = decryptor.decrypt(&bytes).unwrap();
 

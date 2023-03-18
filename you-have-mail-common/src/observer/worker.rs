@@ -164,7 +164,10 @@ impl Worker {
             }
             ObserverRequest::GenConfig(reply) => {
                 debug!("Gen config request");
-                let r = Config::store(self.accounts.values().map(|a| &a.account));
+                let r = Config::store(
+                    self.poll_interval,
+                    self.accounts.values().map(|a| &a.account),
+                );
 
                 if reply.send(r).await.is_err() {
                     error!("Failed to send reply for gen config request");
@@ -265,8 +268,11 @@ async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequ
     loop {
         // Update poll interval
         if last_poll_interval != observer.poll_interval {
-            debug!("Updating observer poll interval old={:?} new={:?}", last_poll_interval, observer.poll_interval);
-            let new_interval= tokio::time::interval(observer.poll_interval);
+            debug!(
+                "Updating observer poll interval old={:?} new={:?}",
+                last_poll_interval, observer.poll_interval
+            );
+            let new_interval = tokio::time::interval(observer.poll_interval);
             *sleep = new_interval;
             last_poll_interval = observer.poll_interval;
         }

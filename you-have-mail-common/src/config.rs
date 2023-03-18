@@ -5,6 +5,7 @@ use proton_api_rs::log::error;
 use proton_api_rs::tokio;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use std::time::Duration;
 use thiserror::Error;
 
 /// Config stores a You Have Mail application state with all the active user accounts
@@ -45,7 +46,7 @@ impl Config {
     pub fn load(
         backends: &[Arc<dyn Backend>],
         data: &[u8],
-    ) -> Result<Vec<ConfigAccount>, ConfigLoadError> {
+    ) -> Result<(Duration, Vec<ConfigAccount>), ConfigLoadError> {
         let config = serde_json::from_slice::<ConfigJSON>(data)
             .map_err(|e| ConfigLoadError::JSON(anyhow!(e)))?;
 
@@ -86,10 +87,11 @@ impl Config {
             result.push((account, refresher));
         }
 
-        Ok(result)
+        Ok((Duration::from_secs(config.poll_interval), result))
     }
 
     pub fn store<'a>(
+        poll_interval: Duration,
         accounts: impl Iterator<Item = &'a Account>,
     ) -> Result<String, ConfigGenError> {
         let mut json_accounts = Vec::<ConfigJSONAccount>::new();
@@ -115,6 +117,7 @@ impl Config {
         }
 
         let config_json = ConfigJSON {
+            poll_interval: poll_interval.as_secs(),
             accounts: json_accounts,
         };
 
@@ -131,6 +134,7 @@ struct ConfigJSONAccount {
 
 #[derive(Deserialize, Serialize)]
 struct ConfigJSON {
+    poll_interval: u64,
     accounts: Vec<ConfigJSONAccount>,
 }
 
@@ -151,6 +155,8 @@ async fn test_config_store_and_load() {
         },
     ]);
 
+    let poll_interval = Duration::from_secs(10);
+
     let account1 = {
         let mut a = Account::new(null_backed.clone(), "foo");
         a.login("foo").await.unwrap();
@@ -158,13 +164,15 @@ async fn test_config_store_and_load() {
     };
     let account2 = Account::new(null_backed.clone(), "bar");
 
-    let config_encrypted = Config::store([account1, account2].iter()).unwrap();
+    let config_generated = Config::store(poll_interval, [account1, account2].iter()).unwrap();
 
-    let accounts = Config::load(&[null_backed], config_encrypted.as_bytes()).unwrap();
+    let (loaded_poll_interval, accounts) =
+        Config::load(&[null_backed], config_generated.as_bytes()).unwrap();
 
     assert_eq!(accounts.len(), 2);
     assert_eq!(accounts[0].0.email(), "foo");
     assert_eq!(accounts[1].0.email(), "bar");
     assert!(accounts[0].1.is_some());
     assert!(accounts[1].1.is_none());
+    assert_eq!(poll_interval, loaded_poll_interval);
 }

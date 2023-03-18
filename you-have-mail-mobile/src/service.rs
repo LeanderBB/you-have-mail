@@ -166,7 +166,7 @@ impl Service {
 pub fn new_service(notifier: Box<dyn Notifier>) -> Result<Arc<Service>, ServiceError> {
     #[cfg(target_os = "android")]
     init_android_logger();
-    new_service_with_backends(notifier, get_backends()).map(Arc::new)
+    new_service_with_backends(notifier, get_backends(), None).map(Arc::new)
 }
 
 pub fn new_service_from_config(
@@ -181,10 +181,10 @@ pub fn new_service_from_config(
 
     let config_backends = backends.iter().map(|x| x.0.clone()).collect::<Vec<_>>();
 
-    let accounts =
+    let (poll_interval, accounts) =
         yhm::Config::load(&config_backends, bytes.as_bytes()).map_err(ConfigError::from)?;
 
-    let service = new_service_with_backends(notifier, backends)?;
+    let service = new_service_with_backends(notifier, backends, Some(poll_interval))?;
 
     debug!("Found {} account(s) in config file", accounts.len());
 
@@ -251,6 +251,7 @@ fn get_backends() -> Vec<Arc<Backend>> {
 fn new_service_with_backends(
     notifier: Box<dyn Notifier>,
     backends: Vec<Arc<Backend>>,
+    poll_interval: Option<Duration>,
 ) -> Result<Service, ServiceError> {
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -260,7 +261,9 @@ fn new_service_with_backends(
             msg: format!("Failed to start tokio runtime {e}"),
         })?;
 
-    let (observer, task) = yhm::ObserverBuilder::new(Box::new(NotifierWrapper(notifier))).build();
+    let (observer, task) = yhm::ObserverBuilder::new(Box::new(NotifierWrapper(notifier)))
+        .poll_interval(poll_interval.unwrap_or(Duration::from_secs(30)))
+        .build();
     let join_handle = runtime.spawn(task);
 
     Ok(Service {
