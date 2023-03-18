@@ -71,7 +71,9 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
             }, onTotpClicked = onTotpClicked)
         }
         composable(Routes.Main.route) {
-            Main(serviceWrapper, navController, requestPermissions)
+            Main(serviceWrapper, navController, requestPermissions) {
+                navController.navigate(Routes.Settings.route)
+            }
         }
         composable(Routes.Backend.route) {
             BackendSelection(serviceWrapper = serviceWrapper, navController = navController)
@@ -121,6 +123,17 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                     }
                 )
             }
+        }
+
+        composable(Routes.Settings.route) {
+            Settings(serviceWrapper,
+                onBackClicked = {
+                    navController.popBackStack()
+                },
+                onPollIntervalUpdate = { interval ->
+                    serviceWrapper.setPollInterval(interval)
+                }
+            )
         }
     }
 }

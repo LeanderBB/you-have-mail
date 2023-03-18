@@ -40,6 +40,9 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private var _accountListFlow: MutableStateFlow<List<ObserverAccount>> =
         MutableStateFlow(ArrayList())
     val accountList: StateFlow<List<ObserverAccount>> get() = _accountListFlow
+    private var _pollIntervalFlow: MutableStateFlow<ULong> =
+        MutableStateFlow(15UL)
+    val pollInterval: StateFlow<ULong> get() = _pollIntervalFlow
 
     private var notificationIDCounter: Int = 2
     private var notificationMap: HashMap<String, NotificationIds> = HashMap()
@@ -80,6 +83,11 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         return mBackends
     }
 
+    fun setPollInterval(interval: ULong) {
+        mService!!.setPollInterval(interval)
+        _pollIntervalFlow.value = interval
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(serviceLogTag, "onStartCommand executed with startId: $startId")
         if (intent != null) {
@@ -114,6 +122,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
                 newServiceFromConfig(this, this, config)
             }
             mBackends.addAll(mService!!.getBackends())
+            _pollIntervalFlow.value = mService!!.getPollInterval()
             updateAccountList()
         } catch (e: ServiceException) {
             Log.e(serviceLogTag, "Failed to create service:$e")

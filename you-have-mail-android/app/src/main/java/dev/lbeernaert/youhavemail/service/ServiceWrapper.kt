@@ -26,6 +26,10 @@ class ServiceWrapper {
         return mObserverService!!.accountList
     }
 
+    fun getPollIntervalValueStateFlow(): StateFlow<ULong> {
+        return mObserverService!!.pollInterval
+    }
+
     fun getBackends(): List<Backend> {
         return mObserverService!!.getBackends()
     }
@@ -74,5 +78,9 @@ class ServiceWrapper {
             Log.e(serviceLogTag, "Failed to get account by index: $e")
             return null
         }
+    }
+
+    fun setPollInterval(intervalSeconds: ULong) {
+        mObserverService!!.setPollInterval(intervalSeconds)
     }
 }

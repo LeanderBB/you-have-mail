@@ -8,6 +8,7 @@ import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -26,14 +27,20 @@ import dev.lbeernaert.youhavemail.components.BackgroundTask
 import dev.lbeernaert.youhavemail.service.ServiceWrapper
 
 @Composable
-fun Main(service: ServiceWrapper, navController: NavController, requestPermissions: () -> Unit) {
+fun Main(
+    service: ServiceWrapper,
+    navController: NavController,
+    requestPermissions: () -> Unit,
+    onSettingsClicked: () -> Unit
+) {
     if (!service.isReady()) {
         BackgroundTask(text = stringResource(id = R.string.connecting_to_service))
     } else {
         AccountList(
             service = service,
             navController = navController,
-            requestPermissions = requestPermissions
+            requestPermissions = requestPermissions,
+            onSettingsClicked = onSettingsClicked,
         )
     }
 }
@@ -43,12 +50,24 @@ fun Main(service: ServiceWrapper, navController: NavController, requestPermissio
 fun AccountList(
     service: ServiceWrapper,
     navController: NavController,
-    requestPermissions: () -> Unit
+    requestPermissions: () -> Unit,
+    onSettingsClicked: () -> Unit
 ) {
     val accounts by service.getAccountsStateFlow().collectAsState()
 
     Scaffold(topBar = {
-        TopAppBar(title = { Text(text = stringResource(id = R.string.app_name)) })
+        TopAppBar(title = { Text(text = stringResource(id = R.string.app_name)) }, actions = {
+            Button(
+                onClick = onSettingsClicked,
+                colors = ButtonDefaults.outlinedButtonColors()
+            ) {
+                Icon(
+                    Icons.Filled.Settings,
+                    contentDescription = null,
+                    modifier = Modifier.size(30.dp)
+                )
+            }
+        })
     },
         floatingActionButtonPosition = FabPosition.End,
         floatingActionButton = {

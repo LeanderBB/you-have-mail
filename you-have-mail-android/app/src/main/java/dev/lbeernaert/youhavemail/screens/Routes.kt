@@ -7,6 +7,8 @@ sealed class Routes(val route: String) {
     object Main : Routes("Main")
     object Backend : Routes("Backend")
 
+    object Settings : Routes("Settings")
+
     companion object {
         fun newLoginRoute(backendIndex: Int, email: String?): String {
             if (email != null) {
