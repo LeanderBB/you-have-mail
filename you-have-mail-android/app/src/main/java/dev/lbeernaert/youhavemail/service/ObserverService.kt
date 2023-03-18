@@ -86,6 +86,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     fun setPollInterval(interval: ULong) {
         mService!!.setPollInterval(interval)
         _pollIntervalFlow.value = interval
+        storeConfig(this)
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
