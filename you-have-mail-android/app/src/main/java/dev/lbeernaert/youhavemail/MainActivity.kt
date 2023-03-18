@@ -166,10 +166,10 @@ class MainActivity : ComponentActivity(), ServiceConnection {
 
         val action = intent.action ?: return
 
-        if (action == notificationActionClicked) {
-            val backend = intent.getStringExtra(notificationIntentBackendKey)!!
-            val email = intent.getStringExtra(notificationIntentEmailKey)!!
-            val appName = intent.getStringExtra(notificationIntentAppNameKey)!!
+        if (action == NotificationActionClicked) {
+            val backend = intent.getStringExtra(NotificationIntentBackendKey)!!
+            val email = intent.getStringExtra(NotificationIntentEmailKey)!!
+            val appName = intent.getStringExtra(NotificationIntentAppNameKey)!!
 
             // Launch the app for this backend
             Log.d(activityLogTag, "Receive click request for '$email' backend='$backend'")

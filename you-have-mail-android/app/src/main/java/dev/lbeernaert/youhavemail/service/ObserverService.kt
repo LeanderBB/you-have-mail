@@ -34,8 +34,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private var wakeLock: PowerManager.WakeLock? = null
     private var isServiceStarted = false
     private val binder = LocalBinder()
-    private val notificationChannelIdService = "YOU_HAVE_MAIL_SERVICE"
-    private val notificationChannelIdAlerter = "YOU_HAVE_MAIL_NOTIFICATION"
     private val coroutineScope = CoroutineScope(
         Dispatchers.Default
     )
@@ -169,8 +167,16 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private fun createNotificationChannel() {
         val notificationManager =
             getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
+
+        val group = notificationManager.createNotificationChannelGroup(
+            NotificationChannelGroup(
+                NotificationGroupNewEmails,
+                "New Emails"
+            )
+        )
+
         val channelService = NotificationChannel(
-            notificationChannelIdService,
+            NotificationChannelService,
             "Background Service ",
             NotificationManager.IMPORTANCE_LOW
         ).let {
@@ -180,15 +186,17 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             it
         }
         notificationManager.createNotificationChannel(channelService)
+
         val channelAlerter = NotificationChannel(
-            notificationChannelIdAlerter,
-            "Alerts",
+            NotificationChannelNewMail,
+            "New Emails and Status",
             NotificationManager.IMPORTANCE_HIGH
         ).let {
             it.description = "You Have Mail Notifications"
             it.enableLights(true)
             it.lightColor = Color.WHITE
             it.enableVibration(true)
+            it.group = NotificationGroupNewEmails
             it.setSound(
                 RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
                 AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
@@ -198,12 +206,31 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             it
         }
         notificationManager.createNotificationChannel(channelAlerter)
+
+        val channelErrors = NotificationChannel(
+            NotificationChannelError,
+            "Errors",
+            NotificationManager.IMPORTANCE_HIGH
+        ).let {
+            it.description = "You Have Mail Errors"
+            it.enableLights(true)
+            it.lightColor = Color.RED
+            it.enableVibration(true)
+            it.setSound(
+                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
+                AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
+                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
+                    .build()
+            )
+            it
+        }
+        notificationManager.createNotificationChannel(channelErrors)
     }
 
     private fun createServiceNotification(): Notification {
         val builder: Notification.Builder = Notification.Builder(
             this,
-            notificationChannelIdService
+            NotificationChannelService,
         )
 
         return builder
@@ -228,15 +255,15 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         val clickIntent: PendingIntent? =
             if (appName != null) {
                 Intent(this, MainActivity::class.java).let { intent ->
-                    intent.action = notificationActionClicked
+                    intent.action = NotificationActionClicked
                     intent.putExtra(
-                        notificationIntentEmailKey, email
+                        NotificationIntentEmailKey, email
                     )
                     intent.putExtra(
-                        notificationIntentBackendKey, backend
+                        NotificationIntentBackendKey, backend
                     )
                     intent.putExtra(
-                        notificationIntentAppNameKey,
+                        NotificationIntentAppNameKey,
                         appName
                     )
                     intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
@@ -255,12 +282,12 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
         val dismissIntent: PendingIntent =
             Intent().let { intent ->
-                intent.action = notificationActionDismissed
+                intent.action = NotificationActionDismissed
                 intent.putExtra(
-                    notificationIntentEmailKey, email
+                    NotificationIntentEmailKey, email
                 )
                 intent.putExtra(
-                    notificationIntentBackendKey, backend
+                    NotificationIntentBackendKey, backend
                 )
                 PendingIntent.getBroadcast(this, 0, intent, PendingIntent.FLAG_IMMUTABLE)
             }
@@ -268,7 +295,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
         val builder: Notification.Builder = Notification.Builder(
             this,
-            notificationChannelIdAlerter
+            NotificationChannelNewMail
         )
 
         if (clickIntent != null) {
@@ -294,7 +321,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
         val builder: Notification.Builder = Notification.Builder(
             this,
-            notificationChannelIdAlerter
+            NotificationChannelError
         )
 
         val errorString = serviceExceptionToErrorStr(err, email)
@@ -323,7 +350,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
         val builder: Notification.Builder = Notification.Builder(
             this,
-            notificationChannelIdAlerter
+            NotificationChannelNewMail,
         )
 
         return builder
