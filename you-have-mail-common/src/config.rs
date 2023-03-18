@@ -87,7 +87,10 @@ impl Config {
             result.push((account, refresher));
         }
 
-        Ok((Duration::from_secs(config.poll_interval), result))
+        Ok((
+            Duration::from_secs(config.poll_interval.unwrap_or(30)),
+            result,
+        ))
     }
 
     pub fn store<'a>(
@@ -117,7 +120,7 @@ impl Config {
         }
 
         let config_json = ConfigJSON {
-            poll_interval: poll_interval.as_secs(),
+            poll_interval: Some(poll_interval.as_secs()),
             accounts: json_accounts,
         };
 
@@ -134,7 +137,7 @@ struct ConfigJSONAccount {
 
 #[derive(Deserialize, Serialize)]
 struct ConfigJSON {
-    poll_interval: u64,
+    poll_interval: Option<u64>,
     accounts: Vec<ConfigJSONAccount>,
 }
 
