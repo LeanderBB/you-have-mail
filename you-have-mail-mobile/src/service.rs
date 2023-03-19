@@ -262,7 +262,7 @@ fn new_service_with_backends(
         })?;
 
     let (observer, task) = yhm::ObserverBuilder::new(Box::new(NotifierWrapper(notifier)))
-        .poll_interval(poll_interval.unwrap_or(Duration::from_secs(30)))
+        .poll_interval(poll_interval.unwrap_or(Duration::from_secs(60 * 5)))
         .build();
     let join_handle = runtime.spawn(task);
 

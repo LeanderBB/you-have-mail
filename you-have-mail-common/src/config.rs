@@ -88,7 +88,7 @@ impl Config {
         }
 
         Ok((
-            Duration::from_secs(config.poll_interval.unwrap_or(30)),
+            Duration::from_secs(config.poll_interval.unwrap_or(5 * 60)),
             result,
         ))
     }
