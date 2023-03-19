@@ -5,14 +5,15 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.SharedPreferences
-import android.graphics.Color
-import android.media.AudioAttributes
-import android.media.RingtoneManager
+import android.net.ConnectivityManager
+import android.net.NetworkCapabilities
+import android.net.NetworkRequest
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
 import android.widget.Toast
+import androidx.core.content.ContextCompat
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dev.lbeernaert.youhavemail.*
@@ -37,6 +38,11 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private val coroutineScope = CoroutineScope(
         Dispatchers.Default
     )
+
+    // System listeners
+    private val networkListener = NetworkListener(this)
+
+    // State Flows
     private var _accountListFlow: MutableStateFlow<List<ObserverAccount>> =
         MutableStateFlow(ArrayList())
     val accountList: StateFlow<List<ObserverAccount>> get() = _accountListFlow
@@ -44,7 +50,8 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         MutableStateFlow(15UL)
     val pollInterval: StateFlow<ULong> get() = _pollIntervalFlow
 
-    private var notificationIDCounter: Int = 2
+    // Notification State
+    private var notificationIDCounter: Int = ServiceAccountNotificationsStartID
     private var notificationMap: HashMap<String, NotificationIds> = HashMap()
     private var unreadMessageCounts: HashMap<String, UInt> = HashMap()
     private var unreadMessageCountMutex: Lock = ReentrantLock()
@@ -89,6 +96,30 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         storeConfig(this)
     }
 
+    fun pauseServiceNoNetwork() {
+        Log.d(serviceLogTag, "Pause service")
+        try {
+            mService!!.pause()
+            updateServiceNotificationStatus("Paused (no network)")
+        } catch (e: ServiceException) {
+            Log.e(serviceLogTag, "Failed to pause service: $e")
+        }
+    }
+
+    fun resumeService() {
+        Log.d(serviceLogTag, "Resume service")
+        try {
+            mService!!.resume()
+            updateServiceNotificationStatus("Running")
+        } catch (e: ServiceException) {
+            Log.e(serviceLogTag, "Failed to resume service: $e")
+            createAndDisplayServiceErrorNotification(
+                "Failed to resume Service, please restart manually",
+                e
+            )
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(serviceLogTag, "onStartCommand executed with startId: $startId")
         if (intent != null) {
@@ -109,10 +140,13 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     override fun onCreate() {
         super.onCreate()
 
-        createNotificationChannel()
+        val notificationManager =
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+
+        createNotificationChannels(notificationManager)
 
         Log.d(serviceLogTag, "Service has been created")
-        startForeground(1, createServiceNotification())
+        startForeground(ServiceNotificationID, createServiceNotification(this, "Running"))
         try {
             val config = loadConfig(this)
             mService = if (config == null) {
@@ -125,12 +159,18 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             mBackends.addAll(mService!!.getBackends())
             _pollIntervalFlow.value = mService!!.getPollInterval()
             updateAccountList()
+            registerNetworkListener()
         } catch (e: ServiceException) {
             Log.e(serviceLogTag, "Failed to create service:$e")
+            createAndDisplayServiceErrorNotification(
+                "Failed to create Service",
+                e
+            )
         }
     }
 
     override fun onDestroy() {
+        unregisterNetworkListener()
         coroutineScope.cancel()
         mInLoginAccount?.destroy()
         mBackends.forEach {
@@ -152,7 +192,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         // we need this lock so our service does not affected by Doze mode
         wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
             newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "YouHaveMailService::lock").apply {
-                acquire()
+                acquire(10 * 60 * 1000L /*10 minutes*/)
             }
         }
     }
@@ -174,85 +214,31 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         setServiceState(this, ServiceState.STOPPED)
     }
 
-    private fun createNotificationChannel() {
-        val notificationManager =
-            getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager
 
-        val group = notificationManager.createNotificationChannelGroup(
-            NotificationChannelGroup(
-                NotificationGroupNewEmails,
-                "New Emails"
-            )
-        )
+    private fun registerNetworkListener() {
+        val request =
+            NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
+                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
+                .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
+                .build()
 
-        val channelService = NotificationChannel(
-            NotificationChannelService,
-            "Background Service ",
-            NotificationManager.IMPORTANCE_LOW
-        ).let {
-            it.description = "You Have Mail Background Service"
-            it.enableLights(false)
-            it.enableVibration(false)
-            it
-        }
-        notificationManager.createNotificationChannel(channelService)
-
-        val channelAlerter = NotificationChannel(
-            NotificationChannelNewMail,
-            "New Emails and Status",
-            NotificationManager.IMPORTANCE_HIGH
-        ).let {
-            it.description = "You Have Mail Notifications"
-            it.enableLights(true)
-            it.lightColor = Color.WHITE
-            it.enableVibration(true)
-            it.group = NotificationGroupNewEmails
-            it.setSound(
-                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
-                AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-            )
-            it
-        }
-        notificationManager.createNotificationChannel(channelAlerter)
-
-        val channelErrors = NotificationChannel(
-            NotificationChannelError,
-            "Errors",
-            NotificationManager.IMPORTANCE_HIGH
-        ).let {
-            it.description = "You Have Mail Errors"
-            it.enableLights(true)
-            it.lightColor = Color.RED
-            it.enableVibration(true)
-            it.setSound(
-                RingtoneManager.getDefaultUri(RingtoneManager.TYPE_NOTIFICATION),
-                AudioAttributes.Builder().setUsage(AudioAttributes.USAGE_NOTIFICATION)
-                    .setContentType(AudioAttributes.CONTENT_TYPE_SONIFICATION)
-                    .build()
-            )
-            it
-        }
-        notificationManager.createNotificationChannel(channelErrors)
+        val connectivityManager =
+            ContextCompat.getSystemService(
+                this,
+                ConnectivityManager::class.java
+            ) as ConnectivityManager
+        connectivityManager.requestNetwork(request, networkListener)
     }
 
-    private fun createServiceNotification(): Notification {
-        val builder: Notification.Builder = Notification.Builder(
-            this,
-            NotificationChannelService,
-        )
-
-        return builder
-            .setContentTitle("You Have Mail")
-            .setContentText("Background Service Running")
-            .setSmallIcon(R.drawable.ic_stat_sync)
-            .setVisibility(Notification.VISIBILITY_SECRET)
-            .setCategory(Notification.CATEGORY_SERVICE)
-            .setOngoing(true)
-            .setTicker("You Have Mail Service")
-            .build()
+    private fun unregisterNetworkListener() {
+        val connectivityManager =
+            ContextCompat.getSystemService(
+                this,
+                ConnectivityManager::class.java
+            ) as ConnectivityManager
+        connectivityManager.unregisterNetworkCallback(networkListener)
     }
+
 
     private fun createAlertNotification(
         email: String,
@@ -323,57 +309,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             .build()
     }
 
-    private fun createAccountErrorNotification(email: String, err: ServiceException): Notification {
-        val pendingIntent: PendingIntent =
-            Intent(this, MainActivity::class.java).let { notificationIntent ->
-                PendingIntent.getActivity(this, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
-            }
-
-        val builder: Notification.Builder = Notification.Builder(
-            this,
-            NotificationChannelError
-        )
-
-        val errorString = serviceExceptionToErrorStr(err, email)
-
-        return builder
-            .setContentTitle("You Have Mail")
-            .setContentText("$email error: $errorString")
-            .setContentIntent(pendingIntent)
-            .setAutoCancel(true)
-            .setVisibility(Notification.VISIBILITY_PRIVATE)
-            .setSmallIcon(R.drawable.ic_stat_err)
-            .setTicker("You Have Mail Alert")
-            .build()
-    }
-
-    private fun createAccountStatusNotification(text: String): Notification {
-        val pendingIntent: PendingIntent =
-            Intent(this, MainActivity::class.java).let { notificationIntent ->
-                PendingIntent.getActivity(
-                    this,
-                    0,
-                    notificationIntent,
-                    PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                )
-            }
-
-        val builder: Notification.Builder = Notification.Builder(
-            this,
-            NotificationChannelNewMail,
-        )
-
-        return builder
-            .setContentTitle("You Have Mail")
-            .setContentText(text)
-            .setAutoCancel(true)
-            .setContentIntent(pendingIntent)
-            .setVisibility(Notification.VISIBILITY_PRIVATE)
-            .setSmallIcon(R.drawable.ic_stat_alert)
-            .setTicker("You Have Mail Alert")
-            .build()
-    }
-
 
     private fun getOrCreateNotificationIDs(email: String): NotificationIds {
         val ids = notificationMap[email]
@@ -381,7 +316,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             return ids
         }
 
-        var newIds = NotificationIds(
+        val newIds = NotificationIds(
             newMessages = notificationIDCounter++,
             statusUpdate = notificationIDCounter++,
             errors = notificationIDCounter++
@@ -396,7 +331,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         newMessageCount: UInt,
         reset: Boolean
     ): UInt {
-        var result = 0u
+        val result: UInt
         unreadMessageCountMutex.lock()
         if (reset) {
             unreadMessageCounts[email] = newMessageCount
@@ -410,14 +345,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         unreadMessageCountMutex.unlock()
         return result
     }
-
-    private fun resetUnreadMessageCount(email: String) {
-        unreadMessageCountMutex.lock()
-        Log.d(serviceLogTag, "Resetting message count $email current=${unreadMessageCounts[email]}")
-        unreadMessageCounts[email] = 0u
-        unreadMessageCountMutex.unlock()
-    }
-
 
     private fun isNotificationVisible(id: Int): Boolean {
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
@@ -453,7 +380,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     override fun accountLoggedOut(email: String) {
         Log.d(serviceLogTag, "Account Logged Out: $email")
         updateAccountList()
-        val notification = createAccountStatusNotification("Account $email session expired")
+        val notification = createAccountStatusNotification(this, "Account $email session expired")
         val ids = getOrCreateNotificationIDs(email)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
@@ -479,7 +406,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
     override fun accountError(email: String, error: ServiceException) {
         Log.e(serviceLogTag, "Account Error: $email => $error")
-        val notification = createAccountErrorNotification(email, error)
+        val notification = createAccountErrorNotification(this, email, error)
         val ids = getOrCreateNotificationIDs(email)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
@@ -542,6 +469,27 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     override fun notifyError(email: String, error: ServiceException) {
         Toast.makeText(this, serviceExceptionToErrorStr(error, email), Toast.LENGTH_SHORT).show()
         Log.e(serviceLogTag, "Failed to load '$email' from config: $error")
+    }
+
+    private fun updateServiceNotificationStatus(newState: String) {
+        val notification = createServiceNotification(this, newState)
+        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+            if (this.areNotificationsEnabled()) {
+                notify(ServiceNotificationID, notification)
+            }
+        }
+    }
+
+    private fun createAndDisplayServiceErrorNotification(
+        text: String,
+        exception: ServiceException
+    ) {
+        val notification = createServiceErrorNotification(this, text, exception)
+        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+            if (this.areNotificationsEnabled()) {
+                notify(ServiceErrorNotificationID, notification)
+            }
+        }
     }
 }
 
