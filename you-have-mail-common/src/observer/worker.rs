@@ -189,10 +189,6 @@ impl Worker {
     }
 
     async fn poll_accounts(&mut self) {
-        if self.paused {
-            return;
-        }
-
         for wa in &mut self.accounts.values_mut() {
             // Track logged out status if for some reason something slips through.
             if wa.account.is_logged_out() {
@@ -266,30 +262,40 @@ async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequ
     tokio::pin!(sleep);
     let mut last_poll_interval = observer.poll_interval;
     loop {
-        // Update poll interval
-        if last_poll_interval != observer.poll_interval {
-            debug!(
-                "Updating observer poll interval old={:?} new={:?}",
-                last_poll_interval, observer.poll_interval
-            );
-            let new_interval = tokio::time::interval(observer.poll_interval);
-            *sleep = new_interval;
-            last_poll_interval = observer.poll_interval;
-        }
-
-        tokio::select! {
-            _ = sleep.tick() => {
-                observer.poll_accounts().await;
-            }
-
-            request = receiver.recv() => {
-                if let Some(request) = request {
-                    if observer.handle_request(request).await {
-                        break;
-                    }
+        if observer.paused {
+            // If the observer is paused we shouldn't wake up all the time to do nothing,
+            // wait for the next command to come in to do something.
+            if let Some(request) = receiver.recv().await {
+                if observer.handle_request(request).await {
+                    break;
                 }
             }
+        } else {
+            // Update poll interval
+            if last_poll_interval != observer.poll_interval {
+                debug!(
+                    "Updating observer poll interval old={:?} new={:?}",
+                    last_poll_interval, observer.poll_interval
+                );
+                let new_interval = tokio::time::interval(observer.poll_interval);
+                *sleep = new_interval;
+                last_poll_interval = observer.poll_interval;
+            }
 
+            tokio::select! {
+                _ = sleep.tick() => {
+                    observer.poll_accounts().await;
+                }
+
+                request = receiver.recv() => {
+                    if let Some(request) = request {
+                        if observer.handle_request(request).await {
+                            break;
+                        }
+                    }
+                }
+
+            }
         }
     }
     debug!("Exiting observer loop")

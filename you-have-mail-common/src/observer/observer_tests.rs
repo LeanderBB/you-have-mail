@@ -63,7 +63,7 @@ async fn notifier_called() {
 }
 
 #[tokio::test]
-async fn paused_not_call_notifier() {
+async fn paused_does_not_call_notifier() {
     let (_, account) = new_backend_and_account().await;
 
     let mut notifier = MockNotifier::new();
@@ -123,7 +123,7 @@ async fn resume_after_pause_calls_notifier() {
                 }
             )
         })
-        .times(1..)
+        .times(2..)
         .return_const(());
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
@@ -136,7 +136,7 @@ async fn resume_after_pause_calls_notifier() {
             observer.add_account(account).await.unwrap();
             tokio::time::sleep(Duration::from_millis(100)).await;
             observer.resume().await.unwrap();
-            tokio::time::sleep(Duration::from_millis(100)).await;
+            tokio::time::sleep(Duration::from_millis(400)).await;
         },
     )
     .await;
