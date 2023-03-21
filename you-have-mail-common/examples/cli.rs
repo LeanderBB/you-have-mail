@@ -13,8 +13,7 @@ use you_have_mail_common::{
 
 #[cfg(feature = "proton-backend")]
 fn new_backed() -> Arc<dyn Backend> {
-    let app_version = std::env::var("YHM_PROTON_APP_VERSION").unwrap();
-    return you_have_mail_common::backend::proton::new_backend(&app_version);
+    return you_have_mail_common::backend::proton::new_backend();
 }
 
 #[cfg(not(feature = "proton-backend"))]

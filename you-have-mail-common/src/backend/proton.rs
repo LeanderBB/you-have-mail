@@ -7,6 +7,7 @@ use crate::AccountState;
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
 use proton_api_rs::domain::{EventId, ExposeSecret, LabelID, MessageAction, MoreEvents, UserUid};
+use proton_api_rs::log::{debug, error};
 use proton_api_rs::{
     Client, ClientBuilder, ClientBuilderError, ClientLoginState, HttpClientError, RequestError,
     TOTPClient,
@@ -16,17 +17,15 @@ use serde_json::Value;
 use std::fmt::Debug;
 use std::sync::Arc;
 
+const PROTON_APP_VERSION: &str = "web-mail@5.0.17.9";
+
 /// Create a proton mail backend.
-pub fn new_backend(app_version: &str) -> Arc<dyn Backend> {
-    Arc::new(ProtonBackend {
-        builder: ClientBuilder::new().app_version(app_version),
-    })
+pub fn new_backend() -> Arc<dyn Backend> {
+    Arc::new(ProtonBackend {})
 }
 
 #[derive(Debug)]
-struct ProtonBackend {
-    builder: ClientBuilder,
-}
+struct ProtonBackend {}
 
 const PROTON_BACKEND_NAME: &str = "Proton Mail";
 
@@ -39,7 +38,6 @@ struct ProtonAccount {
 
 #[derive(Debug)]
 struct ProtonAuthRefresher {
-    builder: ClientBuilder,
     email: String,
     uid: String,
     token: String,
@@ -75,6 +73,33 @@ struct ProtonAwaitTotp {
     client: TOTPClient,
 }
 
+macro_rules! try_request {
+    ($request:expr, $refresh:expr) => {{
+        let r = $request.await;
+        match r {
+            Ok(t) => Ok(t),
+            Err(e) => {
+                if let RequestError::API(api_err) = &e {
+                    if api_err.http_code == 401 {
+                        debug!("Proton account expired, attempting refresh");
+                        // Unauthorized, try to refresh once
+                        if let Err(e) = $refresh.await {
+                            error!("Proton account expired, refresh failed {e}");
+                            Err(e)
+                        } else {
+                            $request.await
+                        }
+                    } else {
+                        Err(e)
+                    }
+                } else {
+                    Err(e)
+                }
+            }
+        }
+    }};
+}
+
 #[async_trait]
 impl Backend for ProtonBackend {
     fn name(&self) -> &str {
@@ -86,7 +111,11 @@ impl Backend for ProtonBackend {
     }
 
     async fn login(&self, email: &str, password: &str) -> BackendResult<AccountState> {
-        match self.builder.clone().login(email, password).await? {
+        match ClientBuilder::new()
+            .app_version(PROTON_APP_VERSION)
+            .login(email, password)
+            .await?
+        {
             ClientLoginState::Authenticated(c) => Ok(AccountState::LoggedIn(Box::new(
                 ProtonAccount::new(c, email.to_string()),
             ))),
@@ -103,7 +132,6 @@ impl Backend for ProtonBackend {
         let config =
             serde_json::from_value::<ProtonAuthRefresherInfo>(value).map_err(|e| anyhow!(e))?;
         Ok(Box::new(ProtonAuthRefresher {
-            builder: self.builder.clone(),
             email: config.email,
             uid: config.uid,
             token: config.token,
@@ -116,7 +144,8 @@ impl Account for ProtonAccount {
     async fn check(&mut self) -> BackendResult<NewEmailReply> {
         if let Some(client) = &mut self.client {
             if self.last_event_id.is_none() {
-                let event_id = client.get_latest_event_id().await?;
+                let event_id =
+                    try_request!({ client.get_latest_event_id() }, { client.refresh_auth() })?;
                 self.last_event_id = Some(event_id);
             }
 
@@ -125,7 +154,8 @@ impl Account for ProtonAccount {
             if let Some(event_id) = &mut self.last_event_id {
                 let mut has_more = MoreEvents::No;
                 loop {
-                    let event = client.get_event(event_id).await?;
+                    let event =
+                        try_request!({ client.get_event(event_id) }, { client.refresh_auth() })?;
                     if event.event_id != *event_id || has_more == MoreEvents::Yes {
                         if let Some(message_events) = &event.messages {
                             for msg_event in message_events {
@@ -173,6 +203,32 @@ impl Account for ProtonAccount {
     }
 }
 
+/*
+async fn try_request<'a, T, Fut,R>(client: &'a mut Client, f:R) -> Result<T, RequestError> where
+        R: Fn(&'a mut Client) -> Fut + 'a,
+    Fut: Future<Output=Result<T, RequestError>>,
+T:Send,
+{
+    let r = {f(client).await};
+    match r {
+        Ok(t) => Ok(t),
+        Err(e) => {
+            if let RequestError::API(api_err) = &e {
+                debug!("Proton account expired, attempting refresh");
+                // Unauthorized, try to refresh once
+                if api_err.http_code == 401 {
+                    if let Err(e) = client.refresh_auth().await {
+                        error!("Proton account expired, refresh failed {e}");
+                    } else {
+                        return f(client).await
+                    }
+                }
+            }
+            Err(e)
+        }
+    }
+}*/
+
 #[async_trait]
 impl AwaitTotp for ProtonAwaitTotp {
     async fn submit_totp(
@@ -192,8 +248,8 @@ impl AwaitTotp for ProtonAwaitTotp {
 #[async_trait]
 impl AuthRefresher for ProtonAuthRefresher {
     async fn refresh(self: Box<Self>) -> Result<AccountState, BackendError> {
-        let client = self
-            .builder
+        let client = ClientBuilder::new()
+            .app_version(PROTON_APP_VERSION)
             .with_token(&UserUid::from(self.uid), &self.token)
             .await?;
         Ok(AccountState::LoggedIn(Box::new(ProtonAccount::new(
