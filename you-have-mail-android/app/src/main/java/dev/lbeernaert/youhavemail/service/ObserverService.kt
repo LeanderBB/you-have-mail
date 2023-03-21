@@ -58,6 +58,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
     // Have to keep this here or it won't survive activity refreshes
     private var mInLoginAccount: Account? = null
+    private var mInLoginProxy: Proxy? = null
     private var mBackends: ArrayList<Backend> = ArrayList()
 
     var mService: dev.lbeernaert.youhavemail.Service? = null
@@ -82,6 +83,14 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         mInLoginAccount = account
     }
 
+    fun setInLoginProxy(proxy: Proxy?) {
+        mInLoginProxy = proxy
+    }
+
+    fun getInLoginProxy(): Proxy? {
+        return mInLoginProxy
+    }
+
     fun getInLoginAccount(): Account? {
         return mInLoginAccount
     }
@@ -94,6 +103,10 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         mService!!.setPollInterval(interval)
         _pollIntervalFlow.value = interval
         storeConfig(this)
+    }
+
+    fun setAccountProxy(email: String, proxy: Proxy?) {
+        mService!!.setAccountProxy(email, proxy)
     }
 
     fun pauseServiceNoNetwork() {
@@ -192,7 +205,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         // we need this lock so our service does not affected by Doze mode
         wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
             newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "YouHaveMailService::lock").apply {
-                acquire(10 * 60 * 1000L /*10 minutes*/)
+                acquire()
             }
         }
     }
@@ -413,6 +426,11 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
                 notify(ids.errors, notification)
             }
         }
+    }
+
+    override fun proxyApplied(email: String, proxy: Proxy?) {
+        Log.d(serviceLogTag, "Account $email applied Proxy $proxy")
+        updateAccountList()
     }
 
     private fun updateAccountList() {

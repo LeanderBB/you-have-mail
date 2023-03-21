@@ -3,7 +3,7 @@
 use crate::backend::{
     Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, NewEmailReply,
 };
-use crate::AccountState;
+use crate::{AccountState, Proxy, ProxyProtocol};
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
 use proton_api_rs::domain::{EventId, ExposeSecret, LabelID, MessageAction, MoreEvents, UserUid};
@@ -12,6 +12,7 @@ use proton_api_rs::{
     Client, ClientBuilder, ClientBuilderError, ClientLoginState, HttpClientError, RequestError,
     TOTPClient,
 };
+use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::Debug;
@@ -110,12 +111,13 @@ impl Backend for ProtonBackend {
         "For Proton accounts (mail.proton.com)"
     }
 
-    async fn login(&self, email: &str, password: &str) -> BackendResult<AccountState> {
-        match ClientBuilder::new()
-            .app_version(PROTON_APP_VERSION)
-            .login(email, password)
-            .await?
-        {
+    async fn login<'a>(
+        &self,
+        email: &str,
+        password: &str,
+        proxy: Option<&'a Proxy>,
+    ) -> BackendResult<AccountState> {
+        match new_client_builder(proxy).login(email, password).await? {
             ClientLoginState::Authenticated(c) => Ok(AccountState::LoggedIn(Box::new(
                 ProtonAccount::new(c, email.to_string()),
             ))),
@@ -126,6 +128,13 @@ impl Backend for ProtonBackend {
                 })))
             }
         }
+    }
+
+    async fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()> {
+        return new_client_builder(Some(proxy))
+            .ping()
+            .await
+            .map_err(|e| e.into());
     }
 
     fn auth_refresher_from_config(&self, value: Value) -> Result<Box<dyn AuthRefresher>, Error> {
@@ -189,6 +198,16 @@ impl Account for ProtonAccount {
         Ok(())
     }
 
+    async fn set_proxy<'a>(&mut self, proxy: Option<&'a Proxy>) -> BackendResult<()> {
+        if let Some(client) = &mut self.client {
+            let new_client = new_client_builder(proxy).with_client_auth(client)?;
+            *client = new_client;
+            Ok(())
+        } else {
+            Err(BackendError::Unknown(anyhow!("Client is no longer active")))
+        }
+    }
+
     fn auth_refresher_config(&self) -> Result<Value, Error> {
         let Some(client) = &self.client else {
             return Err(anyhow!("invalid state"));
@@ -202,32 +221,6 @@ impl Account for ProtonAccount {
         Ok(value)
     }
 }
-
-/*
-async fn try_request<'a, T, Fut,R>(client: &'a mut Client, f:R) -> Result<T, RequestError> where
-        R: Fn(&'a mut Client) -> Fut + 'a,
-    Fut: Future<Output=Result<T, RequestError>>,
-T:Send,
-{
-    let r = {f(client).await};
-    match r {
-        Ok(t) => Ok(t),
-        Err(e) => {
-            if let RequestError::API(api_err) = &e {
-                debug!("Proton account expired, attempting refresh");
-                // Unauthorized, try to refresh once
-                if api_err.http_code == 401 {
-                    if let Err(e) = client.refresh_auth().await {
-                        error!("Proton account expired, refresh failed {e}");
-                    } else {
-                        return f(client).await
-                    }
-                }
-            }
-            Err(e)
-        }
-    }
-}*/
 
 #[async_trait]
 impl AwaitTotp for ProtonAwaitTotp {
@@ -247,9 +240,11 @@ impl AwaitTotp for ProtonAwaitTotp {
 
 #[async_trait]
 impl AuthRefresher for ProtonAuthRefresher {
-    async fn refresh(self: Box<Self>) -> Result<AccountState, BackendError> {
-        let client = ClientBuilder::new()
-            .app_version(PROTON_APP_VERSION)
+    async fn refresh<'a>(
+        self: Box<Self>,
+        proxy: Option<&'a Proxy>,
+    ) -> Result<AccountState, BackendError> {
+        let client = new_client_builder(proxy)
             .with_token(&UserUid::from(self.uid), &self.token)
             .await?;
         Ok(AccountState::LoggedIn(Box::new(ProtonAccount::new(
@@ -287,4 +282,28 @@ impl From<RequestError> for BackendError {
             RequestError::Other(e) => BackendError::Unknown(anyhow!(e)),
         }
     }
+}
+
+fn proxy_as_proton_proxy(proxy: &Proxy) -> proton_api_rs::Proxy {
+    proton_api_rs::Proxy {
+        protocol: match proxy.protocol {
+            ProxyProtocol::Https => proton_api_rs::ProxyProtocol::Https,
+            ProxyProtocol::Socks5 => proton_api_rs::ProxyProtocol::Socks5,
+        },
+        auth: proxy.auth.as_ref().map(|a| proton_api_rs::ProxyAuth {
+            username: a.username.clone(),
+            password: SecretString::new(a.password.clone()),
+        }),
+        url: proxy.url.clone(),
+        port: proxy.port,
+    }
+}
+
+fn new_client_builder(proxy: Option<&Proxy>) -> ClientBuilder {
+    let mut builder = ClientBuilder::new().app_version(PROTON_APP_VERSION);
+    if let Some(p) = proxy {
+        builder = builder.with_proxy(proxy_as_proton_proxy(p));
+    }
+
+    builder
 }

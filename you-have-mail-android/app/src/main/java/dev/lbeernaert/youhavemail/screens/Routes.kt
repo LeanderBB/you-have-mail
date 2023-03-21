@@ -9,6 +9,9 @@ sealed class Routes(val route: String) {
 
     object Settings : Routes("Settings")
 
+    object ProxyLogin : Routes("ProxyLogin/{index}")
+    object ProxySettings : Routes("ProxySettings/{index}")
+
     companion object {
         fun newLoginRoute(backendIndex: Int, email: String?): String {
             if (email != null) {
@@ -18,8 +21,16 @@ sealed class Routes(val route: String) {
             return "Login/$backendIndex"
         }
 
-        fun newAccountRoute(AccountIndex: Int): String {
-            return "Account/$AccountIndex"
+        fun newProxyLoginRoute(backendIndex: Int): String {
+            return "ProxyLogin/$backendIndex"
+        }
+
+        fun newAccountRoute(accountIndex: Int): String {
+            return "Account/$accountIndex"
+        }
+
+        fun newAccountProxyRoute(accountIndex: Int): String {
+            return "ProxySettings/$accountIndex"
         }
     }
 }

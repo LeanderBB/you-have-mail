@@ -1,4 +1,5 @@
 use crate::backend::{AuthRefresher, NewEmailReply};
+use crate::Proxy;
 use proton_api_rs::log::error;
 use std::sync::Arc;
 use thiserror::Error;
@@ -12,6 +13,7 @@ pub struct Account {
     backend: Arc<dyn crate::backend::Backend>,
     state: AccountState,
     email: String,
+    proxy: Option<Proxy>,
 }
 
 /// Possible states for an account.
@@ -32,6 +34,8 @@ pub enum AccountError {
     InvalidState,
     #[error("Backend error occurred: {0}")]
     Backend(#[from] crate::backend::BackendError),
+    #[error("Proxy configuration is invalid or Proxy is unreachable")]
+    Proxy,
 }
 
 impl AccountError {
@@ -53,11 +57,16 @@ impl AccountError {
 pub type AccountResult<T> = Result<T, AccountError>;
 
 impl Account {
-    pub fn new<T: Into<String>>(backend: Arc<dyn crate::backend::Backend>, email: T) -> Self {
+    pub fn new<T: Into<String>>(
+        backend: Arc<dyn crate::backend::Backend>,
+        email: T,
+        proxy: Option<Proxy>,
+    ) -> Self {
         Self {
             backend,
             state: AccountState::LoggedOut,
             email: email.into(),
+            proxy,
         }
     }
 
@@ -65,11 +74,13 @@ impl Account {
         backend: Arc<dyn crate::backend::Backend>,
         email: T,
         state: AccountState,
+        proxy: Option<Proxy>,
     ) -> Self {
         Self {
             backend,
             state,
             email: email.into(),
+            proxy,
         }
     }
 
@@ -80,6 +91,7 @@ impl Account {
             backend: self.backend.clone(),
             email: self.email.clone(),
             state: std::mem::replace(&mut self.state, AccountState::LoggedOut),
+            proxy: self.proxy.take(),
         }
     }
 
@@ -130,7 +142,10 @@ impl Account {
             return Err(AccountError::InvalidState);
         }
 
-        self.state = self.backend.login(&self.email, password).await?;
+        self.state = self
+            .backend
+            .login(&self.email, password, self.proxy.as_ref())
+            .await?;
         Ok(())
     }
 
@@ -178,8 +193,35 @@ impl Account {
             return Err(AccountError::InvalidState);
         }
 
-        self.state = refresher.refresh().await?;
+        self.state = refresher.refresh(self.proxy.as_ref()).await?;
         Ok(())
+    }
+
+    /// Apply proxy configuration to this account
+    pub async fn set_proxy(&mut self, proxy: Option<&Proxy>) -> AccountResult<bool> {
+        if self.proxy.as_ref() == proxy {
+            return Ok(false);
+        }
+
+        if let Some(p) = proxy {
+            self.backend.check_proxy(p).await.map_err(|e| {
+                error!("Failed to apply proxy to account {}:{e}", self.email);
+                AccountError::Proxy
+            })?;
+        }
+
+        if let AccountState::LoggedIn(a) = &mut self.state {
+            a.set_proxy(proxy).await?;
+        }
+
+        self.proxy = proxy.cloned();
+
+        Ok(true)
+    }
+
+    /// Get current proxy applied to this account.
+    pub fn get_proxy(&self) -> &Option<Proxy> {
+        &self.proxy
     }
 
     pub(crate) fn get_impl(&self) -> Option<&dyn crate::backend::Account> {

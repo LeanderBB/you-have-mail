@@ -1,9 +1,10 @@
 use crate::observer::rpc::{
-    AddAccountRequest, GenConfigRequest, GetAccountListRequest, GetPollIntervalRequest,
-    LogoutAccountRequest, ObserverPRC, ObserverRequest, RemoveAccountRequest,
+    AddAccountRequest, ApplyProxyRequest, GenConfigRequest, GetAccountListRequest,
+    GetPollIntervalRequest, GetProxyRequest, LogoutAccountRequest, ObserverPRC, ObserverRequest,
+    RemoveAccountRequest,
 };
 use crate::observer::worker::Worker;
-use crate::{Account, AccountError, ConfigGenError, Notifier};
+use crate::{Account, AccountError, ConfigGenError, Notifier, Proxy};
 use proton_api_rs::tokio::sync::mpsc::Sender;
 use std::fmt::Formatter;
 use std::future::Future;
@@ -47,6 +48,7 @@ pub struct ObserverAccount {
     pub email: String,
     pub status: ObserverAccountStatus,
     pub backend: String,
+    pub proxy: Option<Proxy>,
 }
 
 /// Errors returned during observer RPC calls.
@@ -196,6 +198,21 @@ impl Observer {
 
     pub async fn get_poll_interval(&self) -> Result<Duration, ObserverRPCError<(), ()>> {
         self.perform_rpc(GetPollIntervalRequest {}).await
+    }
+
+    pub async fn get_proxy_settings(
+        &self,
+        email: String,
+    ) -> Result<Option<Proxy>, ObserverRPCError<(), ObserverError>> {
+        self.perform_rpc(GetProxyRequest { email }).await
+    }
+
+    pub async fn set_proxy_settings(
+        &self,
+        email: String,
+        proxy: Option<Proxy>,
+    ) -> Result<(), ObserverRPCError<(), ObserverError>> {
+        self.perform_rpc(ApplyProxyRequest { email, proxy }).await
     }
 
     async fn perform_rpc<T: ObserverPRC>(

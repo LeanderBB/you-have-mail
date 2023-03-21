@@ -38,8 +38,16 @@ class ServiceWrapper {
         return mObserverService?.getInLoginAccount()
     }
 
+    fun getInLoginProxy(): Proxy? {
+        return mObserverService!!.getInLoginProxy()
+    }
+
+    fun setInLoginProxy(proxy: Proxy?) {
+        return mObserverService!!.setInLoginProxy(proxy)
+    }
+
     fun newAccount(backend: Backend, email: String): Account {
-        val account = mService!!.newAccount(backend, email)
+        val account = mService!!.newAccount(backend, email, mObserverService!!.getInLoginProxy())
         mObserverService!!.setInLoginAccount(account)
         return account
     }
@@ -56,6 +64,18 @@ class ServiceWrapper {
         mService!!.removeAccount(email)
     }
 
+    fun checkProxy(backendIndex: Int, proxy: Proxy?) {
+        if (proxy == null) {
+            return
+        }
+
+        mService!!.checkProxy(getBackends()[backendIndex], proxy)
+    }
+
+    fun setAccountProxy(email: String, proxy: Proxy?) {
+        mService!!.setAccountProxy(email, proxy)
+    }
+
     fun backendIndexByName(name: String): Int? {
         for (b in getBackends().listIterator().withIndex()) {
             if (b.value.name() == name) {
@@ -68,7 +88,7 @@ class ServiceWrapper {
 
     fun getAccount(index: Int): ObserverAccount? {
         try {
-            val accounts = mService!!.getObservedAccounts()
+            val accounts = mObserverService!!.accountList.value
             if (index < accounts.size) {
                 return accounts[index]
             }

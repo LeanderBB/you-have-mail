@@ -12,7 +12,7 @@ async fn test_login_flow() {
     };
     let backend = you_have_mail_common::backend::null::new_backend(&[accounts]);
 
-    let mut account = Account::new(backend, "foo");
+    let mut account = Account::new(backend, "foo", None);
     account
         .login("b")
         .await

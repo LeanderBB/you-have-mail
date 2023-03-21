@@ -2,7 +2,7 @@
 use crate::backend::{
     Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, NewEmailReply,
 };
-use crate::AccountState;
+use crate::{AccountState, Proxy};
 use anyhow::{anyhow, Error};
 use async_trait::async_trait;
 use proton_api_rs::tokio;
@@ -67,7 +67,12 @@ impl Backend for NullBacked {
         "Test backend to verify app behavior"
     }
 
-    async fn login(&self, email: &str, password: &str) -> BackendResult<AccountState> {
+    async fn login<'a>(
+        &self,
+        email: &str,
+        password: &str,
+        _: Option<&'a Proxy>,
+    ) -> BackendResult<AccountState> {
         if let Some(account) = self.accounts.get(email) {
             if let Some(d) = account.wait_time {
                 tokio::time::sleep(d).await;
@@ -98,6 +103,10 @@ impl Backend for NullBacked {
         )));
     }
 
+    async fn check_proxy(&self, _: &Proxy) -> BackendResult<()> {
+        Ok(())
+    }
+
     fn auth_refresher_from_config(&self, value: Value) -> Result<Box<dyn AuthRefresher>, Error> {
         let cfg = serde_json::from_value::<NullAuthRefresherInfo>(value).map_err(|e| anyhow!(e))?;
         Ok(Box::new(NullAuthRefresher { email: cfg.email }))
@@ -106,7 +115,10 @@ impl Backend for NullBacked {
 
 #[async_trait]
 impl AuthRefresher for NullAuthRefresher {
-    async fn refresh(self: Box<Self>) -> Result<AccountState, BackendError> {
+    async fn refresh<'a>(
+        self: Box<Self>,
+        _: Option<&'a Proxy>,
+    ) -> Result<AccountState, BackendError> {
         Ok(AccountState::LoggedIn(Box::new(NullAccount {
             email: self.email,
             wait_time: None,
@@ -129,6 +141,10 @@ impl Account for NullAccount {
         if let Some(d) = self.wait_time {
             tokio::time::sleep(d).await;
         }
+        Ok(())
+    }
+
+    async fn set_proxy<'a>(&mut self, _: Option<&'a Proxy>) -> BackendResult<()> {
         Ok(())
     }
 

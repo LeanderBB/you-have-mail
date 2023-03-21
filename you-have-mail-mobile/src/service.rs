@@ -1,6 +1,8 @@
 //! Glue code which combines all of the You Have Mail Components into on Service.
 
-use crate::{ConfigError, Notifier, NotifierWrapper, ServiceError, ServiceFromConfigCallback};
+use crate::{
+    ConfigError, Notifier, NotifierWrapper, Proxy, ServiceError, ServiceFromConfigCallback,
+};
 use std::ops::DerefMut;
 use std::sync::{Arc, RwLock};
 use std::time::Duration;
@@ -82,9 +84,14 @@ pub struct Service {
 }
 
 impl Service {
-    pub fn new_account(self: Arc<Self>, backend: &Backend, email: String) -> Arc<Account> {
+    pub fn new_account(
+        self: Arc<Self>,
+        backend: &Backend,
+        email: String,
+        proxy: Option<Proxy>,
+    ) -> Arc<Account> {
         Arc::new(Account {
-            account: RwLock::new(yhm::Account::new(backend.0.clone(), email)),
+            account: RwLock::new(yhm::Account::new(backend.0.clone(), email, proxy)),
             service: self,
         })
     }
@@ -121,6 +128,16 @@ impl Service {
     pub fn remove_account(&self, email: String) -> Result<(), ServiceError> {
         self.runtime
             .block_on(async { self.observer.remove_account(email).await })?;
+        Ok(())
+    }
+
+    pub fn set_account_proxy(
+        &self,
+        email: String,
+        proxy: Option<Proxy>,
+    ) -> Result<(), ServiceError> {
+        self.runtime
+            .block_on(async { self.observer.set_proxy_settings(email, proxy).await })?;
         Ok(())
     }
 
@@ -161,6 +178,20 @@ impl Service {
             .block_on(async { self.observer.set_poll_interval(duration).await })?;
         Ok(())
     }
+
+    pub fn check_proxy(&self, backend: &Backend, proxy: Option<Proxy>) -> Result<(), ServiceError> {
+        if let Some(p) = proxy {
+            return self
+                .runtime
+                .block_on(async { backend.0.check_proxy(&p).await })
+                .map_err(|e| {
+                    error!("Failed to check proxy: {e}");
+                    ServiceError::ProxyError
+                });
+        }
+
+        Ok(())
+    }
 }
 
 pub fn new_service(notifier: Box<dyn Notifier>) -> Result<Arc<Service>, ServiceError> {
@@ -181,14 +212,14 @@ pub fn new_service_from_config(
 
     let config_backends = backends.iter().map(|x| x.0.clone()).collect::<Vec<_>>();
 
-    let (poll_interval, accounts) =
+    let config =
         yhm::Config::load(&config_backends, bytes.as_bytes()).map_err(ConfigError::from)?;
 
-    let service = new_service_with_backends(notifier, backends, Some(poll_interval))?;
+    let service = new_service_with_backends(notifier, backends, Some(config.poll_interval))?;
 
-    debug!("Found {} account(s) in config file", accounts.len());
+    debug!("Found {} account(s) in config file", config.accounts.len());
 
-    for account in accounts {
+    for account in config.accounts {
         debug!(
             "Refreshing account={} backend={}",
             account.0.email(),
@@ -241,7 +272,7 @@ fn get_backends() -> Vec<Arc<Backend>> {
                 },
             ])
         },
-        yhm::backend::proton::new_backend("web-mail@5.0.17.9"),
+        yhm::backend::proton::new_backend(),
     ]
     .into_iter()
     .map(|x| Arc::new(Backend(x)))

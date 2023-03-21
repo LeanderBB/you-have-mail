@@ -39,4 +39,20 @@
     <string name="seconds">Seconds</string>
     <string name="minutes">Minutes</string>
     <string name="update_poll_interval">Updating Poll Interval</string>
+    <string name="poll_interval_desc">
+        Frequency at which the observer should poll the accounts. A higher poll interval can help
+        reduce battery usage.
+    </string>
+    <string name="network">Network</string>
+    <string name="use_proxy">Use Proxy</string>
+    <string name="apply_proxy">Applying Proxy Settings...</string>
+    <string name="ip_address">IP Address</string>
+    <string name="ip_port">IP Port</string>
+    <string name="proxy_user">Proxy User</string>
+    <string name="proxy_protocol">Proxy Protocol</string>
+    <string name="proxy_settings">Proxy Settings</string>
+    <string name="proxy_user_password">Proxy User Password</string>
+    <string name="proxy_auth">Authentication</string>
+    <string name="next">Next</string>
+    <string name="apply">Apply</string>
 </resources>

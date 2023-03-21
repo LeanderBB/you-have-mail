@@ -35,7 +35,7 @@ fun Settings(
                 .fillMaxSize()
         ) {
             var expanded by remember { mutableStateOf(false) }
-            val items = listOf(5UL, 10UL, 15UL, 30UL, 60UL, 150UL, 300UL, 600UL, 1800UL, 3600UL)
+            val items = listOf(15UL, 30UL, 60UL, 150UL, 300UL, 600UL, 1800UL, 3600UL)
             var selectedIndex by remember { mutableStateOf(0) }
 
             val onPollIntervalModified: () -> Unit = {
@@ -44,38 +44,46 @@ fun Settings(
                 }
             }
 
+            Text(
+                text = stringResource(id = R.string.poll_interval),
+                style = MaterialTheme.typography.caption
+            )
+            Spacer(modifier = Modifier.padding(10.dp))
+            Text(
+                text = stringResource(id = R.string.poll_interval_desc),
+                style = MaterialTheme.typography.subtitle1
+            )
+            Spacer(modifier = Modifier.padding(10.dp))
+            TextField(
+                modifier = Modifier
+                    .fillMaxWidth(),
+                value = secondsToText(
+                    pollIntervalValue,
+                    secondsStr,
+                    minutesStr
+                ),
+                readOnly = true,
+                singleLine = true,
+                onValueChange = {},
+                trailingIcon = {
+                    ExposedDropdownMenuDefaults.TrailingIcon(
+                        expanded = expanded,
+                        onIconClick = { expanded = true })
+                },
+                colors = ExposedDropdownMenuDefaults.textFieldColors(),
+            )
+            Spacer(modifier = Modifier.padding(10.dp))
             Box(
                 modifier = Modifier
+                    .padding(20.dp)
                     .fillMaxSize()
                     .wrapContentSize(Alignment.TopStart)
             ) {
-                TextField(
-                    label = {
-                        Text(text = stringResource(id = R.string.poll_interval))
-                    },
-                    modifier = Modifier
-                        .fillMaxWidth(),
-                    value = secondsToText(
-                        pollIntervalValue,
-                        secondsStr,
-                        minutesStr
-                    ),
-                    readOnly = true,
-                    singleLine = true,
-                    onValueChange = {},
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(
-                            expanded = expanded,
-                            onIconClick = { expanded = true })
-                    },
-                    colors = ExposedDropdownMenuDefaults.textFieldColors(),
-                )
                 DropdownMenu(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
                     modifier = Modifier
                         .fillMaxWidth()
-                        .padding(20.dp)
                 ) {
                     items.forEachIndexed { index, s ->
                         DropdownMenuItem(onClick = {
@@ -88,7 +96,6 @@ fun Settings(
                     }
                 }
             }
-
         }
     }
 }

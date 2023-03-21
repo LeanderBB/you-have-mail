@@ -1,6 +1,6 @@
 use crate::backend::null::{new_backend, NullTestAccount};
 use crate::backend::Backend;
-use crate::{Account, Notification, Notifier, NullNotifier, ObserverBuilder};
+use crate::{Account, Notification, Notifier, NullNotifier, ObserverBuilder, Proxy, ProxyProtocol};
 use crate::{MockNotifier, Observer};
 use mockall::Sequence;
 use proton_api_rs::tokio;
@@ -16,7 +16,7 @@ async fn new_backend_and_account() -> (Arc<dyn Backend>, Account) {
         wait_time: None,
     };
     let backend = new_backend(&[accounts]);
-    let mut account = Account::new(backend.clone(), "foo");
+    let mut account = Account::new(backend.clone(), "foo", None);
     account.login("bar").await.unwrap();
 
     assert!(account.is_logged_in());
@@ -285,6 +285,77 @@ async fn test_get_set_poll_interval() {
             assert_eq!(current_interval, new_poll_interval);
         }
     })
+    .await;
+}
+
+#[tokio::test]
+async fn test_proxy_settings() {
+    // Apply the same proxy twice in a row and then remove it.
+    let (_, account) = new_backend_and_account().await;
+
+    let mut notifier = MockNotifier::new();
+    let mut sequence = Sequence::new();
+    notifier
+        .expect_notify()
+        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .times(1)
+        .in_sequence(&mut sequence)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| matches!(n, Notification::ProxyApplied(_, Some(_))))
+        .times(1)
+        .in_sequence(&mut sequence)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| matches!(n, Notification::ProxyApplied(_, None)))
+        .times(1)
+        .in_sequence(&mut sequence)
+        .return_const(());
+    notifier
+        .expect_notify()
+        .withf(|n| {
+            matches!(
+                n,
+                Notification::NewEmail {
+                    account: "foo",
+                    count: 1,
+                    ..
+                }
+            )
+        })
+        .times(1..)
+        .return_const(());
+
+    let notifier: Box<dyn Notifier> = Box::new(notifier);
+
+    with_observer(
+        Duration::from_millis(10),
+        notifier,
+        move |observer| async move {
+            let proxy = Proxy {
+                protocol: ProxyProtocol::Https,
+                auth: None,
+                url: "127.0.0.1".into(),
+                port: 1080,
+            };
+            observer.add_account(account).await.unwrap();
+            observer
+                .set_proxy_settings("foo".to_string(), Some(proxy.clone()))
+                .await
+                .unwrap();
+            observer
+                .set_proxy_settings("foo".to_string(), Some(proxy.clone()))
+                .await
+                .unwrap();
+            observer
+                .set_proxy_settings("foo".to_string(), None)
+                .await
+                .unwrap();
+            tokio::time::sleep(Duration::from_secs(1)).await;
+        },
+    )
     .await;
 }
 

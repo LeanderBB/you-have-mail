@@ -1,7 +1,7 @@
 //! Implementations for possible account backends from which one can receive email
 //! notifications for.
 
-use crate::AccountState;
+use crate::{AccountState, Proxy};
 use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
@@ -47,7 +47,15 @@ pub trait Backend: Send + Sync + Debug {
     fn description(&self) -> &str;
 
     /// Login an account.
-    async fn login(&self, username: &str, password: &str) -> BackendResult<AccountState>;
+    async fn login<'a>(
+        &self,
+        username: &str,
+        password: &str,
+        proxy: Option<&'a Proxy>,
+    ) -> BackendResult<AccountState>;
+
+    /// Check proxy settings.
+    async fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()>;
 
     /// Load the necessary information to refresh the user's account access credentials.
     fn auth_refresher_from_config(
@@ -65,6 +73,9 @@ pub trait Account: Send + Sync + Debug {
 
     /// Logout the account.
     async fn logout(&mut self) -> BackendResult<()>;
+
+    /// Apply the given proxy to the connector. If proxy is none, remove it.
+    async fn set_proxy<'a>(&mut self, proxy: Option<&'a Proxy>) -> BackendResult<()>;
 
     /// Load the necessary information to refresh the user's account access credentials.
     fn auth_refresher_config(&self) -> Result<serde_json::Value, anyhow::Error>;
@@ -85,5 +96,8 @@ pub trait AwaitTotp: Send + Sync + Debug {
 #[cfg_attr(test, automock)]
 #[async_trait]
 pub trait AuthRefresher: Send + Sync + Debug {
-    async fn refresh(self: Box<Self>) -> Result<AccountState, BackendError>;
+    async fn refresh<'a>(
+        self: Box<Self>,
+        proxy: Option<&'a Proxy>,
+    ) -> Result<AccountState, BackendError>;
 }

@@ -1,5 +1,6 @@
 use crate::backend::BackendError;
 use crate::observer::rpc::ObserverRequest;
+use crate::Notification::ProxyApplied;
 use crate::{
     Account, AccountError, Config, Notification, Notifier, ObserverAccount, ObserverAccountStatus,
     ObserverError,
@@ -142,6 +143,7 @@ impl Worker {
                         email: k.clone(),
                         status: v.status,
                         backend: v.account.backend().name().to_string(),
+                        proxy: v.account.get_proxy().clone(),
                     })
                     .collect::<Vec<_>>();
 
@@ -183,6 +185,49 @@ impl Worker {
                 if reply.send(Ok(self.poll_interval)).await.is_err() {
                     error!("Failed to send reply for poll interval request");
                 }
+                false
+            }
+            ObserverRequest::ApplyProxy(email, proxy, reply) => {
+                if let Some(p) = &proxy {
+                    debug!("Applying new proxy settings email={email} proxy={{protocol={:?} url={}:{} auth={}}}",
+                    p.protocol, p.url, p.port,p.auth.is_some()
+                    )
+                } else {
+                    debug!("Applying new proxy settings email={email} proxy=None")
+                }
+
+                let result = if let Some(account) = self.accounts.get_mut(&email) {
+                    match account.account.set_proxy(proxy.as_ref()).await {
+                        Ok(changed) => {
+                            if changed {
+                                self.notifier.notify(ProxyApplied(&email, proxy.as_ref()))
+                            }
+                            Ok(())
+                        }
+                        Err(e) => Err(e.into()),
+                    }
+                } else {
+                    Err(ObserverError::NoSuchAccount(email))
+                };
+
+                if reply.send(result).await.is_err() {
+                    error!("Failed to send reply for remove account request");
+                }
+
+                false
+            }
+            ObserverRequest::GetProxy(email, reply) => {
+                debug!("Get proxy settings request email={email}");
+                let result = if let Some(account) = self.accounts.get_mut(&email) {
+                    Ok(account.account.get_proxy().clone())
+                } else {
+                    Err(ObserverError::NoSuchAccount(email))
+                };
+
+                if reply.send(result).await.is_err() {
+                    error!("Failed to send reply for remove account request");
+                }
+
                 false
             }
         }
@@ -327,6 +372,7 @@ mod tests {
             crate::backend::null::new_backend(&[]),
             "foo",
             AccountState::LoggedIn(Box::new(mock_account)),
+            None,
         );
         let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
 
@@ -378,6 +424,7 @@ mod tests {
             crate::backend::null::new_backend(&[]),
             "foo",
             AccountState::LoggedIn(Box::new(mock_account)),
+            None,
         );
         let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
 
@@ -415,6 +462,7 @@ mod tests {
             crate::backend::null::new_backend(&[]),
             "foo",
             AccountState::LoggedIn(Box::new(mock_account)),
+            None,
         );
         let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
 

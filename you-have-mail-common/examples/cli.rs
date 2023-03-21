@@ -7,8 +7,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use you_have_mail_common::backend::Backend;
 use you_have_mail_common::{
-    Account, Config, ConfigAccount, DefaultEncryption, Encryption, EncryptionKey, Notification,
-    Notifier, ObserverBuilder,
+    Account, Config, DefaultEncryption, Encryption, EncryptionKey, Notification, Notifier,
+    ObserverBuilder,
 };
 
 #[cfg(feature = "proton-backend")]
@@ -23,6 +23,7 @@ fn new_backed() -> Arc<dyn Backend> {
         email: "foo".to_string(),
         password: "bar".to_string(),
         totp: None,
+        proxy: None,
     }]);
 }
 
@@ -39,10 +40,10 @@ async fn main() {
     let encryption_key = get_or_create_encryption_key();
     let encryptor = DefaultEncryption::new(encryption_key);
     let backend = new_backed();
-    let accounts = if let Some((_, accounts)) = load_config(&encryptor, &[backend.clone()]).await {
+    let accounts = if let Some(config) = load_config(&encryptor, &[backend.clone()]).await {
         println!("Previous accounts detected");
-        let mut result = Vec::with_capacity(accounts.len());
-        for (mut a, refresher) in accounts {
+        let mut result = Vec::with_capacity(config.accounts.len());
+        for (mut a, refresher) in config.accounts {
             if let Some(r) = refresher {
                 println!("Refreshing account: {}", a.email());
                 a.refresh(r).await.unwrap();
@@ -57,7 +58,7 @@ async fn main() {
         let email = std::env::var("YHM_EMAIL").unwrap();
         let password = std::env::var("YHM_PASSWORD").unwrap();
 
-        let mut account = Account::new(backend, &email);
+        let mut account = Account::new(backend, &email, None);
         account.login(&password).await.unwrap();
 
         if account.is_awaiting_totp() {
@@ -106,7 +107,7 @@ async fn main() {
 async fn load_config(
     decryptor: &DefaultEncryption,
     backends: &[Arc<dyn Backend>],
-) -> Option<(Duration, Vec<ConfigAccount>)> {
+) -> Option<Config> {
     if let Some(bytes) = load_config_file().await {
         let decrypted = decryptor.decrypt(&bytes).unwrap();
 

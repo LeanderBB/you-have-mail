@@ -1,5 +1,5 @@
 use crate::backend::{AuthRefresher, Backend};
-use crate::Account;
+use crate::{Account, Proxy};
 use anyhow::anyhow;
 use proton_api_rs::log::error;
 use proton_api_rs::tokio;
@@ -7,11 +7,6 @@ use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
-
-/// Config stores a You Have Mail application state with all the active user accounts
-/// and their auth tokens.
-#[derive(Copy, Clone)]
-pub struct Config {}
 
 #[derive(Debug, Error)]
 pub enum ConfigLoadError {
@@ -42,12 +37,16 @@ pub enum ConfigGenError {
 
 pub type ConfigAccount = (Account, Option<Box<dyn AuthRefresher>>);
 
+/// Config stores a You Have Mail application state with all the active user accounts
+/// and their auth tokens.
+pub struct Config {
+    pub accounts: Vec<ConfigAccount>,
+    pub poll_interval: Duration,
+}
+
 impl Config {
-    pub fn load(
-        backends: &[Arc<dyn Backend>],
-        data: &[u8],
-    ) -> Result<(Duration, Vec<ConfigAccount>), ConfigLoadError> {
-        let config = serde_json::from_slice::<ConfigJSON>(data)
+    pub fn load(backends: &[Arc<dyn Backend>], data: &[u8]) -> Result<Self, ConfigLoadError> {
+        let config = serde_json::from_slice::<ConfigJSONRead>(data)
             .map_err(|e| ConfigLoadError::JSON(anyhow!(e)))?;
 
         let mut result = Vec::with_capacity(config.accounts.len());
@@ -82,15 +81,15 @@ impl Config {
                 None
             };
 
-            let account = Account::new(b, account.email);
+            let account = Account::new(b, account.email, account.proxy);
 
             result.push((account, refresher));
         }
 
-        Ok((
-            Duration::from_secs(config.poll_interval.unwrap_or(5 * 60)),
-            result,
-        ))
+        Ok(Self {
+            poll_interval: Duration::from_secs(config.poll_interval.unwrap_or(5 * 60)),
+            accounts: result,
+        })
     }
 
     pub fn store<'a>(
@@ -116,12 +115,13 @@ impl Config {
                 email: account.email().to_string(),
                 backend: account.backend().name().to_string(),
                 value,
+                proxy: account.get_proxy().clone(),
             })
         }
 
-        let config_json = ConfigJSON {
+        let config_json = ConfigJSONWrite {
             poll_interval: Some(poll_interval.as_secs()),
-            accounts: json_accounts,
+            accounts: &json_accounts,
         };
 
         serde_json::to_string(&config_json).map_err(|e| ConfigGenError::JSON(anyhow!(e)))
@@ -133,16 +133,35 @@ struct ConfigJSONAccount {
     email: String,
     backend: String,
     value: Option<serde_json::Value>,
+    proxy: Option<Proxy>,
 }
 
-#[derive(Deserialize, Serialize)]
-struct ConfigJSON {
+#[derive(Serialize)]
+struct ConfigJSONWrite<'a> {
+    poll_interval: Option<u64>,
+    accounts: &'a [ConfigJSONAccount],
+}
+
+#[derive(Deserialize)]
+struct ConfigJSONRead {
     poll_interval: Option<u64>,
     accounts: Vec<ConfigJSONAccount>,
 }
 
 #[tokio::test]
 async fn test_config_store_and_load() {
+    use crate::{Proxy, ProxyAuth, ProxyProtocol};
+
+    let proxy = Proxy {
+        protocol: ProxyProtocol::Socks5,
+        auth: Some(ProxyAuth {
+            username: "Hello".into(),
+            password: "Goodbye".into(),
+        }),
+        url: "127.0.0.1".into(),
+        port: 1080,
+    };
+
     let null_backed = crate::backend::null::new_backend(&[
         crate::backend::null::NullTestAccount {
             email: "foo".to_string(),
@@ -161,21 +180,21 @@ async fn test_config_store_and_load() {
     let poll_interval = Duration::from_secs(10);
 
     let account1 = {
-        let mut a = Account::new(null_backed.clone(), "foo");
+        let mut a = Account::new(null_backed.clone(), "foo", Some(proxy.clone()));
         a.login("foo").await.unwrap();
         a
     };
-    let account2 = Account::new(null_backed.clone(), "bar");
+    let account2 = Account::new(null_backed.clone(), "bar", None);
 
     let config_generated = Config::store(poll_interval, [account1, account2].iter()).unwrap();
 
-    let (loaded_poll_interval, accounts) =
-        Config::load(&[null_backed], config_generated.as_bytes()).unwrap();
+    let config = Config::load(&[null_backed], config_generated.as_bytes()).unwrap();
 
-    assert_eq!(accounts.len(), 2);
-    assert_eq!(accounts[0].0.email(), "foo");
-    assert_eq!(accounts[1].0.email(), "bar");
-    assert!(accounts[0].1.is_some());
-    assert!(accounts[1].1.is_none());
-    assert_eq!(poll_interval, loaded_poll_interval);
+    assert_eq!(config.accounts.len(), 2);
+    assert_eq!(config.accounts[0].0.email(), "foo");
+    assert_eq!(config.accounts[1].0.email(), "bar");
+    assert_eq!(config.accounts[0].0.get_proxy(), &Some(proxy));
+    assert!(config.accounts[0].1.is_some());
+    assert!(config.accounts[1].1.is_none());
+    assert_eq!(config.poll_interval, poll_interval);
 }

@@ -8,6 +8,7 @@ import androidx.compose.material.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -28,7 +29,11 @@ fun Login(
     onBackClicked: () -> Unit,
     onLoginClicked: suspend (email: String, password: String) -> Unit
 ) {
-    var email = remember { mutableStateOf(TextFieldValue(accountEmail)) }
+    var email = rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(
+            TextFieldValue(accountEmail)
+        )
+    }
     val password = remember { mutableStateOf(TextFieldValue()) }
     val loginBackgroundLabel = stringResource(id = R.string.login_to_account, email.value.text)
 

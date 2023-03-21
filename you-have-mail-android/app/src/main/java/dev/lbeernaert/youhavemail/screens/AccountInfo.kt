@@ -25,6 +25,7 @@ fun AccountInfo(
     onLogout: suspend () -> Unit,
     onLogin: () -> Unit,
     onDelete: suspend () -> Unit,
+    onProxyClicked: () -> Unit,
 ) {
     val accountState = remember { mutableStateOf(accountStatus) }
 
@@ -66,7 +67,7 @@ fun AccountInfo(
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = backendName,
+                text = "Backend: $backendName",
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -81,6 +82,10 @@ fun AccountInfo(
                 text = stringResource(id = R.string.status, statusString),
                 modifier = Modifier.fillMaxWidth()
             )
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            ActionButton(text = stringResource(id = R.string.proxy_settings), onProxyClicked)
 
             Spacer(modifier = Modifier.height(40.dp))
 

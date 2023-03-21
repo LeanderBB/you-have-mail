@@ -21,6 +21,8 @@ pub enum ServiceError {
     Offline,
     #[error("{error}")]
     Config { error: ConfigError },
+    #[error("Proxy settings invalid or Proxy is unreachable")]
+    ProxyError,
     #[error("Unknown: {msg}")]
     Unknown { msg: String },
 }
@@ -62,6 +64,7 @@ impl From<yhm::AccountError> for ServiceError {
         match value {
             yhm::AccountError::InvalidState => ServiceError::InvalidAccountState,
             yhm::AccountError::Backend(e) => e.into(),
+            yhm::AccountError::Proxy => ServiceError::ProxyError,
         }
     }
 }

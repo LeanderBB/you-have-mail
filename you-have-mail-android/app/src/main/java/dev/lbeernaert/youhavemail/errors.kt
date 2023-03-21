@@ -42,6 +42,9 @@ fun serviceExceptionToErrorStr(e: ServiceException, email: String?): String {
         is ServiceException.AccountNotFound -> {
             return "Account not found"
         }
+        is ServiceException.ProxyException -> {
+            return "Proxy configuration is invalid or Proxy is unreachable"
+        }
         else -> {
             return "Unknown error occurred"
         }

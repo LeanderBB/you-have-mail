@@ -32,9 +32,11 @@
 mod bindings;
 mod errors;
 mod interfaces;
+mod proxy;
 mod service;
 
 pub use bindings::*;
 pub use errors::*;
 pub use interfaces::*;
+pub use proxy::*;
 pub use service::*;

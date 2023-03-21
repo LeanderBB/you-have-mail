@@ -2,11 +2,13 @@ package dev.lbeernaert.youhavemail.screens
 
 import android.util.Log
 import androidx.compose.runtime.Composable
+import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.service.ServiceWrapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -110,6 +112,7 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                     onLogin = {
                         val backendIndex = serviceWrapper.backendIndexByName(account.backend)
                         if (backendIndex != null) {
+                            serviceWrapper.setInLoginProxy(account.proxy)
                             navController.navigate(Routes.newLoginRoute(backendIndex, email))
                         } else {
                             Log.e(navLogTag, "Could not find backend named: ${account.backend}")
@@ -120,6 +123,9 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                             serviceWrapper.removeAccount(email)
                         }
                         navController.popBackStack(Routes.Main.route, false)
+                    },
+                    onProxyClicked = {
+                        navController.navigate(Routes.newAccountProxyRoute(accountIndex))
                     }
                 )
             }
@@ -134,6 +140,64 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                     serviceWrapper.setPollInterval(interval)
                 }
             )
+        }
+
+        composable(
+            Routes.ProxyLogin.route,
+            arguments = listOf(navArgument("index") { type = NavType.IntType })
+        ) {
+            val args = it.arguments
+            val backendIndex = args?.getInt("index")
+            if (backendIndex == null) {
+                Log.e(navLogTag, "No backend index selected, returning to main screen")
+                navController.popBackStack(Routes.Main.route, false)
+            } else {
+                ProxyScreen(
+                    onBackClicked = {
+                        navController.popBackStack()
+                    },
+                    applyButtonText = stringResource(id = R.string.next),
+                    onApplyClicked = { proxy ->
+                        withContext(Dispatchers.Default) {
+                            serviceWrapper.checkProxy(backendIndex, proxy)
+                        }
+                        serviceWrapper.setInLoginProxy(proxy)
+                        navController.navigate(Routes.newLoginRoute(backendIndex, null))
+                    },
+                    proxy = null,
+                )
+            }
+        }
+
+        composable(
+            Routes.ProxySettings.route,
+            arguments = listOf(navArgument("index") { type = NavType.IntType })
+        ) {
+            val accountIndex = it.arguments?.getInt("index")
+            if (accountIndex == null) {
+                Log.e(navLogTag, "No account index selected, returning to main screen")
+                navController.popBackStack(Routes.Main.route, false)
+            }
+
+            val account = serviceWrapper.getAccount(accountIndex!!)
+            if (account == null) {
+                Log.e(navLogTag, "Account not found, return to main screen")
+                navController.popBackStack(Routes.Main.route, false)
+            } else {
+                ProxyScreen(
+                    onBackClicked = {
+                        navController.popBackStack()
+                    },
+                    applyButtonText = stringResource(id = R.string.apply),
+                    onApplyClicked = { proxy ->
+                        withContext(Dispatchers.Default) {
+                            serviceWrapper.setAccountProxy(account.email, proxy = proxy)
+                        }
+                        navController.popBackStack()
+                    },
+                    proxy = account.proxy,
+                )
+            }
         }
     }
 }

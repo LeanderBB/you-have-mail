@@ -17,6 +17,7 @@ interface ServiceError {
     Unknown(string msg);
     Config(ConfigError error);
     AccountNotFound(string email);
+    ProxyError();
 };
 
 [Error]
@@ -37,6 +38,7 @@ enum ObserverAccountStatus {
 interface Backend {
     string name();
     string description();
+
 };
 
 interface Account {
@@ -62,6 +64,24 @@ dictionary ObserverAccount {
     string email;
     ObserverAccountStatus status;
     string backend;
+    Proxy? proxy;
+};
+
+enum ProxyProtocol {
+    "Https",
+    "Socks5"
+};
+
+dictionary ProxyAuth {
+    string username;
+    string password;
+};
+
+dictionary Proxy {
+    ProxyProtocol protocol;
+    ProxyAuth? auth;
+    string url;
+    u16 port;
 };
 
 callback interface Notifier {
@@ -72,6 +92,7 @@ callback interface Notifier {
     void account_offline(string email);
     void account_online(string email);
     void account_error(string email, ServiceError error);
+    void proxy_applied(string email, Proxy? proxy);
 };
 
 callback interface ServiceFromConfigCallback {
@@ -83,7 +104,10 @@ interface Service {
     sequence<Backend> get_backends();
 
     [Self=ByArc]
-    Account new_account([ByRef]Backend backend, string email);
+    Account new_account([ByRef]Backend backend, string email, Proxy? proxy);
+
+    [Throws=ServiceError]
+    void check_proxy([ByRef]Backend backend, Proxy? proxy);
 
     [Throws=ServiceError]
     sequence<ObserverAccount> get_observed_accounts();
@@ -96,6 +120,9 @@ interface Service {
 
     [Throws=ServiceError]
     void remove_account(string email);
+
+    [Throws=ServiceError]
+    void set_account_proxy(string email, Proxy? proxy);
 
     [Throws=ServiceError]
     void pause();

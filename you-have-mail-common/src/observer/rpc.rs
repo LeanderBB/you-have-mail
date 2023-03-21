@@ -1,4 +1,4 @@
-use crate::{Account, ConfigGenError, ObserverAccount, ObserverError};
+use crate::{Account, ConfigGenError, ObserverAccount, ObserverError, Proxy};
 use proton_api_rs::tokio::sync::mpsc::Sender;
 use std::time::Duration;
 
@@ -14,6 +14,8 @@ pub enum ObserverRequest {
     GenConfig(Sender<Result<String, ConfigGenError>>),
     SetPollInterval(Duration),
     GetPollInterval(Sender<Result<Duration, ()>>),
+    ApplyProxy(String, Option<Proxy>, Sender<Result<(), ObserverError>>),
+    GetProxy(String, Sender<Result<Option<Proxy>, ObserverError>>),
 }
 
 #[doc(hidden)]
@@ -138,6 +140,46 @@ impl ObserverPRC for GetPollIntervalRequest {
 
     fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
         ObserverRequest::GetPollInterval(reply)
+    }
+
+    fn recover_send_value(_: ObserverRequest) -> Option<Self::SendFailedValue> {
+        None
+    }
+}
+
+#[doc(hidden)]
+pub struct ApplyProxyRequest {
+    pub email: String,
+    pub proxy: Option<Proxy>,
+}
+
+impl ObserverPRC for ApplyProxyRequest {
+    type Output = ();
+    type Error = ObserverError;
+    type SendFailedValue = ();
+
+    fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
+        ObserverRequest::ApplyProxy(self.email, self.proxy, reply)
+    }
+
+    fn recover_send_value(_: ObserverRequest) -> Option<Self::SendFailedValue> {
+        None
+    }
+}
+
+#[doc(hidden)]
+pub struct GetProxyRequest {
+    pub email: String,
+}
+
+#[doc(hidden)]
+impl ObserverPRC for GetProxyRequest {
+    type Output = Option<Proxy>;
+    type Error = ObserverError;
+    type SendFailedValue = ();
+
+    fn into_request(self, reply: Sender<Result<Self::Output, Self::Error>>) -> ObserverRequest {
+        ObserverRequest::GetProxy(self.email, reply)
     }
 
     fn recover_send_value(_: ObserverRequest) -> Option<Self::SendFailedValue> {

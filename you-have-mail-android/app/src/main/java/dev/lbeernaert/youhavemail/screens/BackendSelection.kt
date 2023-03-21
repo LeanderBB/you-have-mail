@@ -41,7 +41,8 @@ fun BackendSelection(serviceWrapper: ServiceWrapper, navController: NavControlle
     },
         content = { _ ->
             BackendList(backends = serviceWrapper.getBackends(), onClicked = {
-                navController.navigate(Routes.newLoginRoute(it, null))
+                serviceWrapper.setInLoginProxy(null)
+                navController.navigate(Routes.newProxyLoginRoute(it))
             })
         }
     )

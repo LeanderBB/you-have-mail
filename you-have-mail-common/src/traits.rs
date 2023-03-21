@@ -1,6 +1,6 @@
 //! Collection of Traits expected to be implemented by the respective application targets.
 
-use crate::AccountError;
+use crate::{AccountError, Proxy};
 #[cfg(test)]
 use mockall::automock;
 
@@ -25,6 +25,8 @@ pub enum Notification<'a> {
     AccountOnline(&'a str),
     /// An error occurred with an account
     AccountError(&'a str, AccountError),
+    /// A proxy configuration was applied
+    ProxyApplied(&'a str, Option<&'a Proxy>),
 }
 
 /// When an email has been received the notifier will be called.
