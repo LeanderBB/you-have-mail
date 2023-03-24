@@ -1,6 +1,6 @@
 [package]
 name = "you-have-mail-common"
-version = "0.2.0"
+version = "0.2.1"
 edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
@@ -22,7 +22,7 @@ serde = "1"
 secrecy = "0.8"
 
 [dependencies.proton-api-rs]
-version = "0.5.0"
+version = "0.5.1"
 optional = true
 
 [dev-dependencies]

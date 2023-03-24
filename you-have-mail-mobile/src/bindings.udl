@@ -13,7 +13,6 @@ interface ServiceError {
     InvalidAccountState();
     RequestError(string msg);
     LoggedOut();
-    Offline();
     Unknown(string msg);
     Config(ConfigError error);
     AccountNotFound(string email);

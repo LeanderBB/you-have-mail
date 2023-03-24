@@ -234,6 +234,10 @@ impl Worker {
     }
 
     async fn poll_accounts(&mut self) {
+        if self.paused {
+            return;
+        }
+
         for wa in &mut self.accounts.values_mut() {
             // Track logged out status if for some reason something slips through.
             if wa.account.is_logged_out() {
@@ -282,7 +286,10 @@ impl Worker {
                                     .notify(Notification::AccountLoggedOut(wa.account.email()));
                                 wa.status = ObserverAccountStatus::LoggedOut;
                             }
-                            BackendError::Offline => {
+                            BackendError::Offline(_) => {
+                                self.notifier
+                                    .notify(Notification::AccountError(wa.account.email(), e));
+
                                 if wa.status == ObserverAccountStatus::Offline {
                                     return;
                                 }
@@ -351,6 +358,7 @@ mod tests {
     use crate::backend::{BackendError, MockAccount, NewEmailReply};
     use crate::observer::worker::Worker;
     use crate::{Account, AccountState, MockNotifier, Notification};
+    use anyhow::anyhow;
     use mockall::Sequence;
     use proton_api_rs::tokio;
     use std::time::Duration;
@@ -363,11 +371,16 @@ mod tests {
             .withf(|n| matches!(n, Notification::AccountOffline(_)))
             .times(1)
             .return_const(());
+        notifier
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountError(_, _)))
+            .times(4)
+            .return_const(());
         let mut mock_account = MockAccount::new();
         mock_account
             .expect_check()
             .times(4)
-            .returning(|| Err(BackendError::Offline));
+            .returning(|| Err(BackendError::Offline(anyhow!("offline"))));
         let account = Account::with_state(
             crate::backend::null::new_backend(&[]),
             "foo",
@@ -392,7 +405,19 @@ mod tests {
         let mut notifier_sequence = Sequence::new();
         notifier
             .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountError(_, _)))
+            .times(1)
+            .in_sequence(&mut notifier_sequence)
+            .return_const(());
+        notifier
+            .expect_notify()
             .withf(|n| matches!(n, Notification::AccountOffline(_)))
+            .times(1)
+            .in_sequence(&mut notifier_sequence)
+            .return_const(());
+        notifier
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountError(_, _)))
             .times(1)
             .in_sequence(&mut notifier_sequence)
             .return_const(());
@@ -414,7 +439,7 @@ mod tests {
             .expect_check()
             .times(2)
             .in_sequence(&mut mock_sequence)
-            .returning(|| Err(BackendError::Offline));
+            .returning(|| Err(BackendError::Offline(anyhow!("offline"))));
         mock_account
             .expect_check()
             .times(1)

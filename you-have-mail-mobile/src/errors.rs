@@ -17,8 +17,6 @@ pub enum ServiceError {
     RequestError { msg: String },
     #[error("Account session expired")]
     LoggedOut,
-    #[error("Account backend is not reachable")]
-    Offline,
     #[error("{error}")]
     Config { error: ConfigError },
     #[error("Proxy settings invalid or Proxy is unreachable")]
@@ -52,7 +50,7 @@ impl From<yhm::backend::BackendError> for ServiceError {
         use yhm::backend::BackendError;
         match value {
             BackendError::LoggedOut => ServiceError::LoggedOut,
-            BackendError::Offline => ServiceError::Offline,
+            BackendError::Offline(e) => ServiceError::RequestError { msg: e.to_string() },
             BackendError::Request(e) => ServiceError::RequestError { msg: e.to_string() },
             BackendError::Unknown(e) => ServiceError::Unknown { msg: e.to_string() },
         }

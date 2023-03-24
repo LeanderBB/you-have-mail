@@ -29,13 +29,6 @@ fun serviceExceptionToErrorStr(e: ServiceException, email: String?): String {
                 "Account is logged out"
             }
         }
-        is ServiceException.Offline -> {
-            return if (email != null) {
-                "Account $email is offline"
-            } else {
-                "Account is offline"
-            }
-        }
         is ServiceException.Config -> {
             return "Configuration error"
         }

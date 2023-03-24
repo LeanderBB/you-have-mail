@@ -268,9 +268,12 @@ impl From<RequestError> for BackendError {
     fn from(value: RequestError) -> Self {
         match value {
             RequestError::HttpClient(e) => match e {
-                HttpClientError::Redirect(_) => BackendError::Unknown(anyhow!(e)),
-                HttpClientError::Timeout | HttpClientError::Connection => BackendError::Offline,
-                _ => BackendError::Unknown(anyhow!(e)),
+                HttpClientError::Redirect(_, err) => BackendError::Request(err),
+                HttpClientError::Timeout(err) => BackendError::Request(err),
+                HttpClientError::Request(err) => BackendError::Request(err),
+                HttpClientError::Connection(err) => BackendError::Offline(err),
+                HttpClientError::Body(err) => BackendError::Request(err),
+                HttpClientError::Other(err) => BackendError::Request(err),
             },
             RequestError::API(e) => {
                 if e.http_code == 401 {

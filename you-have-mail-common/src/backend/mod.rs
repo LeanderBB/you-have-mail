@@ -20,8 +20,8 @@ pub mod proton;
 pub enum BackendError {
     #[error("The user account has been logged out or the token expired")]
     LoggedOut,
-    #[error("The user account server's are not reachable")]
-    Offline,
+    #[error("The user account server's are not reachable or there was a connection error: {0}")]
+    Offline(#[source] anyhow::Error),
     #[error("{0}")]
     Request(#[source] anyhow::Error),
     #[error("An unknown error occurred: {0}")]

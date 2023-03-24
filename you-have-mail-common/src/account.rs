@@ -39,13 +39,6 @@ pub enum AccountError {
 }
 
 impl AccountError {
-    pub fn is_offline(&self) -> bool {
-        if let AccountError::Backend(e) = self {
-            return matches!(e, crate::backend::BackendError::Offline);
-        }
-        false
-    }
-
     pub fn is_logged_out(&self) -> bool {
         if let AccountError::Backend(e) = self {
             return matches!(e, crate::backend::BackendError::LoggedOut);
