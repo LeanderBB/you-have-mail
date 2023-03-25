@@ -17,6 +17,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::time::Duration;
 
 const PROTON_APP_VERSION: &str = "web-mail@5.0.17.9";
 
@@ -168,10 +169,12 @@ impl Account for ProtonAccount {
                     if event.event_id != *event_id || has_more == MoreEvents::Yes {
                         if let Some(message_events) = &event.messages {
                             for msg_event in message_events {
-                                if msg_event.action == MessageAction::Create
-                                    && msg_event.message.labels.contains(&LabelID::inbox())
-                                {
-                                    result.count += 1
+                                if msg_event.action == MessageAction::Create {
+                                    if let Some(message) = &msg_event.message {
+                                        if message.labels.contains(&LabelID::inbox()) {
+                                            result.count += 1
+                                        }
+                                    }
                                 }
                             }
                         }
@@ -309,4 +312,6 @@ fn new_client_builder(proxy: Option<&Proxy>) -> ClientBuilder {
     }
 
     builder
+        .connect_timeout(Duration::from_secs(60))
+        .request_timeout(Duration::from_secs(3 * 60))
 }
