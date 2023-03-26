@@ -19,3 +19,8 @@ This repository is split into the following projects:
 * [you-have-mail-common](you-have-mail-common): Shared code for the project
 * [you-have-mail-mobile](you-have-mail-mobile): Shared code for mobile bindings
 * [you-have-mail-android](you-have-mail-android): Android Application
+
+
+## Donations
+
+* Monero: `86CBWfyMFAYM6a7zJUmhj5Xp7hmm8LkVRE9xSHuJ28Lti22KGxGXSNBUGkJBw7PvJC5RWJfEvqkJJjhsaJPT8LYB4kbXc2S`
