@@ -101,6 +101,7 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                     accountEmail = email,
                     backendName = account.backend,
                     accountStatus = account.status,
+                    activity = serviceWrapper.getAccountActivity(email),
                     onBackClicked = {
                         navController.popBackStack(Routes.Main.route, false)
                     },

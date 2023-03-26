@@ -56,4 +56,5 @@
     <string name="proxy_auth">Authentication</string>
     <string name="next">Next</string>
     <string name="apply">Apply</string>
+    <string name="account_activity">Activity</string>
 </resources>

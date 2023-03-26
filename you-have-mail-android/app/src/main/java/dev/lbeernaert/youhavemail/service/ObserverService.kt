@@ -23,6 +23,7 @@ import kotlinx.coroutines.cancel
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.launch
+import java.time.LocalDateTime
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
@@ -30,6 +31,8 @@ import java.util.concurrent.locks.ReentrantLock
 const val serviceLogTag = "observer"
 
 data class NotificationIds(val newMessages: Int, val statusUpdate: Int, val errors: Int)
+
+data class AccountActivity(val dateTime: LocalDateTime, val status: String)
 
 class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private var wakeLock: PowerManager.WakeLock? = null
@@ -55,6 +58,10 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private var notificationMap: HashMap<String, NotificationIds> = HashMap()
     private var unreadMessageCounts: HashMap<String, UInt> = HashMap()
     private var unreadMessageCountMutex: Lock = ReentrantLock()
+
+    // Account Activity
+    private var accountActivity = HashMap<String, ArrayList<AccountActivity>>()
+    private var accountActivityLock: Lock = ReentrantLock()
 
     // Have to keep this here or it won't survive activity refreshes
     private var mInLoginAccount: Account? = null
@@ -117,10 +124,11 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         } catch (e: ServiceException) {
             Log.e(serviceLogTag, "Failed to pause service: $e")
         }
+        recordAccountActivityAll("Paused due to lack of network")
     }
 
     fun resumeService() {
-        Log.d(serviceLogTag, "Resume service")
+        Log.d(serviceLogTag, "Network restored")
         try {
             mService!!.resume()
             updateServiceNotificationStatus("Running")
@@ -131,6 +139,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
                 e
             )
         }
+        recordAccountActivityAll("Resumed")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -387,11 +396,13 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
     override fun accountAdded(email: String) {
         Log.d(serviceLogTag, "Account added: $email")
+        addAccountActivity(email)
         updateAccountList()
     }
 
     override fun accountLoggedOut(email: String) {
         Log.d(serviceLogTag, "Account Logged Out: $email")
+        recordAccountActivity(email, "Session Expired")
         updateAccountList()
         val notification = createAccountStatusNotification(this, "Account $email session expired")
         val ids = getOrCreateNotificationIDs(email)
@@ -405,20 +416,24 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     override fun accountRemoved(email: String) {
         Log.d(serviceLogTag, "Account Removed: $email")
         updateAccountList()
+        removeAccountActivity(email)
     }
 
     override fun accountOffline(email: String) {
         Log.d(serviceLogTag, "Account Offline: $email")
+        recordAccountActivity(email, "Offline")
         updateAccountList()
     }
 
     override fun accountOnline(email: String) {
         Log.d(serviceLogTag, "Account Online: $email")
+        recordAccountActivity(email, "Online")
         updateAccountList()
     }
 
     override fun accountError(email: String, error: ServiceException) {
         Log.e(serviceLogTag, "Account Error: $email => $error")
+        recordAccountActivity(email, error.toString())
         val notification = createAccountErrorNotification(this, email, error)
         val ids = getOrCreateNotificationIDs(email)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
@@ -431,6 +446,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     override fun proxyApplied(email: String, proxy: Proxy?) {
         Log.d(serviceLogTag, "Account $email applied Proxy $proxy")
         updateAccountList()
+        recordAccountActivity(email, "Proxy settings changed")
     }
 
     private fun updateAccountList() {
@@ -486,6 +502,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
     override fun notifyError(email: String, error: ServiceException) {
         Toast.makeText(this, serviceExceptionToErrorStr(error, email), Toast.LENGTH_SHORT).show()
+        recordAccountActivity(email, "Load from config: $error")
         Log.e(serviceLogTag, "Failed to load '$email' from config: $error")
     }
 
@@ -507,6 +524,76 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             if (this.areNotificationsEnabled()) {
                 notify(ServiceErrorNotificationID, notification)
             }
+        }
+    }
+
+
+    fun getAccountActivity(email: String): List<AccountActivity> {
+        accountActivityLock.lock()
+        val result = ArrayList(accountActivity[email]!!)
+        accountActivityLock.unlock()
+        return result
+    }
+
+    private fun recordAccountActivity(email: String, message: String) {
+        try {
+            accountActivityLock.lock()
+
+            val newActivity = AccountActivity(dateTime = LocalDateTime.now(), message)
+
+            var list = accountActivity.getOrPut(email) { ArrayList() }
+
+            if (list.size > 20) {
+                list.removeAt(0)
+            }
+            list.add(newActivity)
+
+        } catch (e: Exception) {
+            Log.e(serviceLogTag, "Failed to record activity: $e")
+        } finally {
+            accountActivityLock.unlock()
+        }
+    }
+
+    private fun recordAccountActivityAll(message: String) {
+        try {
+            accountActivityLock.lock()
+
+            val newActivity = AccountActivity(dateTime = LocalDateTime.now(), message)
+
+            for (list in accountActivity.values) {
+                if (list.size > 20) {
+                    list.removeAt(0)
+                }
+                list.add(newActivity)
+            }
+
+        } catch (e: Exception) {
+            Log.e(serviceLogTag, "Failed to record activity: $e")
+        } finally {
+            accountActivityLock.unlock()
+        }
+    }
+
+    private fun removeAccountActivity(email: String) {
+        try {
+            accountActivityLock.lock()
+            accountActivity.remove(email)
+        } catch (e: Exception) {
+            Log.e(serviceLogTag, "Failed to remove activity: $e")
+        } finally {
+            accountActivityLock.unlock()
+        }
+    }
+
+    private fun addAccountActivity(email: String) {
+        try {
+            accountActivityLock.lock()
+            accountActivity[email] = kotlin.collections.ArrayList()
+        } catch (e: Exception) {
+            Log.e(serviceLogTag, "Failed to remove activity: $e")
+        } finally {
+            accountActivityLock.unlock()
         }
     }
 }

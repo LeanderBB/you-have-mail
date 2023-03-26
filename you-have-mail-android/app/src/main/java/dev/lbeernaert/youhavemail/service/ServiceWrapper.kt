@@ -73,7 +73,7 @@ class ServiceWrapper {
     }
 
     fun setAccountProxy(email: String, proxy: Proxy?) {
-        mService!!.setAccountProxy(email, proxy)
+        mObserverService!!.setAccountProxy(email, proxy)
     }
 
     fun backendIndexByName(name: String): Int? {
@@ -102,5 +102,9 @@ class ServiceWrapper {
 
     fun setPollInterval(intervalSeconds: ULong) {
         mObserverService!!.setPollInterval(intervalSeconds)
+    }
+
+    fun getAccountActivity(email: String): List<AccountActivity> {
+        return mObserverService!!.getAccountActivity(email)
     }
 }

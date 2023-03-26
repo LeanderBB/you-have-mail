@@ -1,6 +1,9 @@
 package dev.lbeernaert.youhavemail.screens
 
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
@@ -14,6 +17,7 @@ import dev.lbeernaert.youhavemail.ObserverAccountStatus
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
+import dev.lbeernaert.youhavemail.service.AccountActivity
 
 
 @Composable
@@ -21,6 +25,7 @@ fun AccountInfo(
     accountEmail: String,
     backendName: String,
     accountStatus: ObserverAccountStatus,
+    activity: List<AccountActivity>,
     onBackClicked: () -> Unit,
     onLogout: suspend () -> Unit,
     onLogin: () -> Unit,
@@ -52,11 +57,11 @@ fun AccountInfo(
             modifier = Modifier
                 .padding(padding)
                 .padding(20.dp)
-                .fillMaxSize(),
+                .fillMaxSize()
+                .verticalScroll(rememberScrollState(), true),
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally,
-
-            ) {
+        ) {
 
             Text(
                 text = accountEmail,
@@ -105,6 +110,33 @@ fun AccountInfo(
             Spacer(modifier = Modifier.height(20.dp))
 
             ActionButton(text = stringResource(id = R.string.delete_account), onDeleteImpl)
+
+            Spacer(modifier = Modifier.height(40.dp))
+
+            Divider()
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Text(
+                text = stringResource(id = R.string.account_activity),
+                modifier = Modifier.fillMaxWidth()
+            )
+
+            Spacer(modifier = Modifier.height(20.dp))
+
+            for (a in activity.reversed()) {
+                Text(
+                    text = a.dateTime.toString(),
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.subtitle2
+                )
+                Text(
+                    text = a.status,
+                    modifier = Modifier.fillMaxWidth(),
+                    style = MaterialTheme.typography.caption,
+                )
+                Spacer(modifier = Modifier.height(20.dp))
+            }
         }
 
     }
