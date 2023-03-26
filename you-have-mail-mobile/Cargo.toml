@@ -1,6 +1,6 @@
 [package]
 name = "you-have-mail-mobile"
-version = "0.2.2"
+version = "0.3.0"
 edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
@@ -14,7 +14,7 @@ name = "youhavemail"
 
 [dependencies]
 uniffi = {version ="0.23"}
-you-have-mail-common = {path = "../you-have-mail-common", version = "0.2" }
+you-have-mail-common = {path = "../you-have-mail-common", version = "0.3" }
 thiserror = "1"
 tokio = "1"
 

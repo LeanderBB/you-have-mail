@@ -1,6 +1,6 @@
 use crate::backend::BackendError;
 use crate::observer::rpc::ObserverRequest;
-use crate::Notification::ProxyApplied;
+use crate::Notification::{AccountTokenRefresh, ProxyApplied};
 use crate::{
     Account, AccountError, Config, Notification, Notifier, ObserverAccount, ObserverAccountStatus,
     ObserverError,
@@ -254,7 +254,8 @@ impl Worker {
                 wa.account.email(),
                 wa.account.backend().name()
             );
-            match wa.account.check().await {
+            let (result, refreshed) = wa.account.check().await;
+            match result {
                 Ok(check) => {
                     if wa.status != ObserverAccountStatus::Online {
                         self.notifier
@@ -302,6 +303,10 @@ impl Worker {
                         }
                     }
                 }
+            }
+            if refreshed {
+                self.notifier
+                    .notify(AccountTokenRefresh(wa.account.email()))
             }
         }
     }
@@ -374,7 +379,7 @@ mod tests {
         mock_account
             .expect_check()
             .times(4)
-            .returning(|| Err(BackendError::Timeout(anyhow!("offline"))));
+            .returning(|| (Err(BackendError::Timeout(anyhow!("offline"))), false));
         let account = Account::with_state(
             crate::backend::null::new_backend(&[]),
             "foo",
@@ -421,12 +426,12 @@ mod tests {
             .expect_check()
             .times(2)
             .in_sequence(&mut mock_sequence)
-            .returning(|| Err(BackendError::Timeout(anyhow!("offline"))));
+            .returning(|| (Err(BackendError::Timeout(anyhow!("offline"))), false));
         mock_account
             .expect_check()
             .times(1)
             .in_sequence(&mut mock_sequence)
-            .returning(|| Ok(NewEmailReply { count: 1 }));
+            .returning(|| (Ok(NewEmailReply { count: 1 }), false));
         let account = Account::with_state(
             crate::backend::null::new_backend(&[]),
             "foo",
@@ -459,12 +464,12 @@ mod tests {
             .expect_check()
             .times(1)
             .in_sequence(&mut mock_sequence)
-            .returning(|| Err(BackendError::LoggedOut));
+            .returning(|| (Err(BackendError::LoggedOut), false));
         mock_account
             .expect_check()
             .times(0)
             .in_sequence(&mut mock_sequence)
-            .returning(|| Ok(NewEmailReply { count: 1 }));
+            .returning(|| (Ok(NewEmailReply { count: 1 }), false));
         let account = Account::with_state(
             crate::backend::null::new_backend(&[]),
             "foo",
@@ -478,6 +483,67 @@ mod tests {
         // First all puts the account in logged in mode.
         worker.poll_accounts().await;
         // Next calls are noop.
+        worker.poll_accounts().await;
+        worker.poll_accounts().await;
+    }
+
+    #[tokio::test]
+    async fn worker_notifies_account_refresh() {
+        let mut notifier = MockNotifier::new();
+        let mut sequence = Sequence::new();
+        notifier
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountError(_, _)))
+            .times(1)
+            .in_sequence(&mut sequence)
+            .return_const(());
+        notifier
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountTokenRefresh(_)))
+            .times(1)
+            .in_sequence(&mut sequence)
+            .return_const(());
+        notifier
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountOnline(_)))
+            .times(1)
+            .in_sequence(&mut sequence)
+            .return_const(());
+        notifier
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::NewEmail { .. }))
+            .times(1)
+            .in_sequence(&mut sequence)
+            .return_const(());
+        notifier
+            .expect_notify()
+            .withf(|n| matches!(n, Notification::AccountTokenRefresh(_)))
+            .times(1)
+            .in_sequence(&mut sequence)
+            .return_const(());
+        notifier.expect_notify().times(0).return_const(());
+        let mut mock_account = MockAccount::new();
+        let mut mock_sequence = Sequence::new();
+        mock_account
+            .expect_check()
+            .times(1)
+            .in_sequence(&mut mock_sequence)
+            .returning(|| (Err(BackendError::Unknown(anyhow!("error"))), true));
+        mock_account
+            .expect_check()
+            .times(1)
+            .in_sequence(&mut mock_sequence)
+            .returning(|| (Ok(NewEmailReply { count: 1 }), true));
+
+        let account = Account::with_state(
+            crate::backend::null::new_backend(&[]),
+            "foo",
+            AccountState::LoggedIn(Box::new(mock_account)),
+            None,
+        );
+        let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
+
+        worker.add_account(account);
         worker.poll_accounts().await;
         worker.poll_accounts().await;
     }

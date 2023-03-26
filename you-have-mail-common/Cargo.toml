@@ -1,6 +1,6 @@
 [package]
 name = "you-have-mail-common"
-version = "0.2.3"
+version = "0.3.0"
 edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"

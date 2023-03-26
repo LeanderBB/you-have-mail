@@ -73,7 +73,8 @@ pub trait Backend: Send + Sync + Debug {
 #[async_trait]
 pub trait Account: Send + Sync + Debug {
     /// Execute the code that will check whether new mail is available.
-    async fn check(&mut self) -> BackendResult<NewEmailReply>;
+    /// If the account token was refreshed the second member of the tuple will be true.
+    async fn check(&mut self) -> (BackendResult<NewEmailReply>, bool);
 
     /// Logout the account.
     async fn logout(&mut self) -> BackendResult<()>;

@@ -12,6 +12,7 @@ pub trait Notifier: Send + Sync {
     fn account_online(&self, email: String);
     fn account_error(&self, email: String, error: ServiceError);
     fn proxy_applied(&self, email: String, proxy: Option<Proxy>);
+    fn account_token_refreshed(&self, email: String);
 }
 
 pub struct NotifierWrapper(pub Box<dyn Notifier>);
@@ -34,6 +35,7 @@ impl you_have_mail_common::Notifier for NotifierWrapper {
             Not::AccountOnline(e) => self.0.account_online(e.to_string()),
             Not::AccountError(e, err) => self.0.account_error(e.to_string(), err.into()),
             Not::ProxyApplied(e, proxy) => self.0.proxy_applied(e.to_string(), proxy.cloned()),
+            Not::AccountTokenRefresh(e) => self.0.account_token_refreshed(e.to_string()),
         }
     }
 }

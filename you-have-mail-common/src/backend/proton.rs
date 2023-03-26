@@ -79,7 +79,7 @@ macro_rules! try_request {
     ($request:expr, $refresh:expr) => {{
         let r = $request.await;
         match r {
-            Ok(t) => Ok(t),
+            Ok(t) => (Ok(t), false),
             Err(e) => {
                 if let RequestError::API(api_err) = &e {
                     if api_err.http_code == 401 {
@@ -87,15 +87,15 @@ macro_rules! try_request {
                         // Unauthorized, try to refresh once
                         if let Err(e) = $refresh.await {
                             error!("Proton account expired, refresh failed {e}");
-                            Err(e)
+                            (Err(e), false)
                         } else {
-                            $request.await
+                            ($request.await, true)
                         }
                     } else {
-                        Err(e)
+                        (Err(e), false)
                     }
                 } else {
-                    Err(e)
+                    (Err(e), false)
                 }
             }
         }
@@ -151,44 +151,60 @@ impl Backend for ProtonBackend {
 
 #[async_trait]
 impl Account for ProtonAccount {
-    async fn check(&mut self) -> BackendResult<NewEmailReply> {
+    async fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
         if let Some(client) = &mut self.client {
             if self.last_event_id.is_none() {
-                let event_id =
-                    try_request!({ client.get_latest_event_id() }, { client.refresh_auth() })?;
-                self.last_event_id = Some(event_id);
+                let (r, _) =
+                    try_request!({ client.get_latest_event_id() }, { client.refresh_auth() });
+                match r {
+                    Err(e) => return (Err(e.into()), false),
+                    Ok(event_id) => {
+                        self.last_event_id = Some(event_id);
+                    }
+                }
             }
 
             let mut result = NewEmailReply { count: 0 };
+            let mut account_refreshed = false;
 
             if let Some(event_id) = &mut self.last_event_id {
                 let mut has_more = MoreEvents::No;
                 loop {
-                    let event =
-                        try_request!({ client.get_event(event_id) }, { client.refresh_auth() })?;
-                    if event.event_id != *event_id || has_more == MoreEvents::Yes {
-                        if let Some(message_events) = &event.messages {
-                            for msg_event in message_events {
-                                if msg_event.action == MessageAction::Create {
-                                    if let Some(message) = &msg_event.message {
-                                        if message.labels.contains(&LabelID::inbox()) {
-                                            result.count += 1
+                    match try_request!({ client.get_event(event_id) }, { client.refresh_auth() }) {
+                        (Err(e), b) => {
+                            account_refreshed = account_refreshed || b;
+                            return (Err(e.into()), account_refreshed);
+                        }
+                        (Ok(event), b) => {
+                            account_refreshed = account_refreshed || b;
+                            if event.event_id != *event_id || has_more == MoreEvents::Yes {
+                                if let Some(message_events) = &event.messages {
+                                    for msg_event in message_events {
+                                        if msg_event.action == MessageAction::Create {
+                                            if let Some(message) = &msg_event.message {
+                                                if message.labels.contains(&LabelID::inbox()) {
+                                                    result.count += 1
+                                                }
+                                            }
                                         }
                                     }
                                 }
+
+                                *event_id = event.event_id;
+                                has_more = event.more;
+                            } else {
+                                return (Ok(result), account_refreshed);
                             }
                         }
-
-                        *event_id = event.event_id;
-                        has_more = event.more;
-                    } else {
-                        return Ok(result);
                     }
                 }
             }
         }
 
-        Err(BackendError::Unknown(anyhow!("Client is no longer active")))
+        (
+            Err(BackendError::Unknown(anyhow!("Client is no longer active"))),
+            false,
+        )
     }
 
     async fn logout(&mut self) -> BackendResult<()> {

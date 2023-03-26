@@ -114,18 +114,18 @@ impl Account {
     }
 
     /// Run check on the account to see if new emails have arrived.
-    pub async fn check(&mut self) -> AccountResult<NewEmailReply> {
+    pub async fn check(&mut self) -> (AccountResult<NewEmailReply>, bool) {
         match &mut self.state {
             AccountState::LoggedIn(a) => match a.check().await {
-                Ok(r) => Ok(r),
-                Err(e) => {
+                (Ok(r), b) => (Ok(r), b),
+                (Err(e), b) => {
                     if matches!(e, crate::backend::BackendError::LoggedOut) {
                         self.state = AccountState::LoggedOut;
                     }
-                    Err(e.into())
+                    (Err(e.into()), b)
                 }
             },
-            _ => Err(AccountError::InvalidState),
+            _ => (Err(AccountError::InvalidState), false),
         }
     }
 

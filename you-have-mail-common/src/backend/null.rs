@@ -133,8 +133,8 @@ struct NullAuthRefresherInfo {
 
 #[async_trait]
 impl Account for NullAccount {
-    async fn check(&mut self) -> BackendResult<NewEmailReply> {
-        Ok(NewEmailReply { count: 1 })
+    async fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
+        (Ok(NewEmailReply { count: 1 }), false)
     }
 
     async fn logout(&mut self) -> BackendResult<()> {
