@@ -24,6 +24,8 @@ pub enum ObserverAccountStatus {
     Online,
     /// The account is logged out or the session expired.
     LoggedOut,
+    /// The account encountered an error
+    Error,
 }
 
 impl std::fmt::Display for ObserverAccountStatus {
@@ -37,6 +39,9 @@ impl std::fmt::Display for ObserverAccountStatus {
             }
             ObserverAccountStatus::LoggedOut => {
                 write!(f, "LoggedOut")
+            }
+            ObserverAccountStatus::Error => {
+                write!(f, "Error Occurred")
             }
         }
     }

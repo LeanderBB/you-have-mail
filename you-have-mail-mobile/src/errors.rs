@@ -3,6 +3,14 @@
 use thiserror::Error;
 use you_have_mail_common as yhm;
 
+#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+pub enum RequestErrorCategory {
+    Timeout,
+    Connection,
+    Request,
+    API,
+}
+
 #[derive(Debug, Error)]
 pub enum ServiceError {
     #[error("RPC failed: {msg}")]
@@ -14,7 +22,10 @@ pub enum ServiceError {
     #[error("The account can't complete this operation in its current state")]
     InvalidAccountState,
     #[error("Backend Error: {msg}")]
-    RequestError { msg: String },
+    RequestError {
+        category: RequestErrorCategory,
+        msg: String,
+    },
     #[error("Account session expired")]
     LoggedOut,
     #[error("{error}")]
@@ -50,9 +61,23 @@ impl From<yhm::backend::BackendError> for ServiceError {
         use yhm::backend::BackendError;
         match value {
             BackendError::LoggedOut => ServiceError::LoggedOut,
-            BackendError::Timeout(e) => ServiceError::RequestError { msg: e.to_string() },
-            BackendError::Request(e) => ServiceError::RequestError { msg: e.to_string() },
+            BackendError::Timeout(e) => ServiceError::RequestError {
+                category: RequestErrorCategory::Connection,
+                msg: e.to_string(),
+            },
+            BackendError::Request(e) => ServiceError::RequestError {
+                category: RequestErrorCategory::Request,
+                msg: e.to_string(),
+            },
             BackendError::Unknown(e) => ServiceError::Unknown { msg: e.to_string() },
+            BackendError::Connection(e) => ServiceError::RequestError {
+                category: RequestErrorCategory::Connection,
+                msg: e.to_string(),
+            },
+            BackendError::API(e) => ServiceError::RequestError {
+                category: RequestErrorCategory::API,
+                msg: e.to_string(),
+            },
         }
     }
 }

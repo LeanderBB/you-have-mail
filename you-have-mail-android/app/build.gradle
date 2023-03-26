@@ -13,8 +13,8 @@ android {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 29
         targetSdk 33
-        versionCode 6
-        versionName "0.3.2"
+        versionCode 7
+        versionName "0.3.3"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {

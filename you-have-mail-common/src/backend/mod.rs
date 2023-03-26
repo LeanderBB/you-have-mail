@@ -22,8 +22,12 @@ pub enum BackendError {
     LoggedOut,
     #[error("The request or connection timed out: {0}")]
     Timeout(#[source] anyhow::Error),
+    #[error("Connection error: {0}")]
+    Connection(#[source] anyhow::Error),
     #[error("{0}")]
     Request(#[source] anyhow::Error),
+    #[error("{0}")]
+    API(#[source] anyhow::Error),
     #[error("An unknown error occurred: {0}")]
     Unknown(#[source] anyhow::Error),
 }

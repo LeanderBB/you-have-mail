@@ -20,7 +20,18 @@ fun serviceExceptionToErrorStr(e: ServiceException, email: String?): String {
             }
         }
         is ServiceException.RequestException -> {
-            return e.msg
+            val errStr = when (e.category) {
+                RequestErrorCategory.TIMEOUT -> "Connection timed out"
+                RequestErrorCategory.CONNECTION -> "Connection error or service unreachable"
+                RequestErrorCategory.REQUEST -> "Network request failed"
+                RequestErrorCategory.API -> e.msg
+            }
+
+            return if (email != null) {
+                "$email: $errStr"
+            } else {
+                errStr
+            }
         }
         is ServiceException.LoggedOut -> {
             return if (email != null) {

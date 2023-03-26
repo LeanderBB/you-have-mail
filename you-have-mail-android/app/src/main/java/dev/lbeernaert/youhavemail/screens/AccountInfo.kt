@@ -77,6 +77,7 @@ fun AccountInfo(
                 ObserverAccountStatus.OFFLINE -> stringResource(id = R.string.status_offline)
                 ObserverAccountStatus.LOGGED_OUT -> stringResource(id = R.string.status_logged_out)
                 ObserverAccountStatus.ONLINE -> stringResource(id = R.string.status_online)
+                ObserverAccountStatus.ERROR -> stringResource(id = R.string.status_online)
             }
             Text(
                 text = stringResource(id = R.string.status, statusString),

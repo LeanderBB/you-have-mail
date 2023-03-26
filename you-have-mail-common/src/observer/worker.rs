@@ -286,7 +286,7 @@ impl Worker {
                                     .notify(Notification::AccountLoggedOut(wa.account.email()));
                                 wa.status = ObserverAccountStatus::LoggedOut;
                             }
-                            BackendError::Timeout(_) => {
+                            BackendError::Timeout(_) | BackendError::Connection(_) => {
                                 if wa.status == ObserverAccountStatus::Offline {
                                     return;
                                 }
@@ -294,9 +294,11 @@ impl Worker {
                                     .notify(Notification::AccountOffline(wa.account.email()));
                                 wa.status = ObserverAccountStatus::Offline;
                             }
-                            _ => self
-                                .notifier
-                                .notify(Notification::AccountError(wa.account.email(), e)),
+                            _ => {
+                                wa.status = ObserverAccountStatus::Error;
+                                self.notifier
+                                    .notify(Notification::AccountError(wa.account.email(), e));
+                            }
                         }
                     }
                 }

@@ -274,7 +274,7 @@ impl From<RequestError> for BackendError {
                 HttpClientError::Redirect(_, err) => BackendError::Request(err),
                 HttpClientError::Timeout(err) => BackendError::Timeout(err),
                 HttpClientError::Request(err) => BackendError::Request(err),
-                HttpClientError::Connection(err) => BackendError::Request(err),
+                HttpClientError::Connection(err) => BackendError::Connection(err),
                 HttpClientError::Body(err) => BackendError::Request(err),
                 HttpClientError::Other(err) => BackendError::Request(err),
             },
@@ -282,7 +282,7 @@ impl From<RequestError> for BackendError {
                 if e.http_code == 401 {
                     return BackendError::LoggedOut;
                 }
-                BackendError::Request(anyhow!(e))
+                BackendError::API(e.into())
             }
             RequestError::JSON(e) => BackendError::Request(anyhow!(e)),
             RequestError::Other(e) => BackendError::Unknown(anyhow!(e)),

@@ -6,12 +6,20 @@ namespace youhavemail {
     Service new_service_from_config(Notifier notifier, ServiceFromConfigCallback cb, [ByRef]string bytes);
 };
 
+
+enum RequestErrorCategory {
+    "Timeout",
+    "Connection",
+    "Request",
+    "API"
+};
+
 [Error]
 interface ServiceError {
     RPCFailed(string msg);
     AccountAlreadyActive(string email);
     InvalidAccountState();
-    RequestError(string msg);
+    RequestError(RequestErrorCategory category, string msg);
     LoggedOut();
     Unknown(string msg);
     Config(ConfigError error);
@@ -32,6 +40,7 @@ enum ObserverAccountStatus {
     "Offline",
     "LoggedOut",
     "Online",
+    "Error",
 };
 
 interface Backend {
