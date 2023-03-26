@@ -139,7 +139,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
                 e
             )
         }
-        recordAccountActivityAll("Resumed")
+        recordAccountActivityAll("Resumed, network restored")
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -447,6 +447,11 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         Log.d(serviceLogTag, "Account $email applied Proxy $proxy")
         updateAccountList()
         recordAccountActivity(email, "Proxy settings changed")
+    }
+
+    override fun accountTokenRefreshed(email: String) {
+        Log.d(serviceLogTag, "Account $email access token refreshed")
+        updateAccountList()
     }
 
     private fun updateAccountList() {
