@@ -50,7 +50,7 @@ impl From<yhm::backend::BackendError> for ServiceError {
         use yhm::backend::BackendError;
         match value {
             BackendError::LoggedOut => ServiceError::LoggedOut,
-            BackendError::Offline(e) => ServiceError::RequestError { msg: e.to_string() },
+            BackendError::Timeout(e) => ServiceError::RequestError { msg: e.to_string() },
             BackendError::Request(e) => ServiceError::RequestError { msg: e.to_string() },
             BackendError::Unknown(e) => ServiceError::Unknown { msg: e.to_string() },
         }

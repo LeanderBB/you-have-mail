@@ -272,9 +272,9 @@ impl From<RequestError> for BackendError {
         match value {
             RequestError::HttpClient(e) => match e {
                 HttpClientError::Redirect(_, err) => BackendError::Request(err),
-                HttpClientError::Timeout(err) => BackendError::Request(err),
+                HttpClientError::Timeout(err) => BackendError::Timeout(err),
                 HttpClientError::Request(err) => BackendError::Request(err),
-                HttpClientError::Connection(err) => BackendError::Offline(err),
+                HttpClientError::Connection(err) => BackendError::Request(err),
                 HttpClientError::Body(err) => BackendError::Request(err),
                 HttpClientError::Other(err) => BackendError::Request(err),
             },
@@ -312,6 +312,6 @@ fn new_client_builder(proxy: Option<&Proxy>) -> ClientBuilder {
     }
 
     builder
-        .connect_timeout(Duration::from_secs(60))
+        .connect_timeout(Duration::from_micros(1)) //Duration::from_secs(60))
         .request_timeout(Duration::from_secs(3 * 60))
 }
