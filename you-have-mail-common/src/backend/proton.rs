@@ -19,7 +19,7 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 
-const PROTON_APP_VERSION: &str = "web-mail@5.0.17.9";
+const PROTON_APP_VERSION: &str = "web-mail@5.0.19.5";
 
 /// Create a proton mail backend.
 pub fn new_backend() -> Arc<dyn Backend> {
