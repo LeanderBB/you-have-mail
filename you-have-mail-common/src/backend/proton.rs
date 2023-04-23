@@ -20,22 +20,36 @@ use std::sync::Arc;
 use std::time::Duration;
 
 const PROTON_APP_VERSION: &str = "web-mail@5.0.19.5";
+const PROTON_APP_VERSION_OTHER: &str = "Other";
 
 /// Create a proton mail backend.
 pub fn new_backend() -> Arc<dyn Backend> {
-    Arc::new(ProtonBackend {})
+    Arc::new(ProtonBackend {
+        version: PROTON_APP_VERSION,
+    })
+}
+
+/// Create a proton mail backend.
+pub fn new_backend_version_other() -> Arc<dyn Backend> {
+    Arc::new(ProtonBackend {
+        version: PROTON_APP_VERSION_OTHER,
+    })
 }
 
 #[derive(Debug)]
-struct ProtonBackend {}
+struct ProtonBackend {
+    version: &'static str,
+}
 
 const PROTON_BACKEND_NAME: &str = "Proton Mail";
+const PROTON_BACKEND_NAME_OTHER: &str = "Proton Mail V-Other";
 
 #[derive(Debug)]
 struct ProtonAccount {
     email: String,
     client: Option<Client>,
     last_event_id: Option<EventId>,
+    version: &'static str,
 }
 
 #[derive(Debug)]
@@ -43,6 +57,7 @@ struct ProtonAuthRefresher {
     email: String,
     uid: String,
     token: String,
+    version: &'static str,
 }
 
 #[derive(Deserialize)]
@@ -50,6 +65,7 @@ struct ProtonAuthRefresherInfo {
     email: String,
     uid: String,
     token: String,
+    is_other_version: Option<bool>,
 }
 
 #[derive(Serialize)]
@@ -57,14 +73,16 @@ struct ProtonAuthRefresherInfoRead<'a> {
     email: &'a str,
     uid: &'a str,
     token: &'a str,
+    is_other_version: bool,
 }
 
 impl ProtonAccount {
-    fn new(c: Client, email: String) -> Self {
+    fn new(c: Client, email: String, version: &'static str) -> Self {
         Self {
             email,
             client: Some(c),
             last_event_id: None,
+            version,
         }
     }
 }
@@ -73,6 +91,7 @@ impl ProtonAccount {
 struct ProtonAwaitTotp {
     email: String,
     client: TOTPClient,
+    version: &'static str,
 }
 
 macro_rules! try_request {
@@ -105,11 +124,19 @@ macro_rules! try_request {
 #[async_trait]
 impl Backend for ProtonBackend {
     fn name(&self) -> &str {
-        PROTON_BACKEND_NAME
+        if self.version != PROTON_APP_VERSION_OTHER {
+            PROTON_BACKEND_NAME
+        } else {
+            PROTON_BACKEND_NAME_OTHER
+        }
     }
 
     fn description(&self) -> &str {
-        "For Proton accounts (mail.proton.com)"
+        if self.version != PROTON_APP_VERSION_OTHER {
+            "For Proton accounts (mail.proton.com)"
+        } else {
+            "For Proton accounts (mail.proton.com) - Uses 'Other' as app version"
+        }
     }
 
     async fn login<'a>(
@@ -118,12 +145,16 @@ impl Backend for ProtonBackend {
         password: &str,
         proxy: Option<&'a Proxy>,
     ) -> BackendResult<AccountState> {
-        match new_client_builder(proxy).login(email, password).await? {
+        match new_client_builder(proxy, self.version)
+            .login(email, password)
+            .await?
+        {
             ClientLoginState::Authenticated(c) => Ok(AccountState::LoggedIn(Box::new(
-                ProtonAccount::new(c, email.to_string()),
+                ProtonAccount::new(c, email.to_string(), self.version),
             ))),
             ClientLoginState::AwaitingTotp(c) => {
                 Ok(AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp {
+                    version: self.version,
                     client: c,
                     email: email.to_string(),
                 })))
@@ -132,7 +163,7 @@ impl Backend for ProtonBackend {
     }
 
     async fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()> {
-        return new_client_builder(Some(proxy))
+        return new_client_builder(Some(proxy), self.version)
             .ping()
             .await
             .map_err(|e| e.into());
@@ -141,10 +172,20 @@ impl Backend for ProtonBackend {
     fn auth_refresher_from_config(&self, value: Value) -> Result<Box<dyn AuthRefresher>, Error> {
         let config =
             serde_json::from_value::<ProtonAuthRefresherInfo>(value).map_err(|e| anyhow!(e))?;
+
+        let version = if config.is_other_version.is_none() {
+            PROTON_APP_VERSION
+        } else if !config.is_other_version.unwrap() {
+            PROTON_APP_VERSION
+        } else {
+            PROTON_APP_VERSION_OTHER
+        };
+
         Ok(Box::new(ProtonAuthRefresher {
             email: config.email,
             uid: config.uid,
             token: config.token,
+            version,
         }))
     }
 }
@@ -219,7 +260,7 @@ impl Account for ProtonAccount {
 
     async fn set_proxy<'a>(&mut self, proxy: Option<&'a Proxy>) -> BackendResult<()> {
         if let Some(client) = &mut self.client {
-            let new_client = new_client_builder(proxy).with_client_auth(client)?;
+            let new_client = new_client_builder(proxy, self.version).with_client_auth(client)?;
             *client = new_client;
             Ok(())
         } else {
@@ -235,6 +276,7 @@ impl Account for ProtonAccount {
             email: &self.email,
             uid: client.user_uid().expose_secret().as_str(),
             token: client.user_refresh_token().expose_secret().as_str(),
+            is_other_version: self.version == PROTON_APP_VERSION_OTHER,
         };
         let value = serde_json::to_value(&info).map_err(|e| anyhow!(e))?;
         Ok(value)
@@ -248,7 +290,7 @@ impl AwaitTotp for ProtonAwaitTotp {
         totp: &str,
     ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)> {
         match self.client.submit_totp(totp).await {
-            Ok(c) => Ok(Box::new(ProtonAccount::new(c, self.email))),
+            Ok(c) => Ok(Box::new(ProtonAccount::new(c, self.email, self.version))),
             Err((c, e)) => {
                 self.client = c;
                 Err((self, e.into()))
@@ -263,11 +305,13 @@ impl AuthRefresher for ProtonAuthRefresher {
         self: Box<Self>,
         proxy: Option<&'a Proxy>,
     ) -> Result<AccountState, BackendError> {
-        let client = new_client_builder(proxy)
+        let client = new_client_builder(proxy, self.version)
             .with_token(&UserUid::from(self.uid), &self.token)
             .await?;
         Ok(AccountState::LoggedIn(Box::new(ProtonAccount::new(
-            client, self.email,
+            client,
+            self.email,
+            self.version,
         ))))
     }
 }
@@ -321,8 +365,8 @@ fn proxy_as_proton_proxy(proxy: &Proxy) -> proton_api_rs::Proxy {
     }
 }
 
-fn new_client_builder(proxy: Option<&Proxy>) -> ClientBuilder {
-    let mut builder = ClientBuilder::new().app_version(PROTON_APP_VERSION);
+fn new_client_builder(proxy: Option<&Proxy>, version: &'static str) -> ClientBuilder {
+    let mut builder = ClientBuilder::new().app_version(version);
     if let Some(p) = proxy {
         builder = builder.with_proxy(proxy_as_proton_proxy(p));
     }
