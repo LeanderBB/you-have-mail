@@ -173,9 +173,7 @@ impl Backend for ProtonBackend {
         let config =
             serde_json::from_value::<ProtonAuthRefresherInfo>(value).map_err(|e| anyhow!(e))?;
 
-        let version = if config.is_other_version.is_none() {
-            PROTON_APP_VERSION
-        } else if !config.is_other_version.unwrap() {
+        let version = if config.is_other_version.is_none() || !config.is_other_version.unwrap() {
             PROTON_APP_VERSION
         } else {
             PROTON_APP_VERSION_OTHER
@@ -278,7 +276,7 @@ impl Account for ProtonAccount {
             token: client.user_refresh_token().expose_secret().as_str(),
             is_other_version: self.version == PROTON_APP_VERSION_OTHER,
         };
-        let value = serde_json::to_value(&info).map_err(|e| anyhow!(e))?;
+        let value = serde_json::to_value(info).map_err(|e| anyhow!(e))?;
         Ok(value)
     }
 }
