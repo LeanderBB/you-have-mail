@@ -1,6 +1,9 @@
 package dev.lbeernaert.youhavemail.service
 
-import android.app.*
+import android.app.Activity
+import android.app.Notification
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.app.Service
 import android.content.Context
 import android.content.Intent
@@ -16,7 +19,32 @@ import android.widget.Toast
 import androidx.core.content.ContextCompat
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
-import dev.lbeernaert.youhavemail.*
+import dev.lbeernaert.youhavemail.Account
+import dev.lbeernaert.youhavemail.Backend
+import dev.lbeernaert.youhavemail.MainActivity
+import dev.lbeernaert.youhavemail.NotificationActionClicked
+import dev.lbeernaert.youhavemail.NotificationActionDismissed
+import dev.lbeernaert.youhavemail.NotificationChannelNewMail
+import dev.lbeernaert.youhavemail.NotificationIntentAppNameKey
+import dev.lbeernaert.youhavemail.NotificationIntentBackendKey
+import dev.lbeernaert.youhavemail.NotificationIntentEmailKey
+import dev.lbeernaert.youhavemail.Notifier
+import dev.lbeernaert.youhavemail.ObserverAccount
+import dev.lbeernaert.youhavemail.Proxy
+import dev.lbeernaert.youhavemail.R
+import dev.lbeernaert.youhavemail.ServiceAccountNotificationsStartID
+import dev.lbeernaert.youhavemail.ServiceErrorNotificationID
+import dev.lbeernaert.youhavemail.ServiceException
+import dev.lbeernaert.youhavemail.ServiceFromConfigCallback
+import dev.lbeernaert.youhavemail.ServiceNotificationID
+import dev.lbeernaert.youhavemail.createAccountErrorNotification
+import dev.lbeernaert.youhavemail.createAccountStatusNotification
+import dev.lbeernaert.youhavemail.createNotificationChannels
+import dev.lbeernaert.youhavemail.createServiceErrorNotification
+import dev.lbeernaert.youhavemail.createServiceNotification
+import dev.lbeernaert.youhavemail.newService
+import dev.lbeernaert.youhavemail.newServiceFromConfig
+import dev.lbeernaert.youhavemail.serviceExceptionToErrorStr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -535,7 +563,13 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
     fun getAccountActivity(email: String): List<AccountActivity> {
         accountActivityLock.lock()
-        val result = ArrayList(accountActivity[email]!!)
+
+        var result = if (accountActivity.containsKey(email)) {
+            ArrayList(accountActivity[email]!!)
+        } else {
+            ArrayList()
+        }
+
         accountActivityLock.unlock()
         return result
     }
@@ -607,6 +641,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 fun getAppNameForBackend(backend: String): String? {
     return when (backend) {
         "Proton Mail" -> "ch.protonmail.android"
+        "Proton Mail V-Other" -> "ch.protonmail.android"
 
         else -> null
     }
