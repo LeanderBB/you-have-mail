@@ -18,9 +18,23 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
 import androidx.activity.result.contract.ActivityResultContracts
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.width
+import androidx.compose.material.AlertDialog
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Surface
+import androidx.compose.material.Text
+import androidx.compose.material.TextButton
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.MutableState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -28,7 +42,12 @@ import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
 import dev.lbeernaert.youhavemail.screens.MainNavController
-import dev.lbeernaert.youhavemail.service.*
+import dev.lbeernaert.youhavemail.service.Actions
+import dev.lbeernaert.youhavemail.service.ObserverService
+import dev.lbeernaert.youhavemail.service.ServiceState
+import dev.lbeernaert.youhavemail.service.ServiceWrapper
+import dev.lbeernaert.youhavemail.service.getServiceState
+import dev.lbeernaert.youhavemail.service.serviceLogTag
 import dev.lbeernaert.youhavemail.ui.theme.YouHaveMailTheme
 
 
@@ -183,6 +202,7 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                 if (appIntent != null) {
                     appIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     appIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    appIntent.addFlags(Intent.FLAG_ACTIVITY_TASK_ON_HOME)
                     appIntent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                     appIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     startActivity(appIntent)
