@@ -35,16 +35,7 @@ async fn notifier_called() {
         .return_const(());
     notifier
         .expect_notify()
-        .withf(|n| {
-            matches!(
-                n,
-                Notification::NewEmail {
-                    account: "foo",
-                    count: 1,
-                    ..
-                }
-            )
-        })
+        .withf(|n| matches!(n, Notification::NewEmail { account: "foo", .. }))
         .times(1..)
         .return_const(());
 
@@ -74,16 +65,7 @@ async fn paused_does_not_call_notifier() {
         .return_const(());
     notifier
         .expect_notify()
-        .withf(|n| {
-            matches!(
-                n,
-                Notification::NewEmail {
-                    account: "foo",
-                    count: 1,
-                    ..
-                }
-            )
-        })
+        .withf(|n| matches!(n, Notification::NewEmail { account: "foo", .. }))
         .times(0)
         .return_const(());
 
@@ -113,16 +95,7 @@ async fn resume_after_pause_calls_notifier() {
         .return_const(());
     notifier
         .expect_notify()
-        .withf(|n| {
-            matches!(
-                n,
-                Notification::NewEmail {
-                    account: "foo",
-                    count: 1,
-                    ..
-                }
-            )
-        })
+        .withf(|n| matches!(n, Notification::NewEmail { account: "foo", .. }))
         .times(2..)
         .return_const(());
 
@@ -155,16 +128,7 @@ async fn adding_account_with_same_email_twice_is_error() {
         .return_const(());
     notifier
         .expect_notify()
-        .withf(|n| {
-            matches!(
-                n,
-                Notification::NewEmail {
-                    account: "foo",
-                    count: 1,
-                    ..
-                }
-            )
-        })
+        .withf(|n| matches!(n, Notification::NewEmail { account: "foo", .. }))
         .times(..)
         .return_const(());
 
@@ -208,16 +172,7 @@ async fn adding_account_after_logout_works() {
         .return_const(());
     notifier
         .expect_notify()
-        .withf(|n| {
-            matches!(
-                n,
-                Notification::NewEmail {
-                    account: "foo",
-                    count: 1,
-                    ..
-                }
-            )
-        })
+        .withf(|n| matches!(n, Notification::NewEmail { account: "foo", .. }))
         .times(1..)
         .return_const(());
 
@@ -315,16 +270,7 @@ async fn test_proxy_settings() {
         .return_const(());
     notifier
         .expect_notify()
-        .withf(|n| {
-            matches!(
-                n,
-                Notification::NewEmail {
-                    account: "foo",
-                    count: 1,
-                    ..
-                }
-            )
-        })
+        .withf(|n| matches!(n, Notification::NewEmail { account: "foo", .. }))
         .times(1..)
         .return_const(());
 

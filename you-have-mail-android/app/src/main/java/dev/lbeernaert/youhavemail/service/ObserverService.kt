@@ -14,8 +14,11 @@ import android.net.NetworkRequest
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
+import android.text.Html
+import android.text.Spanned
 import android.util.Log
 import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
@@ -62,6 +65,8 @@ data class NotificationIds(val newMessages: Int, val statusUpdate: Int, val erro
 
 data class AccountActivity(val dateTime: LocalDateTime, val status: String)
 
+data class UnreadState(var unreadCount: UInt, var lines: ArrayList<Spanned>)
+
 class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private var wakeLock: PowerManager.WakeLock? = null
     private var isServiceStarted = false
@@ -84,8 +89,8 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     // Notification State
     private var notificationIDCounter: Int = ServiceAccountNotificationsStartID
     private var notificationMap: HashMap<String, NotificationIds> = HashMap()
-    private var unreadMessageCounts: HashMap<String, UInt> = HashMap()
-    private var unreadMessageCountMutex: Lock = ReentrantLock()
+    private var unreadState: HashMap<String, UnreadState> = HashMap()
+    private var unreadMessageStateMutex: Lock = ReentrantLock()
 
     // Account Activity
     private var accountActivity = HashMap<String, ArrayList<AccountActivity>>()
@@ -293,7 +298,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private fun createAlertNotification(
         email: String,
         backend: String,
-        messageCount: UInt
+        unreadState: UnreadState,
     ): Notification {
 
         val appName = getAppNameForBackend(backend)
@@ -339,7 +344,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             }
 
 
-        val builder: Notification.Builder = Notification.Builder(
+        val builder: NotificationCompat.Builder = NotificationCompat.Builder(
             this,
             NotificationChannelNewMail
         )
@@ -348,17 +353,26 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             builder.setContentIntent(clickIntent)
         }
 
+        var style = NotificationCompat.InboxStyle()
+
+        for (line in unreadState.lines.reversed()) {
+            style = style.addLine(line)
+        }
+
         return builder
-            .setContentTitle("You Have Mail")
-            .setContentText("$email has $messageCount new message(s)")
+            .setContentTitle("$email has ${unreadState.unreadCount} new message(s)")
             .setDeleteIntent(dismissIntent)
+            .setStyle(style)
             .setAutoCancel(true)
-            .setVisibility(Notification.VISIBILITY_PRIVATE)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setSmallIcon(R.drawable.ic_stat_alert)
             .setTicker("You Have Mail Alert")
             .build()
     }
 
+    private fun genNotificationID(): Int {
+        return System.currentTimeMillis().toInt()
+    }
 
     private fun getOrCreateNotificationIDs(email: String): NotificationIds {
         val ids = notificationMap[email]
@@ -379,20 +393,23 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private fun getAndUpdateUnreadMessageCount(
         email: String,
         newMessageCount: UInt,
+        line: Spanned,
         reset: Boolean
-    ): UInt {
-        val result: UInt
-        unreadMessageCountMutex.lock()
+    ): UnreadState {
+        val result: UnreadState
+        unreadMessageStateMutex.lock()
         if (reset) {
-            unreadMessageCounts[email] = newMessageCount
-            result = newMessageCount
+            val state = UnreadState(newMessageCount, arrayListOf(line))
+            unreadState[email] = state
+            result = state
         } else {
-            var count = unreadMessageCounts.getOrDefault(email, 0u)
-            count += newMessageCount
-            unreadMessageCounts[email] = count
-            result = count
+            var state = unreadState.getOrDefault(email, UnreadState(0u, arrayListOf()))
+            state.unreadCount += newMessageCount
+            state.lines.add(line)
+            unreadState[email] = state
+            result = state
         }
-        unreadMessageCountMutex.unlock()
+        unreadMessageStateMutex.unlock()
         return result
     }
 
@@ -408,17 +425,24 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         return false
     }
 
-
-    override fun newEmail(account: String, backend: String, count: UInt) {
-        Log.d(serviceLogTag, "New Mail: $account ($backend) num=$count")
-        val ids = getOrCreateNotificationIDs(account)
-        val isNotificationActive = isNotificationVisible(ids.newMessages)
-        val unreadCount = getAndUpdateUnreadMessageCount(account, count, !isNotificationActive)
-        val notification = createAlertNotification(account, backend, unreadCount)
-        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
-            if (this.areNotificationsEnabled()) {
-                notify(ids.newMessages, notification)
+    override fun newEmail(account: String, backend: String, sender: String, subject: String) {
+        Log.d(serviceLogTag, "New Mail: $account ($backend)")
+        try {
+            val ids = getOrCreateNotificationIDs(account)
+            val isNotificationActive = isNotificationVisible(ids.newMessages)
+            val styleText: Spanned =
+                Html.fromHtml("<b>$sender:</b> $subject", Html.FROM_HTML_MODE_LEGACY)
+            val unreadState =
+                getAndUpdateUnreadMessageCount(account, 1u, styleText, !isNotificationActive)
+            val notification =
+                createAlertNotification(account, backend, unreadState)
+            with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+                if (this.areNotificationsEnabled()) {
+                    notify(ids.newMessages, notification)
+                }
             }
+        } catch (e: Exception) {
+            Log.e(serviceLogTag, "Failed to display notification: $e")
         }
     }
 
@@ -430,14 +454,19 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
     override fun accountLoggedOut(email: String) {
         Log.d(serviceLogTag, "Account Logged Out: $email")
-        recordAccountActivity(email, "Session Expired")
-        updateAccountList()
-        val notification = createAccountStatusNotification(this, "Account $email session expired")
-        val ids = getOrCreateNotificationIDs(email)
-        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
-            if (this.areNotificationsEnabled()) {
-                notify(ids.statusUpdate, notification)
+        try {
+            recordAccountActivity(email, "Session Expired")
+            updateAccountList()
+            val notification =
+                createAccountStatusNotification(this, "Account $email session expired")
+            val ids = getOrCreateNotificationIDs(email)
+            with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+                if (this.areNotificationsEnabled()) {
+                    notify(ids.statusUpdate, notification)
+                }
             }
+        } catch (e: Exception) {
+            Log.e(serviceLogTag, "Failed to display notification: $e")
         }
     }
 
@@ -461,13 +490,17 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
     override fun accountError(email: String, error: ServiceException) {
         Log.e(serviceLogTag, "Account Error: $email => $error")
-        recordAccountActivity(email, error.toString())
-        val notification = createAccountErrorNotification(this, email, error)
-        val ids = getOrCreateNotificationIDs(email)
-        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
-            if (this.areNotificationsEnabled()) {
-                notify(ids.errors, notification)
+        try {
+            recordAccountActivity(email, error.toString())
+            val notification = createAccountErrorNotification(this, email, error)
+            val ids = getOrCreateNotificationIDs(email)
+            with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+                if (this.areNotificationsEnabled()) {
+                    notify(ids.errors, notification)
+                }
             }
+        } catch (e: Exception) {
+            Log.e(serviceLogTag, "Failed to display notification: $e")
         }
     }
 
@@ -642,6 +675,7 @@ fun getAppNameForBackend(backend: String): String? {
     return when (backend) {
         "Proton Mail" -> "ch.protonmail.android"
         "Proton Mail V-Other" -> "ch.protonmail.android"
+        "Null Backend" -> "ch.protonmail.android"
 
         else -> null
     }

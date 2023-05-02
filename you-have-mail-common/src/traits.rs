@@ -1,5 +1,6 @@
 //! Collection of Traits expected to be implemented by the respective application targets.
 
+use crate::backend::EmailInfo;
 use crate::{AccountError, Proxy};
 #[cfg(test)]
 use mockall::automock;
@@ -11,7 +12,7 @@ pub enum Notification<'a> {
     NewEmail {
         account: &'a str,
         backend: &'a str,
-        count: usize,
+        emails: &'a [EmailInfo],
     },
     /// A new account was recently added
     AccountAdded(&'a str),

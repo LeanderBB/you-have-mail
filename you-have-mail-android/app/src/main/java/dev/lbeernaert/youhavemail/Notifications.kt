@@ -1,11 +1,16 @@
 package dev.lbeernaert.youhavemail
 
-import android.app.*
+import android.app.Notification
+import android.app.NotificationChannel
+import android.app.NotificationChannelGroup
+import android.app.NotificationManager
+import android.app.PendingIntent
 import android.content.Context
 import android.content.Intent
 import android.graphics.Color
 import android.media.AudioAttributes
 import android.media.RingtoneManager
+import androidx.core.app.NotificationCompat
 
 const val NotificationActionDismissed = "NotificationDismissed"
 const val NotificationActionClicked = "NotificationClicked"
@@ -25,7 +30,7 @@ const val ServiceAccountNotificationsStartID = 3
 
 
 fun createServiceNotification(context: Context, state: String): Notification {
-    val builder: Notification.Builder = Notification.Builder(
+    val builder: NotificationCompat.Builder = NotificationCompat.Builder(
         context,
         NotificationChannelService,
     )
@@ -34,7 +39,7 @@ fun createServiceNotification(context: Context, state: String): Notification {
         .setContentTitle("You Have Mail")
         .setContentText("Background Service $state")
         .setSmallIcon(R.drawable.ic_stat_sync)
-        .setVisibility(Notification.VISIBILITY_SECRET)
+        .setVisibility(NotificationCompat.VISIBILITY_SECRET)
         .setCategory(Notification.CATEGORY_SERVICE)
         .setOngoing(true)
         .setTicker("You Have Mail Service")
@@ -51,7 +56,7 @@ fun createAccountErrorNotification(
             PendingIntent.getActivity(context, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
         }
 
-    val builder: Notification.Builder = Notification.Builder(
+    val builder: NotificationCompat.Builder = NotificationCompat.Builder(
         context,
         NotificationChannelError
     )
@@ -63,7 +68,7 @@ fun createAccountErrorNotification(
         .setContentText("$email error: $errorString")
         .setContentIntent(pendingIntent)
         .setAutoCancel(true)
-        .setVisibility(Notification.VISIBILITY_PRIVATE)
+        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
         .setSmallIcon(R.drawable.ic_stat_err)
         .setTicker("You Have Mail Alert")
         .build()
@@ -79,7 +84,7 @@ fun createServiceErrorNotification(
             PendingIntent.getActivity(context, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
         }
 
-    val builder: Notification.Builder = Notification.Builder(
+    val builder: NotificationCompat.Builder = NotificationCompat.Builder(
         context,
         NotificationChannelError
     )
@@ -108,7 +113,7 @@ fun createAccountStatusNotification(context: Context, text: String): Notificatio
             )
         }
 
-    val builder: Notification.Builder = Notification.Builder(
+    val builder: NotificationCompat.Builder = NotificationCompat.Builder(
         context,
         NotificationChannelNewMail,
     )
@@ -118,7 +123,7 @@ fun createAccountStatusNotification(context: Context, text: String): Notificatio
         .setContentText(text)
         .setAutoCancel(true)
         .setContentIntent(pendingIntent)
-        .setVisibility(Notification.VISIBILITY_PRIVATE)
+        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
         .setSmallIcon(R.drawable.ic_stat_alert)
         .setTicker("You Have Mail Alert")
         .build()

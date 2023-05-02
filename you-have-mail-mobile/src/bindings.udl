@@ -93,7 +93,7 @@ dictionary Proxy {
 };
 
 callback interface Notifier {
-    void new_email (string account, string backend, u32 count);
+    void new_email (string account, string backend, string sender, string subject);
     void account_added(string email);
     void account_logged_out(string email);
     void account_removed(string email);

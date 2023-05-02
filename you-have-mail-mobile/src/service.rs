@@ -219,6 +219,10 @@ pub fn new_service_from_config(
 
     debug!("Found {} account(s) in config file", config.accounts.len());
 
+    if let Err(e) = service.pause() {
+        error!("Failed to pause service: {e}")
+    }
+
     for account in config.accounts {
         debug!(
             "Refreshing account={} backend={}",
@@ -248,6 +252,11 @@ pub fn new_service_from_config(
             error!("Failed to add refreshed account={account_email} to observer");
             from_config_cb.notify_error(account_email, e.into());
         }
+    }
+
+    if let Err(e) = service.resume() {
+        error!("Failed to resume service: {e}");
+        return Err(e);
     }
 
     Ok(Arc::new(service))

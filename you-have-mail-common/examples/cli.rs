@@ -37,6 +37,8 @@ impl Notifier for StdOutNotifier {
 
 #[tokio::main(worker_threads = 1)]
 async fn main() {
+    env_logger::init();
+
     let encryption_key = get_or_create_encryption_key();
     let encryptor = DefaultEncryption::new(encryption_key);
     let backend = new_backed();

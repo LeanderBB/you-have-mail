@@ -1,7 +1,8 @@
 //! You have mail implementation for proton mail accounts.
 
 use crate::backend::{
-    Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, NewEmailReply,
+    Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, EmailInfo,
+    NewEmailReply,
 };
 use crate::{AccountState, Proxy, ProxyProtocol};
 use anyhow::{anyhow, Error};
@@ -203,7 +204,7 @@ impl Account for ProtonAccount {
                 }
             }
 
-            let mut result = NewEmailReply { count: 0 };
+            let mut result = NewEmailReply { emails: vec![] };
             let mut account_refreshed = false;
 
             if let Some(event_id) = &mut self.last_event_id {
@@ -222,7 +223,16 @@ impl Account for ProtonAccount {
                                         if msg_event.action == MessageAction::Create {
                                             if let Some(message) = &msg_event.message {
                                                 if message.labels.contains(&LabelID::inbox()) {
-                                                    result.count += 1
+                                                    result.emails.push(EmailInfo {
+                                                        subject: message.subject.clone(),
+                                                        sender: if let Some(name) =
+                                                            &message.sender_name
+                                                        {
+                                                            name.clone()
+                                                        } else {
+                                                            message.sender_address.clone()
+                                                        },
+                                                    })
                                                 }
                                             }
                                         }

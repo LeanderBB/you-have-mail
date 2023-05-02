@@ -1,6 +1,7 @@
 //! Null backend implementation, useful for testing.
 use crate::backend::{
-    Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, NewEmailReply,
+    Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, EmailInfo,
+    NewEmailReply,
 };
 use crate::{AccountState, Proxy};
 use anyhow::{anyhow, Error};
@@ -39,6 +40,7 @@ struct NullBacked {
 struct NullAccount {
     email: String,
     wait_time: Option<Duration>,
+    counter: usize,
 }
 
 #[doc(hidden)]
@@ -94,6 +96,7 @@ impl Backend for NullBacked {
                 Ok(AccountState::LoggedIn(Box::new(NullAccount {
                     email: email.to_string(),
                     wait_time: account.wait_time,
+                    counter: 0,
                 })))
             };
         }
@@ -122,6 +125,7 @@ impl AuthRefresher for NullAuthRefresher {
         Ok(AccountState::LoggedIn(Box::new(NullAccount {
             email: self.email,
             wait_time: None,
+            counter: 0,
         })))
     }
 }
@@ -131,10 +135,26 @@ struct NullAuthRefresherInfo {
     email: String,
 }
 
+impl NullAccount {
+    pub(crate) fn create_email_info(counter: usize) -> EmailInfo {
+        EmailInfo {
+            sender: format!("Null {}", counter),
+            subject: format!("Null Subject {}", counter),
+        }
+    }
+
+    pub(crate) fn create_email_reply(counter: usize) -> NewEmailReply {
+        NewEmailReply {
+            emails: vec![Self::create_email_info(counter)],
+        }
+    }
+}
+
 #[async_trait]
 impl Account for NullAccount {
     async fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
-        (Ok(NewEmailReply { count: 1 }), false)
+        self.counter += 1;
+        (Ok(Self::create_email_reply(self.counter)), false)
     }
 
     async fn logout(&mut self) -> BackendResult<()> {
@@ -173,6 +193,7 @@ impl AwaitTotp for NullAwaitTotp {
         Ok(Box::new(NullAccount {
             email: self.email,
             wait_time: self.wait_time,
+            counter: 0,
         }))
     }
 }

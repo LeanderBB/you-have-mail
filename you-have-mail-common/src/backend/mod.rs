@@ -34,10 +34,15 @@ pub enum BackendError {
 
 pub type BackendResult<T> = Result<T, BackendError>;
 
+#[derive(Debug, Clone)]
+pub struct EmailInfo {
+    pub sender: String,
+    pub subject: String,
+}
 /// Reply for new email queries.
-#[derive(Debug, Copy, Clone)]
+#[derive(Debug, Clone)]
 pub struct NewEmailReply {
-    pub count: usize,
+    pub emails: Vec<EmailInfo>,
 }
 
 /// Implementation for the backends.

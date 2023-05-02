@@ -262,11 +262,11 @@ impl Worker {
                             .notify(Notification::AccountOnline(wa.account.email()))
                     }
                     wa.status = ObserverAccountStatus::Online;
-                    if check.count > 0 {
+                    if !check.emails.is_empty() {
                         self.notifier.notify(Notification::NewEmail {
                             account: wa.account.email(),
                             backend: wa.account.backend().name(),
-                            count: check.count,
+                            emails: &check.emails,
                         });
                     }
                 }
@@ -359,7 +359,7 @@ async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequ
 
 #[cfg(test)]
 mod tests {
-    use crate::backend::{BackendError, MockAccount, NewEmailReply};
+    use crate::backend::{BackendError, EmailInfo, MockAccount, NewEmailReply};
     use crate::observer::worker::Worker;
     use crate::{Account, AccountState, MockNotifier, Notification};
     use anyhow::anyhow;
@@ -431,7 +431,17 @@ mod tests {
             .expect_check()
             .times(1)
             .in_sequence(&mut mock_sequence)
-            .returning(|| (Ok(NewEmailReply { count: 1 }), false));
+            .returning(|| {
+                (
+                    Ok(NewEmailReply {
+                        emails: vec![EmailInfo {
+                            sender: "Foo".to_string(),
+                            subject: "Bar".to_string(),
+                        }],
+                    }),
+                    false,
+                )
+            });
         let account = Account::with_state(
             crate::backend::null::new_backend(&[]),
             "foo",
@@ -469,7 +479,7 @@ mod tests {
             .expect_check()
             .times(0)
             .in_sequence(&mut mock_sequence)
-            .returning(|| (Ok(NewEmailReply { count: 1 }), false));
+            .returning(|| (Ok(NewEmailReply { emails: vec![] }), false));
         let account = Account::with_state(
             crate::backend::null::new_backend(&[]),
             "foo",
@@ -533,7 +543,17 @@ mod tests {
             .expect_check()
             .times(1)
             .in_sequence(&mut mock_sequence)
-            .returning(|| (Ok(NewEmailReply { count: 1 }), true));
+            .returning(|| {
+                (
+                    Ok(NewEmailReply {
+                        emails: vec![EmailInfo {
+                            sender: "Foo".to_string(),
+                            subject: "Bar".to_string(),
+                        }],
+                    }),
+                    true,
+                )
+            });
 
         let account = Account::with_state(
             crate::backend::null::new_backend(&[]),
