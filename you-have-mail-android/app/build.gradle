@@ -13,8 +13,8 @@ android {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 29
         targetSdk 33
-        versionCode 13
-        versionName "0.6.0"
+        versionCode 14
+        versionName "0.6.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -79,6 +79,10 @@ cargo {
     targetIncludes = ["libyouhavemail.so", "libgo-srp.so"]
     targetDirectory = "../../target"
     profile = "release"
+    // Uncomment for testing only.
+    /*features {
+        defaultAnd("null_backend")
+    }*/
 }
 
 afterEvaluate {

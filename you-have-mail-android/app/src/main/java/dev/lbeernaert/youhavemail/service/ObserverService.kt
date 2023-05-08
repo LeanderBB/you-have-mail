@@ -353,6 +353,18 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             builder.setContentIntent(clickIntent)
         }
 
+        if (unreadState.lines.size == 1) {
+            return builder
+                .setContentTitle("$email has 1 new message")
+                .setContentText(unreadState.lines[0])
+                .setDeleteIntent(dismissIntent)
+                .setAutoCancel(true)
+                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+                .setSmallIcon(R.drawable.ic_stat_alert)
+                .setTicker("You Have Mail Alert")
+                .build()
+        }
+
         var style = NotificationCompat.InboxStyle()
 
         for (line in unreadState.lines.reversed()) {
