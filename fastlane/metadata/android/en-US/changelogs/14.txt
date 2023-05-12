@@ -1,0 +1,1 @@
+* Only use Inbox Style notification when more than 1 message is available.
