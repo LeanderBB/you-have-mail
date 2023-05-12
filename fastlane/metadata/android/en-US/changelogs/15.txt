@@ -1,0 +1,1 @@
+* Add fastlane metadata for FDroid inclusion
