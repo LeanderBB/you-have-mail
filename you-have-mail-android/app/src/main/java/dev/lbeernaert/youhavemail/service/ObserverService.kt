@@ -175,6 +175,22 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         recordAccountActivityAll("Resumed, network restored")
     }
 
+    fun acquireWakeLock() {
+        wakeLock?.let {
+            if (!it.isHeld) {
+                it.acquire()
+            }
+        }
+    }
+
+    fun releaseWakeLock() {
+        wakeLock?.let {
+            if (it.isHeld) {
+                it.release()
+            }
+        }
+    }
+
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         Log.d(serviceLogTag, "onStartCommand executed with startId: $startId")
         if (intent != null) {
@@ -255,11 +271,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     private fun stopService() {
         Log.d(serviceLogTag, "Stopping foreground service")
         try {
-            wakeLock?.let {
-                if (it.isHeld) {
-                    it.release()
-                }
-            }
+            releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } catch (e: java.lang.Exception) {

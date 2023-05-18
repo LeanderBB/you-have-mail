@@ -3,17 +3,15 @@ use crate::observer::rpc::{
     GetPollIntervalRequest, GetProxyRequest, LogoutAccountRequest, ObserverPRC, ObserverRequest,
     RemoveAccountRequest,
 };
-use crate::observer::worker::Worker;
+use crate::observer::worker::{BackgroundWorker, Worker};
 use crate::{Account, AccountError, ConfigGenError, Notifier, Proxy};
-use proton_api_rs::tokio::sync::mpsc::Sender;
 use std::fmt::Formatter;
-use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 use thiserror::Error;
 
 #[derive(Clone)]
-pub struct Observer(Arc<Sender<ObserverRequest>>);
+pub struct Observer(Arc<BackgroundWorker>);
 
 /// Account status for the accounts being watched by the observer.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
@@ -58,6 +56,7 @@ pub struct ObserverAccount {
 
 /// Errors returned during observer RPC calls.
 #[derive(Debug, Error)]
+#[allow(clippy::result_large_err)]
 pub enum ObserverRPCError<T, E> {
     #[error("Failed to send request to observer")]
     SendFailed(T),
@@ -105,57 +104,55 @@ impl ObserverBuilder {
         self
     }
 
-    pub fn build(self) -> (Observer, impl Future<Output = ()>) {
+    pub fn build(self) -> Observer {
         Observer::new(self)
     }
 }
 
 impl Observer {
-    fn new(builder: ObserverBuilder) -> (Self, impl Future<Output = ()>) {
-        let (task, sender) = Worker::build(builder.notifier, builder.poll_interval);
-        (Self(Arc::new(sender)), task)
+    fn new(builder: ObserverBuilder) -> Self {
+        Self(Worker::build(builder.notifier, builder.poll_interval))
     }
 
     /// Get the list of observed accounts and their status
-    pub async fn get_accounts(
+    pub fn get_accounts(
         &self,
     ) -> Result<Vec<ObserverAccount>, ObserverRPCError<(), ObserverError>> {
-        self.perform_rpc(GetAccountListRequest {}).await
+        self.perform_rpc(GetAccountListRequest {})
     }
 
     /// Add a new account to be observed for new emails.
-    pub async fn add_account(
+    #[allow(clippy::result_large_err)]
+    pub fn add_account(
         &self,
         account: Account,
     ) -> Result<(), ObserverRPCError<Account, ObserverError>> {
-        self.perform_rpc(AddAccountRequest { account }).await
+        self.perform_rpc(AddAccountRequest { account })
     }
 
     /// Logout an account, but do not remove it from the observer list
-    pub async fn logout_account<T: Into<String>>(
+    pub fn logout_account<T: Into<String>>(
         &self,
         email: T,
     ) -> Result<(), ObserverRPCError<String, ObserverError>> {
         self.perform_rpc(LogoutAccountRequest {
             email: email.into(),
         })
-        .await
     }
 
     /// Remove an account with the following email from the observer list.
-    pub async fn remove_account<T: Into<String>>(
+    pub fn remove_account<T: Into<String>>(
         &self,
         email: T,
     ) -> Result<(), ObserverRPCError<String, ObserverError>> {
         self.perform_rpc(RemoveAccountRequest {
             email: email.into(),
         })
-        .await
     }
 
     /// Signal that the worker should terminate.
-    pub async fn shutdown_worker(&self) -> Result<(), ObserverRPCError<(), ObserverError>> {
-        if self.0.send(ObserverRequest::Exit).await.is_err() {
+    pub fn shutdown_worker(&self) -> Result<(), ObserverRPCError<(), ObserverError>> {
+        if self.0.send(ObserverRequest::Exit).is_err() {
             return Err(ObserverRPCError::SendFailed(()));
         }
 
@@ -163,8 +160,8 @@ impl Observer {
     }
 
     /// Pause the execution of the observer.
-    pub async fn pause(&self) -> Result<(), ObserverRPCError<(), ObserverError>> {
-        if self.0.send(ObserverRequest::Pause).await.is_err() {
+    pub fn pause(&self) -> Result<(), ObserverRPCError<(), ObserverError>> {
+        if self.0.send(ObserverRequest::Pause).is_err() {
             return Err(ObserverRPCError::SendFailed(()));
         }
 
@@ -172,8 +169,8 @@ impl Observer {
     }
 
     /// Resume the execution of the observer.
-    pub async fn resume(&self) -> Result<(), ObserverRPCError<(), ObserverError>> {
-        if self.0.send(ObserverRequest::Resume).await.is_err() {
+    pub fn resume(&self) -> Result<(), ObserverRPCError<(), ObserverError>> {
+        if self.0.send(ObserverRequest::Resume).is_err() {
             return Err(ObserverRPCError::SendFailed(()));
         }
 
@@ -181,18 +178,14 @@ impl Observer {
     }
 
     /// Generate configuration data for the currently active account list.
-    pub async fn generate_config(&self) -> Result<String, ObserverRPCError<(), ConfigGenError>> {
-        self.perform_rpc(GenConfigRequest {}).await
+    pub fn generate_config(&self) -> Result<String, ObserverRPCError<(), ConfigGenError>> {
+        self.perform_rpc(GenConfigRequest {})
     }
 
-    pub async fn set_poll_interval(
-        &self,
-        duration: Duration,
-    ) -> Result<(), ObserverRPCError<(), ()>> {
+    pub fn set_poll_interval(&self, duration: Duration) -> Result<(), ObserverRPCError<(), ()>> {
         if self
             .0
             .send(ObserverRequest::SetPollInterval(duration))
-            .await
             .is_err()
         {
             return Err(ObserverRPCError::SendFailed(()));
@@ -201,33 +194,32 @@ impl Observer {
         Ok(())
     }
 
-    pub async fn get_poll_interval(&self) -> Result<Duration, ObserverRPCError<(), ()>> {
-        self.perform_rpc(GetPollIntervalRequest {}).await
+    pub fn get_poll_interval(&self) -> Result<Duration, ObserverRPCError<(), ()>> {
+        self.perform_rpc(GetPollIntervalRequest {})
     }
 
-    pub async fn get_proxy_settings(
+    pub fn get_proxy_settings(
         &self,
         email: String,
     ) -> Result<Option<Proxy>, ObserverRPCError<(), ObserverError>> {
-        self.perform_rpc(GetProxyRequest { email }).await
+        self.perform_rpc(GetProxyRequest { email })
     }
 
-    pub async fn set_proxy_settings(
+    pub fn set_proxy_settings(
         &self,
         email: String,
         proxy: Option<Proxy>,
     ) -> Result<(), ObserverRPCError<(), ObserverError>> {
-        self.perform_rpc(ApplyProxyRequest { email, proxy }).await
+        self.perform_rpc(ApplyProxyRequest { email, proxy })
     }
 
-    async fn perform_rpc<T: ObserverPRC>(
+    fn perform_rpc<T: ObserverPRC>(
         &self,
         value: T,
     ) -> Result<T::Output, ObserverRPCError<T::SendFailedValue, T::Error>> {
-        let (sender, mut receiver) =
-            proton_api_rs::tokio::sync::mpsc::channel::<Result<T::Output, T::Error>>(1);
+        let (sender, receiver) = crossbeam_channel::bounded::<Result<T::Output, T::Error>>(1);
         let request = value.into_request(sender);
-        if let Err(e) = self.0.send(request).await {
+        if let Err(e) = self.0.send(request) {
             if let Some(v) = T::recover_send_value(e.0) {
                 return Err(ObserverRPCError::SendFailed(v));
             }
@@ -235,7 +227,7 @@ impl Observer {
             return Err(ObserverRPCError::SendFailedUnexpectedType);
         }
 
-        let Some(result) = receiver.recv().await else {
+        let Ok(result) = receiver.recv() else {
             return Err(ObserverRPCError::NoReply)
         };
 

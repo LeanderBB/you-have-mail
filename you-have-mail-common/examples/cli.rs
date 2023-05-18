@@ -1,7 +1,5 @@
-use proton_api_rs::tokio;
-use proton_api_rs::tokio::io::AsyncBufReadExt;
-use proton_api_rs::tokio::io::AsyncWriteExt;
 use secrecy::{ExposeSecret, Secret};
+use std::io::{BufRead, Read, Write};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Duration;
@@ -35,20 +33,19 @@ impl Notifier for StdOutNotifier {
     }
 }
 
-#[tokio::main(worker_threads = 1)]
-async fn main() {
+fn main() {
     env_logger::init();
 
     let encryption_key = get_or_create_encryption_key();
     let encryptor = DefaultEncryption::new(encryption_key);
     let backend = new_backed();
-    let accounts = if let Some(config) = load_config(&encryptor, &[backend.clone()]).await {
+    let accounts = if let Some(config) = load_config(&encryptor, &[backend.clone()]) {
         println!("Previous accounts detected");
         let mut result = Vec::with_capacity(config.accounts.len());
         for (mut a, refresher) in config.accounts {
             if let Some(r) = refresher {
                 println!("Refreshing account: {}", a.email());
-                a.refresh(r).await.unwrap();
+                a.refresh(r).unwrap();
             } else {
                 println!("Account {} is logged out", a.email());
             }
@@ -61,56 +58,47 @@ async fn main() {
         let password = std::env::var("YHM_PASSWORD").unwrap();
 
         let mut account = Account::new(backend, &email, None);
-        account.login(&password).await.unwrap();
+        account.login(&password).unwrap();
 
         if account.is_awaiting_totp() {
-            let mut stdout = tokio::io::stdout();
-            let mut line_reader = tokio::io::BufReader::new(tokio::io::stdin()).lines();
-            stdout
-                .write_all("Please Input TOTP:".as_bytes())
-                .await
-                .unwrap();
-            stdout.flush().await.unwrap();
-
-            let Some(line) = line_reader.next_line().await.unwrap() else {
+            let mut stdout = std::io::stdout();
+            let mut line_reader = std::io::BufReader::new(std::io::stdin());
+            stdout.write_all("Please Input TOTP:".as_bytes()).unwrap();
+            stdout.flush().unwrap();
+            let mut line = String::new();
+            if let Err(_) = line_reader.read_line(&mut line) {
                 eprintln!("Failed to read totp");
                 return;
             };
 
             let totp = line.trim_end_matches('\n');
-            account.submit_totp(totp).await.unwrap();
+            account.submit_totp(totp).unwrap();
         }
 
         vec![account]
     };
 
-    let (observer, task) = ObserverBuilder::new(Box::new(StdOutNotifier {}))
+    println!("Starting observer...");
+    let observer = ObserverBuilder::new(Box::new(StdOutNotifier {}))
         .poll_interval(Duration::from_secs(10))
         .build();
 
-    println!("Starting observer...");
-    let h = tokio::spawn(task);
-
     for a in accounts {
-        observer.add_account(a).await.unwrap();
+        observer.add_account(a).unwrap();
     }
 
-    tokio::signal::ctrl_c().await.unwrap();
+    let mut input = [0u8];
+    std::io::stdin().read(&mut input).unwrap();
 
     println!("Saving observer state");
-    let config = observer.generate_config().await.unwrap();
-    write_config_file(&encryptor, config.as_bytes()).await;
+    let config = observer.generate_config().unwrap();
+    write_config_file(&encryptor, config.as_bytes());
 
-    h.abort();
-    let _ = h.await;
     println!("Goodbye");
 }
 
-async fn load_config(
-    decryptor: &DefaultEncryption,
-    backends: &[Arc<dyn Backend>],
-) -> Option<Config> {
-    if let Some(bytes) = load_config_file().await {
+fn load_config(decryptor: &DefaultEncryption, backends: &[Arc<dyn Backend>]) -> Option<Config> {
+    if let Some(bytes) = load_config_file() {
         let decrypted = decryptor.decrypt(&bytes).unwrap();
 
         return Some(Config::load(&backends, &decrypted).unwrap());
@@ -149,17 +137,17 @@ const CONFIG_FILE_NAME: &str = "you-have-mail-common-cli.conf";
 fn get_config_file_path() -> PathBuf {
     dirs::config_dir().unwrap().join(CONFIG_FILE_NAME)
 }
-async fn load_config_file() -> Option<Vec<u8>> {
-    match tokio::fs::read(get_config_file_path()).await {
+fn load_config_file() -> Option<Vec<u8>> {
+    match std::fs::read(get_config_file_path()) {
         Ok(v) => Some(v),
         Err(_) => None,
     }
 }
 
-async fn write_config_file(encryptor: &DefaultEncryption, data: &[u8]) {
+fn write_config_file(encryptor: &DefaultEncryption, data: &[u8]) {
     let encrypted = encryptor.encrypt(data).unwrap();
     let config_path = get_config_file_dir();
-    tokio::fs::create_dir_all(&config_path).await.unwrap();
+    std::fs::create_dir_all(&config_path).unwrap();
     let config_file = config_path.join(CONFIG_FILE_NAME);
-    tokio::fs::write(config_file, &encrypted).await.unwrap();
+    std::fs::write(config_file, &encrypted).unwrap();
 }

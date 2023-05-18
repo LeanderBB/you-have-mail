@@ -26,7 +26,6 @@ impl Backend {
 pub type ObserverAccount = yhm::ObserverAccount;
 
 pub struct Account {
-    service: Arc<Service>,
     account: RwLock<yhm::Account>,
 }
 
@@ -51,35 +50,27 @@ impl Account {
     pub fn login(&self, password: String) -> Result<(), ServiceError> {
         let mut accessor = self.account.write().unwrap();
         let account = accessor.deref_mut();
-        self.service
-            .runtime
-            .block_on(async { account.login(&password).await })?;
+        account.login(&password)?;
         Ok(())
     }
 
     pub fn submit_totp(&self, totp: String) -> Result<(), ServiceError> {
         let mut accessor = self.account.write().unwrap();
         let account = accessor.deref_mut();
-        self.service
-            .runtime
-            .block_on(async { account.submit_totp(&totp).await })?;
+        account.submit_totp(&totp)?;
         Ok(())
     }
 
     pub fn logout(&self) -> Result<(), ServiceError> {
         let mut accessor = self.account.write().unwrap();
         let account = accessor.deref_mut();
-        self.service
-            .runtime
-            .block_on(async { account.logout().await })?;
+        account.logout()?;
         Ok(())
     }
 }
 
 pub struct Service {
     observer: yhm::Observer,
-    runtime: tokio::runtime::Runtime,
-    join_handle: tokio::task::JoinHandle<()>,
     backends: Vec<Arc<Backend>>,
 }
 
@@ -92,7 +83,6 @@ impl Service {
     ) -> Arc<Account> {
         Arc::new(Account {
             account: RwLock::new(yhm::Account::new(backend.0.clone(), email, proxy)),
-            service: self,
         })
     }
 
@@ -101,10 +91,7 @@ impl Service {
     }
 
     pub fn get_observed_accounts(&self) -> Result<Vec<ObserverAccount>, ServiceError> {
-        let accounts = self
-            .runtime
-            .block_on(async { self.observer.get_accounts().await })?;
-
+        let accounts = self.observer.get_accounts()?;
         Ok(accounts)
     }
 
@@ -114,20 +101,17 @@ impl Service {
             accessor.take()
         };
 
-        self.runtime
-            .block_on(async { self.observer.add_account(account).await })?;
+        self.observer.add_account(account)?;
         Ok(())
     }
 
     pub fn logout_account(&self, email: String) -> Result<(), ServiceError> {
-        self.runtime
-            .block_on(async { self.observer.logout_account(email).await })?;
+        self.observer.logout_account(email)?;
         Ok(())
     }
 
     pub fn remove_account(&self, email: String) -> Result<(), ServiceError> {
-        self.runtime
-            .block_on(async { self.observer.remove_account(email).await })?;
+        self.observer.remove_account(email)?;
         Ok(())
     }
 
@@ -136,58 +120,47 @@ impl Service {
         email: String,
         proxy: Option<Proxy>,
     ) -> Result<(), ServiceError> {
-        self.runtime
-            .block_on(async { self.observer.set_proxy_settings(email, proxy).await })?;
+        self.observer.set_proxy_settings(email, proxy)?;
         Ok(())
     }
 
     pub fn pause(&self) -> Result<(), ServiceError> {
-        self.runtime
-            .block_on(async { self.observer.pause().await })?;
+        self.observer.pause()?;
         Ok(())
     }
 
     pub fn resume(&self) -> Result<(), ServiceError> {
-        self.runtime
-            .block_on(async { self.observer.resume().await })?;
+        self.observer.resume()?;
         Ok(())
     }
 
     pub fn shutdown(&self) -> Result<(), ServiceError> {
-        self.join_handle.abort();
+        self.observer.shutdown_worker()?;
         Ok(())
     }
 
     pub fn get_config(&self) -> Result<String, ConfigError> {
-        let config = self
-            .runtime
-            .block_on(async { self.observer.generate_config().await })?;
+        let config = self.observer.generate_config()?;
         Ok(config)
     }
 
     pub fn get_poll_interval(&self) -> Result<u64, ServiceError> {
-        let interval = self
-            .runtime
-            .block_on(async { self.observer.get_poll_interval().await })?;
+        let interval = self.observer.get_poll_interval()?;
         Ok(interval.as_secs())
     }
 
     pub fn set_poll_interval(&self, seconds: u64) -> Result<(), ServiceError> {
         let duration = Duration::from_secs(seconds);
-        self.runtime
-            .block_on(async { self.observer.set_poll_interval(duration).await })?;
+        self.observer.set_poll_interval(duration)?;
         Ok(())
     }
 
     pub fn check_proxy(&self, backend: &Backend, proxy: Option<Proxy>) -> Result<(), ServiceError> {
         if let Some(p) = proxy {
-            return self
-                .runtime
-                .block_on(async { backend.0.check_proxy(&p).await })
-                .map_err(|e| {
-                    error!("Failed to check proxy: {e}");
-                    ServiceError::ProxyError
-                });
+            return backend.0.check_proxy(&p).map_err(|e| {
+                error!("Failed to check proxy: {e}");
+                ServiceError::ProxyError
+            });
         }
 
         Ok(())
@@ -231,10 +204,7 @@ pub fn new_service_from_config(
         );
         let mut account_owned = account.0;
         if let Some(refresher) = account.1 {
-            if let Err(e) = service
-                .runtime
-                .block_on(async { account_owned.refresh(refresher).await })
-            {
+            if let Err(e) = account_owned.refresh(refresher) {
                 error!(
                     "Refresh failed account={} backend={}: {e}",
                     account_owned.email(),
@@ -245,10 +215,7 @@ pub fn new_service_from_config(
         }
 
         let account_email = account_owned.email().to_string();
-        if let Err(e) = service
-            .runtime
-            .block_on(async { service.observer.add_account(account_owned).await })
-        {
+        if let Err(e) = service.observer.add_account(account_owned) {
             error!("Failed to add refreshed account={account_email} to observer");
             from_config_cb.notify_error(account_email, e.into());
         }
@@ -294,25 +261,11 @@ fn new_service_with_backends(
     backends: Vec<Arc<Backend>>,
     poll_interval: Option<Duration>,
 ) -> Result<Service, ServiceError> {
-    let runtime = tokio::runtime::Builder::new_multi_thread()
-        .enable_all()
-        .max_blocking_threads(1)
-        .build()
-        .map_err(|e| ServiceError::Unknown {
-            msg: format!("Failed to start tokio runtime {e}"),
-        })?;
-
-    let (observer, task) = yhm::ObserverBuilder::new(Box::new(NotifierWrapper(notifier)))
+    let observer = yhm::ObserverBuilder::new(Box::new(NotifierWrapper(notifier)))
         .poll_interval(poll_interval.unwrap_or(Duration::from_secs(60 * 5)))
         .build();
-    let join_handle = runtime.spawn(task);
 
-    Ok(Service {
-        observer,
-        runtime,
-        join_handle,
-        backends,
-    })
+    Ok(Service { observer, backends })
 }
 
 #[cfg(target_os = "android")]
@@ -328,6 +281,7 @@ fn init_android_logger() {
                     .filter(None, LevelFilter::Error)
                     .filter(Some("you_have_mail_common"), LevelFilter::Debug)
                     .filter(Some("youhavemail::service"), LevelFilter::Debug)
+                    .filter(Some("proton_api_rs"), LevelFilter::Debug)
                     .build(),
             ),
     );

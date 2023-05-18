@@ -5,13 +5,13 @@ use crate::{
     Account, AccountError, Config, Notification, Notifier, ObserverAccount, ObserverAccountStatus,
     ObserverError,
 };
+use crossbeam_channel::{select, tick, Receiver, Sender};
 use proton_api_rs::log::{debug, error};
-use proton_api_rs::tokio;
 use std::collections::hash_map::Entry;
 use std::collections::HashMap;
-use std::future::Future;
+use std::mem::ManuallyDrop;
+use std::sync::Arc;
 use std::time::Duration;
-use tokio::sync::mpsc::{Receiver, Sender};
 
 /// Observer background worker. Handles RPC commands and polls the accounts for updates.
 pub struct Worker {
@@ -27,6 +27,29 @@ struct WorkerAccount {
     status: ObserverAccountStatus,
 }
 
+pub struct BackgroundWorker {
+    thread: Option<std::thread::JoinHandle<()>>,
+    sender: ManuallyDrop<Sender<ObserverRequest>>,
+}
+
+impl BackgroundWorker {
+    pub(super) fn send(
+        &self,
+        request: ObserverRequest,
+    ) -> Result<(), crossbeam_channel::SendError<ObserverRequest>> {
+        self.sender.send(request)
+    }
+}
+
+impl Drop for BackgroundWorker {
+    fn drop(&mut self) {
+        unsafe { ManuallyDrop::drop(&mut self.sender) };
+        if let Some(h) = self.thread.take() {
+            let _ = h.join();
+        }
+    }
+}
+
 impl Worker {
     fn new(notifier: Box<dyn Notifier>, poll_interval: Duration) -> Self {
         Self {
@@ -37,13 +60,18 @@ impl Worker {
         }
     }
 
-    pub fn build(
-        notifier: Box<dyn Notifier>,
-        poll_interval: Duration,
-    ) -> (impl Future<Output = ()>, Sender<ObserverRequest>) {
-        let (sender, receiver) = proton_api_rs::tokio::sync::mpsc::channel::<ObserverRequest>(5);
+    pub fn build(notifier: Box<dyn Notifier>, poll_interval: Duration) -> Arc<BackgroundWorker> {
+        let (sender, receiver) = crossbeam_channel::bounded::<ObserverRequest>(5);
         let observer = Self::new(notifier, poll_interval);
-        (observer_task(observer, receiver), sender)
+
+        let thread = std::thread::spawn(move || {
+            observer_task(observer, receiver);
+        });
+
+        Arc::new(BackgroundWorker {
+            thread: Some(thread),
+            sender: ManuallyDrop::new(sender),
+        })
     }
 
     #[cfg(test)]
@@ -57,7 +85,7 @@ impl Worker {
         );
     }
 
-    async fn handle_request(&mut self, request: ObserverRequest) -> bool {
+    fn handle_request(&mut self, request: ObserverRequest) -> bool {
         match request {
             ObserverRequest::AddAccount(account, reply) => {
                 let account_status = account_status_to_observer_account_status(&account);
@@ -91,7 +119,7 @@ impl Worker {
                     }
                 };
 
-                if reply.send(result).await.is_err() {
+                if reply.send(result).is_err() {
                     error!("Failed to send reply for remove account request");
                 }
 
@@ -100,7 +128,7 @@ impl Worker {
             ObserverRequest::LogoutAccount(email, reply) => {
                 debug!("Logout account request: account {email}");
                 let result = if let Some(account) = self.accounts.get_mut(&email) {
-                    let r = account.account.logout().await.map_err(|e| e.into());
+                    let r = account.account.logout().map_err(|e| e.into());
                     if r.is_ok() {
                         account.status = ObserverAccountStatus::LoggedOut;
                         self.notifier.notify(Notification::AccountLoggedOut(&email));
@@ -110,7 +138,7 @@ impl Worker {
                     Err(ObserverError::NoSuchAccount(email))
                 };
 
-                if reply.send(result).await.is_err() {
+                if reply.send(result).is_err() {
                     error!("Failed to send reply for remove account request");
                 }
 
@@ -119,7 +147,7 @@ impl Worker {
             ObserverRequest::RemoveAccount(email, reply) => {
                 debug!("Remove account request: account {email}");
                 let result = if let Some(mut account) = self.accounts.remove(&email) {
-                    let r = account.account.logout().await;
+                    let r = account.account.logout();
                     if r.is_ok() {
                         self.notifier.notify(Notification::AccountRemoved(&email));
                     }
@@ -128,7 +156,7 @@ impl Worker {
                     Ok(())
                 };
 
-                if reply.send(result.map_err(|e| e.into())).await.is_err() {
+                if reply.send(result.map_err(|e| e.into())).is_err() {
                     error!("Failed to send reply for remove account request");
                 }
 
@@ -147,7 +175,7 @@ impl Worker {
                     })
                     .collect::<Vec<_>>();
 
-                if reply.send(Ok(accounts)).await.is_err() {
+                if reply.send(Ok(accounts)).is_err() {
                     error!("Failed to send reply for remove account request");
                 }
 
@@ -171,7 +199,7 @@ impl Worker {
                     self.accounts.values().map(|a| &a.account),
                 );
 
-                if reply.send(r).await.is_err() {
+                if reply.send(r).is_err() {
                     error!("Failed to send reply for gen config request");
                 }
 
@@ -182,7 +210,7 @@ impl Worker {
                 false
             }
             ObserverRequest::GetPollInterval(reply) => {
-                if reply.send(Ok(self.poll_interval)).await.is_err() {
+                if reply.send(Ok(self.poll_interval)).is_err() {
                     error!("Failed to send reply for poll interval request");
                 }
                 false
@@ -197,7 +225,7 @@ impl Worker {
                 }
 
                 let result = if let Some(account) = self.accounts.get_mut(&email) {
-                    match account.account.set_proxy(proxy.as_ref()).await {
+                    match account.account.set_proxy(proxy.as_ref()) {
                         Ok(changed) => {
                             if changed {
                                 self.notifier.notify(ProxyApplied(&email, proxy.as_ref()))
@@ -210,7 +238,7 @@ impl Worker {
                     Err(ObserverError::NoSuchAccount(email))
                 };
 
-                if reply.send(result).await.is_err() {
+                if reply.send(result).is_err() {
                     error!("Failed to send reply for remove account request");
                 }
 
@@ -224,7 +252,7 @@ impl Worker {
                     Err(ObserverError::NoSuchAccount(email))
                 };
 
-                if reply.send(result).await.is_err() {
+                if reply.send(result).is_err() {
                     error!("Failed to send reply for remove account request");
                 }
 
@@ -233,7 +261,7 @@ impl Worker {
         }
     }
 
-    async fn poll_accounts(&mut self) {
+    fn poll_accounts(&mut self) {
         if self.paused {
             return;
         }
@@ -254,7 +282,7 @@ impl Worker {
                 wa.account.email(),
                 wa.account.backend().name()
             );
-            let (result, refreshed) = wa.account.check().await;
+            let (result, refreshed) = wa.account.check();
             match result {
                 Ok(check) => {
                     if wa.status != ObserverAccountStatus::Online {
@@ -312,19 +340,21 @@ impl Worker {
     }
 }
 
-async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequest>) {
+fn observer_task(mut observer: Worker, receiver: Receiver<ObserverRequest>) {
     debug!("Starting observer loop");
-    let sleep = tokio::time::interval(observer.poll_interval);
-    tokio::pin!(sleep);
     let mut last_poll_interval = observer.poll_interval;
+    let mut ticker = tick(last_poll_interval);
     loop {
         if observer.paused {
             // If the observer is paused we shouldn't wake up all the time to do nothing,
             // wait for the next command to come in to do something.
-            if let Some(request) = receiver.recv().await {
-                if observer.handle_request(request).await {
+            if let Ok(request) = receiver.recv() {
+                if observer.handle_request(request) {
                     break;
                 }
+            } else {
+                debug!("Receiver closed, exiting loop");
+                return;
             }
         } else {
             // Update poll interval
@@ -333,24 +363,22 @@ async fn observer_task(mut observer: Worker, mut receiver: Receiver<ObserverRequ
                     "Updating observer poll interval old={:?} new={:?}",
                     last_poll_interval, observer.poll_interval
                 );
-                let new_interval = tokio::time::interval(observer.poll_interval);
-                *sleep = new_interval;
+                ticker = tick(observer.poll_interval);
                 last_poll_interval = observer.poll_interval;
             }
 
-            tokio::select! {
-                _ = sleep.tick() => {
-                    observer.poll_accounts().await;
-                }
-
-                request = receiver.recv() => {
-                    if let Some(request) = request {
-                        if observer.handle_request(request).await {
-                            break;
-                        }
+            select! {
+                recv(receiver) -> request => {
+                    let Ok(request) = request else {
+                        return;
+                    };
+                    if observer.handle_request(request) {
+                        return;
                     }
                 }
-
+                recv(ticker) -> _ => {
+                    observer.poll_accounts();
+                }
             }
         }
     }
@@ -364,11 +392,10 @@ mod tests {
     use crate::{Account, AccountState, MockNotifier, Notification};
     use anyhow::anyhow;
     use mockall::Sequence;
-    use proton_api_rs::tokio;
     use std::time::Duration;
 
-    #[tokio::test]
-    async fn worker_notifies_offline_only_once() {
+    #[test]
+    fn worker_notifies_offline_only_once() {
         let mut notifier = MockNotifier::new();
         notifier
             .expect_notify()
@@ -391,14 +418,14 @@ mod tests {
         worker.add_account(account);
 
         // Poll account multiple times
-        worker.poll_accounts().await;
-        worker.poll_accounts().await;
-        worker.poll_accounts().await;
-        worker.poll_accounts().await;
+        worker.poll_accounts();
+        worker.poll_accounts();
+        worker.poll_accounts();
+        worker.poll_accounts();
     }
 
-    #[tokio::test]
-    async fn worker_notifies_offline_only_once_and_continues_once_account_comes_online() {
+    #[test]
+    fn worker_notifies_offline_only_once_and_continues_once_account_comes_online() {
         let mut notifier = MockNotifier::new();
 
         let mut notifier_sequence = Sequence::new();
@@ -453,14 +480,14 @@ mod tests {
         worker.add_account(account);
 
         // First two are offline
-        worker.poll_accounts().await;
-        worker.poll_accounts().await;
+        worker.poll_accounts();
+        worker.poll_accounts();
         // Last one should be online
-        worker.poll_accounts().await;
+        worker.poll_accounts();
     }
 
-    #[tokio::test]
-    async fn worker_notifies_logged_out_only_once_and_continues_offline() {
+    #[test]
+    fn worker_notifies_logged_out_only_once_and_continues_offline() {
         let mut notifier = MockNotifier::new();
         notifier
             .expect_notify()
@@ -491,14 +518,14 @@ mod tests {
         worker.add_account(account);
 
         // First all puts the account in logged in mode.
-        worker.poll_accounts().await;
+        worker.poll_accounts();
         // Next calls are noop.
-        worker.poll_accounts().await;
-        worker.poll_accounts().await;
+        worker.poll_accounts();
+        worker.poll_accounts();
     }
 
-    #[tokio::test]
-    async fn worker_notifies_account_refresh() {
+    #[test]
+    fn worker_notifies_account_refresh() {
         let mut notifier = MockNotifier::new();
         let mut sequence = Sequence::new();
         notifier
@@ -564,8 +591,8 @@ mod tests {
         let mut worker = Worker::new(Box::new(notifier), Duration::from_millis(1));
 
         worker.add_account(account);
-        worker.poll_accounts().await;
-        worker.poll_accounts().await;
+        worker.poll_accounts();
+        worker.poll_accounts();
     }
 }
 

@@ -1,5 +1,5 @@
 use crate::{Account, ConfigGenError, ObserverAccount, ObserverError, Proxy};
-use proton_api_rs::tokio::sync::mpsc::Sender;
+use crossbeam_channel::Sender;
 use std::time::Duration;
 
 /// RPC Requests for the `Observer`.

@@ -2,7 +2,6 @@ use crate::backend::{AuthRefresher, Backend};
 use crate::{Account, Proxy};
 use anyhow::anyhow;
 use proton_api_rs::log::error;
-use proton_api_rs::tokio;
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
 use std::time::Duration;
@@ -148,9 +147,9 @@ struct ConfigJSONRead {
     accounts: Vec<ConfigJSONAccount>,
 }
 
-#[tokio::test]
-async fn test_config_store_and_load() {
-    use crate::{Proxy, ProxyAuth, ProxyProtocol};
+#[test]
+fn test_config_store_and_load() {
+    use crate::{ProxyAuth, ProxyProtocol};
 
     let proxy = Proxy {
         protocol: ProxyProtocol::Socks5,
@@ -181,7 +180,7 @@ async fn test_config_store_and_load() {
 
     let account1 = {
         let mut a = Account::new(null_backed.clone(), "foo", Some(proxy.clone()));
-        a.login("foo").await.unwrap();
+        a.login("foo").unwrap();
         a
     };
     let account2 = Account::new(null_backed.clone(), "bar", None);

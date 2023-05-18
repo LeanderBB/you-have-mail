@@ -2,7 +2,6 @@
 //! notifications for.
 
 use crate::{AccountState, Proxy};
-use async_trait::async_trait;
 #[cfg(test)]
 use mockall::automock;
 use std::fmt::Debug;
@@ -47,7 +46,6 @@ pub struct NewEmailReply {
 
 /// Implementation for the backends.
 #[cfg_attr(test, automock)]
-#[async_trait]
 pub trait Backend: Send + Sync + Debug {
     /// Return the backend's name.
     fn name(&self) -> &str;
@@ -56,15 +54,15 @@ pub trait Backend: Send + Sync + Debug {
     fn description(&self) -> &str;
 
     /// Login an account.
-    async fn login<'a>(
+    fn login(
         &self,
         username: &str,
         password: &str,
-        proxy: Option<&'a Proxy>,
+        proxy: Option<&Proxy>,
     ) -> BackendResult<AccountState>;
 
     /// Check proxy settings.
-    async fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()>;
+    fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()>;
 
     /// Load the necessary information to refresh the user's account access credentials.
     fn auth_refresher_from_config(
@@ -75,17 +73,16 @@ pub trait Backend: Send + Sync + Debug {
 
 /// Trait that needs to be implemented for all backend accounts
 #[cfg_attr(test, automock)]
-#[async_trait]
 pub trait Account: Send + Sync + Debug {
     /// Execute the code that will check whether new mail is available.
     /// If the account token was refreshed the second member of the tuple will be true.
-    async fn check(&mut self) -> (BackendResult<NewEmailReply>, bool);
+    fn check(&mut self) -> (BackendResult<NewEmailReply>, bool);
 
     /// Logout the account.
-    async fn logout(&mut self) -> BackendResult<()>;
+    fn logout(&mut self) -> BackendResult<()>;
 
     /// Apply the given proxy to the connector. If proxy is none, remove it.
-    async fn set_proxy<'a>(&mut self, proxy: Option<&'a Proxy>) -> BackendResult<()>;
+    fn set_proxy(&mut self, proxy: Option<&Proxy>) -> BackendResult<()>;
 
     /// Load the necessary information to refresh the user's account access credentials.
     fn auth_refresher_config(&self) -> Result<serde_json::Value, anyhow::Error>;
@@ -93,10 +90,9 @@ pub trait Account: Send + Sync + Debug {
 
 /// Trait for accounts that require 2FA support
 #[cfg_attr(test, automock)]
-#[async_trait]
 pub trait AwaitTotp: Send + Sync + Debug {
     /// Called when TOTP code will be submitted.
-    async fn submit_totp(
+    fn submit_totp(
         self: Box<Self>,
         totp: &str,
     ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)>;
@@ -104,10 +100,6 @@ pub trait AwaitTotp: Send + Sync + Debug {
 
 /// Trait to refresh the accounts' login credentials.
 #[cfg_attr(test, automock)]
-#[async_trait]
 pub trait AuthRefresher: Send + Sync + Debug {
-    async fn refresh<'a>(
-        self: Box<Self>,
-        proxy: Option<&'a Proxy>,
-    ) -> Result<AccountState, BackendError>;
+    fn refresh(self: Box<Self>, proxy: Option<&Proxy>) -> Result<AccountState, BackendError>;
 }

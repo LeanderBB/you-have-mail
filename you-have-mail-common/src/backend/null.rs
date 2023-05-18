@@ -5,8 +5,6 @@ use crate::backend::{
 };
 use crate::{AccountState, Proxy};
 use anyhow::{anyhow, Error};
-use async_trait::async_trait;
-use proton_api_rs::tokio;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
@@ -59,7 +57,6 @@ struct NullAuthRefresher {
 
 const NULL_BACKEND_NAME: &str = "Null Backend";
 
-#[async_trait]
 impl Backend for NullBacked {
     fn name(&self) -> &str {
         NULL_BACKEND_NAME
@@ -69,15 +66,10 @@ impl Backend for NullBacked {
         "Test backend to verify app behavior"
     }
 
-    async fn login<'a>(
-        &self,
-        email: &str,
-        password: &str,
-        _: Option<&'a Proxy>,
-    ) -> BackendResult<AccountState> {
+    fn login(&self, email: &str, password: &str, _: Option<&Proxy>) -> BackendResult<AccountState> {
         if let Some(account) = self.accounts.get(email) {
             if let Some(d) = account.wait_time {
-                tokio::time::sleep(d).await;
+                std::thread::sleep(d);
             }
 
             if account.password != password {
@@ -101,12 +93,12 @@ impl Backend for NullBacked {
             };
         }
 
-        return Err(BackendError::Request(anyhow!(
+        Err(BackendError::Request(anyhow!(
             "invalid user name or password"
-        )));
+        )))
     }
 
-    async fn check_proxy(&self, _: &Proxy) -> BackendResult<()> {
+    fn check_proxy(&self, _: &Proxy) -> BackendResult<()> {
         Ok(())
     }
 
@@ -116,12 +108,8 @@ impl Backend for NullBacked {
     }
 }
 
-#[async_trait]
 impl AuthRefresher for NullAuthRefresher {
-    async fn refresh<'a>(
-        self: Box<Self>,
-        _: Option<&'a Proxy>,
-    ) -> Result<AccountState, BackendError> {
+    fn refresh(self: Box<Self>, _: Option<&Proxy>) -> Result<AccountState, BackendError> {
         Ok(AccountState::LoggedIn(Box::new(NullAccount {
             email: self.email,
             wait_time: None,
@@ -150,21 +138,20 @@ impl NullAccount {
     }
 }
 
-#[async_trait]
 impl Account for NullAccount {
-    async fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
+    fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
         self.counter += 1;
         (Ok(Self::create_email_reply(self.counter)), false)
     }
 
-    async fn logout(&mut self) -> BackendResult<()> {
+    fn logout(&mut self) -> BackendResult<()> {
         if let Some(d) = self.wait_time {
-            tokio::time::sleep(d).await;
+            std::thread::sleep(d);
         }
         Ok(())
     }
 
-    async fn set_proxy<'a>(&mut self, _: Option<&'a Proxy>) -> BackendResult<()> {
+    fn set_proxy(&mut self, _: Option<&Proxy>) -> BackendResult<()> {
         Ok(())
     }
 
@@ -176,14 +163,13 @@ impl Account for NullAccount {
     }
 }
 
-#[async_trait]
 impl AwaitTotp for NullAwaitTotp {
-    async fn submit_totp(
+    fn submit_totp(
         self: Box<NullAwaitTotp>,
         totp: &str,
     ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)> {
         if let Some(d) = self.wait_time {
-            tokio::time::sleep(d).await;
+            std::thread::sleep(d);
         }
 
         if self.totp != totp {

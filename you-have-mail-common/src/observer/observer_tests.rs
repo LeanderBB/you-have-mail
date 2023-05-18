@@ -3,12 +3,10 @@ use crate::backend::Backend;
 use crate::{Account, Notification, Notifier, NullNotifier, ObserverBuilder, Proxy, ProxyProtocol};
 use crate::{MockNotifier, Observer};
 use mockall::Sequence;
-use proton_api_rs::tokio;
-use std::future::Future;
 use std::sync::Arc;
 use std::time::Duration;
 
-async fn new_backend_and_account() -> (Arc<dyn Backend>, Account) {
+fn new_backend_and_account() -> (Arc<dyn Backend>, Account) {
     let accounts = NullTestAccount {
         email: "foo".to_string(),
         password: "bar".to_string(),
@@ -17,15 +15,15 @@ async fn new_backend_and_account() -> (Arc<dyn Backend>, Account) {
     };
     let backend = new_backend(&[accounts]);
     let mut account = Account::new(backend.clone(), "foo", None);
-    account.login("bar").await.unwrap();
+    account.login("bar").unwrap();
 
     assert!(account.is_logged_in());
     (backend, account)
 }
 
-#[tokio::test]
-async fn notifier_called() {
-    let (_, account) = new_backend_and_account().await;
+#[test]
+fn notifier_called() {
+    let (_, account) = new_backend_and_account();
 
     let mut notifier = MockNotifier::new();
     notifier
@@ -41,21 +39,16 @@ async fn notifier_called() {
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
-    with_observer(
-        Duration::from_millis(50),
-        notifier,
-        move |observer| async move {
-            observer.add_account(account).await.unwrap();
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            observer.shutdown_worker().await.unwrap();
-        },
-    )
-    .await;
+    with_observer(Duration::from_millis(50), notifier, move |observer| {
+        observer.add_account(account).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        observer.shutdown_worker().unwrap();
+    });
 }
 
-#[tokio::test]
-async fn paused_does_not_call_notifier() {
-    let (_, account) = new_backend_and_account().await;
+#[test]
+fn paused_does_not_call_notifier() {
+    let (_, account) = new_backend_and_account();
 
     let mut notifier = MockNotifier::new();
     notifier
@@ -71,21 +64,16 @@ async fn paused_does_not_call_notifier() {
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
-    with_observer(
-        Duration::from_millis(10),
-        notifier,
-        move |observer| async move {
-            observer.pause().await.unwrap();
-            observer.add_account(account).await.unwrap();
-            tokio::time::sleep(Duration::from_millis(100)).await;
-        },
-    )
-    .await;
+    with_observer(Duration::from_millis(10), notifier, move |observer| {
+        observer.pause().unwrap();
+        observer.add_account(account).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+    });
 }
 
-#[tokio::test]
-async fn resume_after_pause_calls_notifier() {
-    let (_, account) = new_backend_and_account().await;
+#[test]
+fn resume_after_pause_calls_notifier() {
+    let (_, account) = new_backend_and_account();
 
     let mut notifier = MockNotifier::new();
     notifier
@@ -101,24 +89,19 @@ async fn resume_after_pause_calls_notifier() {
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
-    with_observer(
-        Duration::from_millis(10),
-        notifier,
-        move |observer| async move {
-            observer.pause().await.unwrap();
-            observer.add_account(account).await.unwrap();
-            tokio::time::sleep(Duration::from_millis(100)).await;
-            observer.resume().await.unwrap();
-            tokio::time::sleep(Duration::from_millis(400)).await;
-        },
-    )
-    .await;
+    with_observer(Duration::from_millis(10), notifier, move |observer| {
+        observer.pause().unwrap();
+        observer.add_account(account).unwrap();
+        std::thread::sleep(Duration::from_millis(100));
+        observer.resume().unwrap();
+        std::thread::sleep(Duration::from_millis(400));
+    });
 }
 
-#[tokio::test]
-async fn adding_account_with_same_email_twice_is_error() {
-    let (_, account) = new_backend_and_account().await;
-    let (_, account2) = new_backend_and_account().await;
+#[test]
+fn adding_account_with_same_email_twice_is_error() {
+    let (_, account) = new_backend_and_account();
+    let (_, account2) = new_backend_and_account();
 
     let mut notifier = MockNotifier::new();
     notifier
@@ -134,21 +117,16 @@ async fn adding_account_with_same_email_twice_is_error() {
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
-    with_observer(
-        Duration::from_millis(10),
-        notifier,
-        move |observer| async move {
-            observer.add_account(account).await.unwrap();
-            observer.add_account(account2).await.unwrap_err();
-        },
-    )
-    .await;
+    with_observer(Duration::from_millis(10), notifier, move |observer| {
+        observer.add_account(account).unwrap();
+        observer.add_account(account2).unwrap_err();
+    });
 }
 
-#[tokio::test]
-async fn adding_account_after_logout_works() {
-    let (_, account) = new_backend_and_account().await;
-    let (_, account2) = new_backend_and_account().await;
+#[test]
+fn adding_account_after_logout_works() {
+    let (_, account) = new_backend_and_account();
+    let (_, account2) = new_backend_and_account();
 
     let mut notifier = MockNotifier::new();
     let mut sequence = Sequence::new();
@@ -178,22 +156,17 @@ async fn adding_account_after_logout_works() {
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
-    with_observer(
-        Duration::from_millis(10),
-        notifier,
-        move |observer| async move {
-            observer.add_account(account).await.unwrap();
-            observer.logout_account("foo").await.unwrap();
-            observer.add_account(account2).await.unwrap();
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        },
-    )
-    .await;
+    with_observer(Duration::from_millis(10), notifier, move |observer| {
+        observer.add_account(account).unwrap();
+        observer.logout_account("foo").unwrap();
+        observer.add_account(account2).unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+    });
 }
 
-#[tokio::test]
-async fn removing_account_produces_remove_notification() {
-    let (_, account) = new_backend_and_account().await;
+#[test]
+fn removing_account_produces_remove_notification() {
+    let (_, account) = new_backend_and_account();
 
     let mut notifier = MockNotifier::new();
     let mut sequence = Sequence::new();
@@ -212,41 +185,35 @@ async fn removing_account_produces_remove_notification() {
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
-    with_observer(
-        Duration::from_millis(10),
-        notifier,
-        move |observer| async move {
-            observer.add_account(account).await.unwrap();
-            observer.remove_account("foo").await.unwrap();
-        },
-    )
-    .await;
+    with_observer(Duration::from_millis(10), notifier, move |observer| {
+        observer.add_account(account).unwrap();
+        observer.remove_account("foo").unwrap();
+    });
 }
 
-#[tokio::test]
-async fn test_get_set_poll_interval() {
+#[test]
+fn test_get_set_poll_interval() {
     let notifier: Box<dyn Notifier> = Box::new(NullNotifier {});
     let start_poll_interval = Duration::from_millis(10);
 
-    with_observer(start_poll_interval, notifier, move |observer| async move {
+    with_observer(start_poll_interval, notifier, move |observer| {
         {
-            let current_interval = observer.get_poll_interval().await.unwrap();
+            let current_interval = observer.get_poll_interval().unwrap();
             assert_eq!(current_interval, start_poll_interval);
         }
         {
             let new_poll_interval = Duration::from_secs(20);
-            observer.set_poll_interval(new_poll_interval).await.unwrap();
-            let current_interval = observer.get_poll_interval().await.unwrap();
+            observer.set_poll_interval(new_poll_interval).unwrap();
+            let current_interval = observer.get_poll_interval().unwrap();
             assert_eq!(current_interval, new_poll_interval);
         }
-    })
-    .await;
+    });
 }
 
-#[tokio::test]
-async fn test_proxy_settings() {
+#[test]
+fn test_proxy_settings() {
     // Apply the same proxy twice in a row and then remove it.
-    let (_, account) = new_backend_and_account().await;
+    let (_, account) = new_backend_and_account();
 
     let mut notifier = MockNotifier::new();
     let mut sequence = Sequence::new();
@@ -276,50 +243,36 @@ async fn test_proxy_settings() {
 
     let notifier: Box<dyn Notifier> = Box::new(notifier);
 
-    with_observer(
-        Duration::from_millis(10),
-        notifier,
-        move |observer| async move {
-            let proxy = Proxy {
-                protocol: ProxyProtocol::Https,
-                auth: None,
-                url: "127.0.0.1".into(),
-                port: 1080,
-            };
-            observer.add_account(account).await.unwrap();
-            observer
-                .set_proxy_settings("foo".to_string(), Some(proxy.clone()))
-                .await
-                .unwrap();
-            observer
-                .set_proxy_settings("foo".to_string(), Some(proxy.clone()))
-                .await
-                .unwrap();
-            observer
-                .set_proxy_settings("foo".to_string(), None)
-                .await
-                .unwrap();
-            tokio::time::sleep(Duration::from_secs(1)).await;
-        },
-    )
-    .await;
+    with_observer(Duration::from_millis(10), notifier, move |observer| {
+        let proxy = Proxy {
+            protocol: ProxyProtocol::Https,
+            auth: None,
+            url: "127.0.0.1".into(),
+            port: 1080,
+        };
+        observer.add_account(account).unwrap();
+        observer
+            .set_proxy_settings("foo".to_string(), Some(proxy.clone()))
+            .unwrap();
+        observer
+            .set_proxy_settings("foo".to_string(), Some(proxy.clone()))
+            .unwrap();
+        observer
+            .set_proxy_settings("foo".to_string(), None)
+            .unwrap();
+        std::thread::sleep(Duration::from_secs(1));
+    });
 }
 
-async fn with_observer<F, T>(poll_interval: Duration, notifier: Box<dyn Notifier>, f: F)
+fn with_observer<F, T>(poll_interval: Duration, notifier: Box<dyn Notifier>, f: F)
 where
     F: FnOnce(Observer) -> T,
-    T: Future<Output = ()>,
 {
-    let h = {
-        let (observer, task) = ObserverBuilder::new(notifier)
-            .poll_interval(poll_interval)
-            .build();
-        let h = tokio::spawn(task);
+    let observer = ObserverBuilder::new(notifier)
+        .poll_interval(poll_interval)
+        .build();
 
-        (f)(observer.clone()).await;
+    (f)(observer.clone());
 
-        observer.shutdown_worker().await.unwrap();
-        h
-    };
-    h.await.unwrap();
+    observer.shutdown_worker().unwrap();
 }

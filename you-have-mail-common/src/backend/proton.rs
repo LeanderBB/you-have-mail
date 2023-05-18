@@ -6,12 +6,10 @@ use crate::backend::{
 };
 use crate::{AccountState, Proxy, ProxyProtocol};
 use anyhow::{anyhow, Error};
-use async_trait::async_trait;
 use proton_api_rs::domain::{EventId, ExposeSecret, LabelID, MessageAction, MoreEvents, UserUid};
-use proton_api_rs::log::{debug, error};
 use proton_api_rs::{
-    Client, ClientBuilder, ClientBuilderError, ClientLoginState, HttpClientError, RequestError,
-    TOTPClient,
+    http, AutoAuthRefreshRequestPolicy, AutoRefreshAuthSession, DefaultSessionRequestPolicy,
+    LoginError, SessionType, TotpSession,
 };
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
@@ -22,6 +20,9 @@ use std::time::Duration;
 
 const PROTON_APP_VERSION: &str = "web-mail@5.0.19.5";
 const PROTON_APP_VERSION_OTHER: &str = "Other";
+
+type Client = http::ureq_client::UReqClient;
+type Session = AutoRefreshAuthSession;
 
 /// Create a proton mail backend.
 pub fn new_backend() -> Arc<dyn Backend> {
@@ -48,7 +49,8 @@ const PROTON_BACKEND_NAME_OTHER: &str = "Proton Mail V-Other";
 #[derive(Debug)]
 struct ProtonAccount {
     email: String,
-    client: Option<Client>,
+    client: Client,
+    session: Option<Session>,
     last_event_id: Option<EventId>,
     version: &'static str,
 }
@@ -78,10 +80,11 @@ struct ProtonAuthRefresherInfoRead<'a> {
 }
 
 impl ProtonAccount {
-    fn new(c: Client, email: String, version: &'static str) -> Self {
+    fn new(client: Client, session: Session, email: String, version: &'static str) -> Self {
         Self {
             email,
-            client: Some(c),
+            client,
+            session: Some(session),
             last_event_id: None,
             version,
         }
@@ -91,38 +94,11 @@ impl ProtonAccount {
 #[derive(Debug)]
 struct ProtonAwaitTotp {
     email: String,
-    client: TOTPClient,
+    client: Client,
+    session: TotpSession<AutoAuthRefreshRequestPolicy<DefaultSessionRequestPolicy>>,
     version: &'static str,
 }
 
-macro_rules! try_request {
-    ($request:expr, $refresh:expr) => {{
-        let r = $request.await;
-        match r {
-            Ok(t) => (Ok(t), false),
-            Err(e) => {
-                if let RequestError::API(api_err) = &e {
-                    if api_err.http_code == 401 {
-                        debug!("Proton account expired, attempting refresh");
-                        // Unauthorized, try to refresh once
-                        if let Err(e) = $refresh.await {
-                            error!("Proton account expired, refresh failed {e}");
-                            (Err(e), false)
-                        } else {
-                            ($request.await, true)
-                        }
-                    } else {
-                        (Err(e), false)
-                    }
-                } else {
-                    (Err(e), false)
-                }
-            }
-        }
-    }};
-}
-
-#[async_trait]
 impl Backend for ProtonBackend {
     fn name(&self) -> &str {
         if self.version != PROTON_APP_VERSION_OTHER {
@@ -140,34 +116,32 @@ impl Backend for ProtonBackend {
         }
     }
 
-    async fn login<'a>(
+    fn login(
         &self,
         email: &str,
         password: &str,
-        proxy: Option<&'a Proxy>,
+        proxy: Option<&Proxy>,
     ) -> BackendResult<AccountState> {
-        match new_client_builder(proxy, self.version)
-            .login(email, password)
-            .await?
-        {
-            ClientLoginState::Authenticated(c) => Ok(AccountState::LoggedIn(Box::new(
-                ProtonAccount::new(c, email.to_string(), self.version),
+        let client = new_client(proxy, self.version)?;
+
+        match Session::login(&client, email, password)? {
+            SessionType::Authenticated(s) => Ok(AccountState::LoggedIn(Box::new(
+                ProtonAccount::new(client, s, email.to_string(), self.version),
             ))),
-            ClientLoginState::AwaitingTotp(c) => {
+            SessionType::AwaitingTotp(c) => {
                 Ok(AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp {
                     version: self.version,
-                    client: c,
+                    client,
+                    session: c,
                     email: email.to_string(),
                 })))
             }
         }
     }
 
-    async fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()> {
-        return new_client_builder(Some(proxy), self.version)
-            .ping()
-            .await
-            .map_err(|e| e.into());
+    fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()> {
+        let client = new_client(Some(proxy), self.version)?;
+        proton_api_rs::ping(&client).map_err(|e| e.into())
     }
 
     fn auth_refresher_from_config(&self, value: Value) -> Result<Box<dyn AuthRefresher>, Error> {
@@ -189,14 +163,11 @@ impl Backend for ProtonBackend {
     }
 }
 
-#[async_trait]
 impl Account for ProtonAccount {
-    async fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
-        if let Some(client) = &mut self.client {
+    fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
+        if let Some(session) = &mut self.session {
             if self.last_event_id.is_none() {
-                let (r, _) =
-                    try_request!({ client.get_latest_event_id() }, { client.refresh_auth() });
-                match r {
+                match session.get_latest_event(&self.client) {
                     Err(e) => return (Err(e.into()), false),
                     Ok(event_id) => {
                         self.last_event_id = Some(event_id);
@@ -210,13 +181,13 @@ impl Account for ProtonAccount {
             if let Some(event_id) = &mut self.last_event_id {
                 let mut has_more = MoreEvents::No;
                 loop {
-                    match try_request!({ client.get_event(event_id) }, { client.refresh_auth() }) {
-                        (Err(e), b) => {
-                            account_refreshed = account_refreshed || b;
+                    match session.get_event(&self.client, event_id) {
+                        Err(e) => {
+                            account_refreshed = account_refreshed || session.was_auth_refreshed();
                             return (Err(e.into()), account_refreshed);
                         }
-                        (Ok(event), b) => {
-                            account_refreshed = account_refreshed || b;
+                        Ok(event) => {
+                            account_refreshed = account_refreshed || session.was_auth_refreshed();
                             if event.event_id != *event_id || has_more == MoreEvents::Yes {
                                 if let Some(message_events) = &event.messages {
                                     for msg_event in message_events {
@@ -256,115 +227,108 @@ impl Account for ProtonAccount {
         )
     }
 
-    async fn logout(&mut self) -> BackendResult<()> {
-        if let Some(client) = self.client.take() {
-            if let Err((c, err)) = client.logout().await {
-                self.client = Some(c);
+    fn logout(&mut self) -> BackendResult<()> {
+        if let Some(session) = self.session.take() {
+            if let Err(err) = session.logout(&self.client) {
+                self.session = Some(session);
                 return Err(err.into());
             }
         }
         Ok(())
     }
 
-    async fn set_proxy<'a>(&mut self, proxy: Option<&'a Proxy>) -> BackendResult<()> {
-        if let Some(client) = &mut self.client {
-            let new_client = new_client_builder(proxy, self.version).with_client_auth(client)?;
-            *client = new_client;
-            Ok(())
-        } else {
-            Err(BackendError::Unknown(anyhow!("Client is no longer active")))
-        }
+    fn set_proxy(&mut self, proxy: Option<&Proxy>) -> BackendResult<()> {
+        let new_client = new_client(proxy, self.version)?;
+        self.client = new_client;
+        Ok(())
     }
 
     fn auth_refresher_config(&self) -> Result<Value, Error> {
-        let Some(client) = &self.client else {
+        let Some(session) = &self.session else {
             return Err(anyhow!("invalid state"));
         };
+        let refresh_data = session.get_refresh_data();
         let info = ProtonAuthRefresherInfoRead {
             email: &self.email,
-            uid: client.user_uid().expose_secret().as_str(),
-            token: client.user_refresh_token().expose_secret().as_str(),
+            uid: refresh_data.user_uid.expose_secret().as_str(),
+            token: refresh_data.token.expose_secret().as_str(),
             is_other_version: self.version == PROTON_APP_VERSION_OTHER,
         };
-        let value = serde_json::to_value(info).map_err(|e| anyhow!(e))?;
-        Ok(value)
+
+        serde_json::to_value(info).map_err(|e| anyhow!(e))
     }
 }
 
-#[async_trait]
 impl AwaitTotp for ProtonAwaitTotp {
-    async fn submit_totp(
+    fn submit_totp(
         mut self: Box<Self>,
         totp: &str,
     ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)> {
-        match self.client.submit_totp(totp).await {
-            Ok(c) => Ok(Box::new(ProtonAccount::new(c, self.email, self.version))),
+        match self.session.submit_totp(&self.client, totp) {
+            Ok(c) => Ok(Box::new(ProtonAccount::new(
+                self.client,
+                c,
+                self.email,
+                self.version,
+            ))),
             Err((c, e)) => {
-                self.client = c;
+                self.session = c;
                 Err((self, e.into()))
             }
         }
     }
 }
 
-#[async_trait]
 impl AuthRefresher for ProtonAuthRefresher {
-    async fn refresh<'a>(
-        self: Box<Self>,
-        proxy: Option<&'a Proxy>,
-    ) -> Result<AccountState, BackendError> {
-        let client = new_client_builder(proxy, self.version)
-            .with_token(&UserUid::from(self.uid), &self.token)
-            .await?;
+    fn refresh(self: Box<Self>, proxy: Option<&Proxy>) -> Result<AccountState, BackendError> {
+        let client = new_client(proxy, self.version)?;
+
+        let session = Session::refresh(&client, &UserUid::from(self.uid), &self.token)?;
         Ok(AccountState::LoggedIn(Box::new(ProtonAccount::new(
             client,
+            session,
             self.email,
             self.version,
         ))))
     }
 }
 
-impl From<ClientBuilderError> for BackendError {
-    fn from(value: ClientBuilderError) -> Self {
+impl From<LoginError> for BackendError {
+    fn from(value: LoginError) -> Self {
         match value {
-            ClientBuilderError::ServerProof(_) => BackendError::Request(anyhow!(value)),
-            ClientBuilderError::Request(e) => e.into(),
-            ClientBuilderError::Unsupported2FA(_) => BackendError::Unknown(anyhow!(value)),
-            ClientBuilderError::SRPProof(_) => BackendError::Unknown(anyhow!(value)),
+            LoginError::ServerProof(_) => BackendError::Request(anyhow!(value)),
+            LoginError::Request(e) => e.into(),
+            LoginError::Unsupported2FA(_) => BackendError::Unknown(anyhow!(value)),
+            LoginError::SRPProof(_) => BackendError::Unknown(anyhow!(value)),
         }
     }
 }
 
-impl From<RequestError> for BackendError {
-    fn from(value: RequestError) -> Self {
+impl From<http::Error> for BackendError {
+    fn from(value: http::Error) -> Self {
         match value {
-            RequestError::HttpClient(e) => match e {
-                HttpClientError::Redirect(_, err) => BackendError::Request(err),
-                HttpClientError::Timeout(err) => BackendError::Timeout(err),
-                HttpClientError::Request(err) => BackendError::Request(err),
-                HttpClientError::Connection(err) => BackendError::Connection(err),
-                HttpClientError::Body(err) => BackendError::Request(err),
-                HttpClientError::Other(err) => BackendError::Request(err),
-            },
-            RequestError::API(e) => {
+            http::Error::API(e) => {
                 if e.http_code == 401 {
                     return BackendError::LoggedOut;
                 }
                 BackendError::API(e.into())
             }
-            RequestError::JSON(e) => BackendError::Request(anyhow!(e)),
-            RequestError::Other(e) => BackendError::Unknown(anyhow!(e)),
+            http::Error::Redirect(_, err) => BackendError::Request(err),
+            http::Error::Timeout(err) => BackendError::Timeout(err),
+            http::Error::Connection(err) => BackendError::Connection(err),
+            http::Error::Request(err) => BackendError::Request(err),
+            http::Error::Other(err) => BackendError::Unknown(err),
         }
     }
 }
 
-fn proxy_as_proton_proxy(proxy: &Proxy) -> proton_api_rs::Proxy {
-    proton_api_rs::Proxy {
+fn proxy_as_proton_proxy(proxy: &Proxy) -> http::Proxy {
+    http::Proxy {
         protocol: match proxy.protocol {
-            ProxyProtocol::Https => proton_api_rs::ProxyProtocol::Https,
-            ProxyProtocol::Socks5 => proton_api_rs::ProxyProtocol::Socks5,
+            ProxyProtocol::Https => http::ProxyProtocol::Https,
+            ProxyProtocol::Socks5 => http::ProxyProtocol::Socks5,
         },
-        auth: proxy.auth.as_ref().map(|a| proton_api_rs::ProxyAuth {
+        auth: proxy.auth.as_ref().map(|a| http::ProxyAuth {
             username: a.username.clone(),
             password: SecretString::new(a.password.clone()),
         }),
@@ -373,13 +337,15 @@ fn proxy_as_proton_proxy(proxy: &Proxy) -> proton_api_rs::Proxy {
     }
 }
 
-fn new_client_builder(proxy: Option<&Proxy>, version: &'static str) -> ClientBuilder {
-    let mut builder = ClientBuilder::new().app_version(version);
+fn new_client(proxy: Option<&Proxy>, version: &'static str) -> Result<Client, BackendError> {
+    let mut builder = http::ClientBuilder::new().app_version(version);
     if let Some(p) = proxy {
         builder = builder.with_proxy(proxy_as_proton_proxy(p));
     }
 
     builder
-        .connect_timeout(Duration::from_micros(1)) //Duration::from_secs(60))
+        .connect_timeout(Duration::from_secs(60))
         .request_timeout(Duration::from_secs(3 * 60))
+        .build::<Client>()
+        .map_err(|e| BackendError::Unknown(anyhow!(e)))
 }

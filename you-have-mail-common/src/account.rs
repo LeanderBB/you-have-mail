@@ -114,9 +114,9 @@ impl Account {
     }
 
     /// Run check on the account to see if new emails have arrived.
-    pub async fn check(&mut self) -> (AccountResult<NewEmailReply>, bool) {
+    pub fn check(&mut self) -> (AccountResult<NewEmailReply>, bool) {
         match &mut self.state {
-            AccountState::LoggedIn(a) => match a.check().await {
+            AccountState::LoggedIn(a) => match a.check() {
                 (Ok(r), b) => (Ok(r), b),
                 (Err(e), b) => {
                     if matches!(e, crate::backend::BackendError::LoggedOut) {
@@ -130,25 +130,24 @@ impl Account {
     }
 
     /// Login to the account with the given password.
-    pub async fn login(&mut self, password: &str) -> AccountResult<()> {
+    pub fn login(&mut self, password: &str) -> AccountResult<()> {
         if !self.is_logged_out() {
             return Err(AccountError::InvalidState);
         }
 
         self.state = self
             .backend
-            .login(&self.email, password, self.proxy.as_ref())
-            .await?;
+            .login(&self.email, password, self.proxy.as_ref())?;
         Ok(())
     }
 
     /// Logout the current account.
-    pub async fn logout(&mut self) -> AccountResult<()> {
+    pub fn logout(&mut self) -> AccountResult<()> {
         let old_state = std::mem::replace(&mut self.state, AccountState::LoggedOut);
         match old_state {
             AccountState::LoggedOut | AccountState::AwaitingTotp(..) => Ok(()),
             AccountState::LoggedIn(mut account) => {
-                if let Err(e) = account.logout().await {
+                if let Err(e) = account.logout() {
                     let _ = std::mem::replace(&mut self.state, AccountState::LoggedIn(account));
                     return Err(e.into());
                 }
@@ -159,11 +158,11 @@ impl Account {
 
     /// Submit totp. If the account is not in the awaiting totp state, the
     /// `AccountError::InvalidState` error will be returned.
-    pub async fn submit_totp(&mut self, totp: &str) -> AccountResult<()> {
+    pub fn submit_totp(&mut self, totp: &str) -> AccountResult<()> {
         let old_state = std::mem::replace(&mut self.state, AccountState::LoggedOut);
         match old_state {
             AccountState::LoggedOut => Err(AccountError::InvalidState),
-            AccountState::AwaitingTotp(t) => match t.submit_totp(totp).await {
+            AccountState::AwaitingTotp(t) => match t.submit_totp(totp) {
                 Ok(a) => {
                     self.state = AccountState::LoggedIn(a);
                     Ok(())
@@ -181,30 +180,30 @@ impl Account {
     }
 
     /// Refresh the authentication token for this account.
-    pub async fn refresh(&mut self, refresher: Box<dyn AuthRefresher>) -> AccountResult<()> {
+    pub fn refresh(&mut self, refresher: Box<dyn AuthRefresher>) -> AccountResult<()> {
         if !self.is_logged_out() {
             return Err(AccountError::InvalidState);
         }
 
-        self.state = refresher.refresh(self.proxy.as_ref()).await?;
+        self.state = refresher.refresh(self.proxy.as_ref())?;
         Ok(())
     }
 
     /// Apply proxy configuration to this account
-    pub async fn set_proxy(&mut self, proxy: Option<&Proxy>) -> AccountResult<bool> {
+    pub fn set_proxy(&mut self, proxy: Option<&Proxy>) -> AccountResult<bool> {
         if self.proxy.as_ref() == proxy {
             return Ok(false);
         }
 
         if let Some(p) = proxy {
-            self.backend.check_proxy(p).await.map_err(|e| {
+            self.backend.check_proxy(p).map_err(|e| {
                 error!("Failed to apply proxy to account {}:{e}", self.email);
                 AccountError::Proxy
             })?;
         }
 
         if let AccountState::LoggedIn(a) = &mut self.state {
-            a.set_proxy(proxy).await?;
+            a.set_proxy(proxy)?;
         }
 
         self.proxy = proxy.cloned();
