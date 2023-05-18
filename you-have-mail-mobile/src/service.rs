@@ -157,6 +157,16 @@ impl Service {
 
     pub fn check_proxy(&self, backend: &Backend, proxy: Option<Proxy>) -> Result<(), ServiceError> {
         if let Some(p) = proxy {
+            debug!(
+                "Checking proxy: Protocol={} addr={} port={} auth={}",
+                match p.protocol {
+                    yhm::ProxyProtocol::Https => "https",
+                    yhm::ProxyProtocol::Socks5 => "socks5",
+                },
+                p.url,
+                p.port,
+                p.auth.is_some(),
+            );
             return backend.0.check_proxy(&p).map_err(|e| {
                 error!("Failed to check proxy: {e}");
                 ServiceError::ProxyError
