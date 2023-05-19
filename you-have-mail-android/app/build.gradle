@@ -13,8 +13,8 @@ android {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 29
         targetSdk 33
-        versionCode 18
-        versionName "0.7.0"
+        versionCode 19
+        versionName "0.7.1"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -47,6 +47,12 @@ android {
         }
     }
     ndkVersion "25.2.9519653"
+
+    defaultConfig {
+        ndk {
+            abiFilters 'arm64-v8a', 'x86_64'
+        }
+    }
 }
 
 dependencies {
@@ -85,13 +91,14 @@ cargo {
     }*/
 }
 
-afterEvaluate {
-
-    tasks.whenTaskAdded { task ->
-        if ((task.name == 'javaPreCompileDebug' || task.name == 'javaPreCompileRelease')) {
-            task.dependsOn 'cargoBuild'
-        }
+tasks.whenTaskAdded { task ->
+    // Require cargo to be run before copying native libraries.
+    if ((task.name == 'mergeDebugJniLibFolders' || task.name == 'mergeReleaseJniLibFolders')) {
+        task.dependsOn 'cargoBuild'
     }
+}
+
+afterEvaluate {
 
     // The `cargoBuild` task isn't available until after evaluation.
     android.applicationVariants.all { variant ->
