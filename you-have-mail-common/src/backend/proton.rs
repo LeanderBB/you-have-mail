@@ -117,7 +117,7 @@ impl Backend for ProtonBackend {
         if self.version != PROTON_APP_VERSION_OTHER {
             "For Proton accounts (mail.proton.com)"
         } else {
-            "For Proton accounts (mail.proton.com) - Uses 'Other' as app version"
+            "For Proton accounts (mail.proton.com) - Bypasses Captcha Request"
         }
     }
 
