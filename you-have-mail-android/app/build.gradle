@@ -13,7 +13,7 @@ android {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 29
         targetSdk 33
-        versionCode 17
+        versionCode 18
         versionName "0.7.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"

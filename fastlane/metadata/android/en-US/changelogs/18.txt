@@ -1,0 +1,6 @@
+* Feat: Only send notifications for messages that have not
+  been seen on other clients.
+* Feat: Remove Rust async runtime in favor of blocking code.
+  Might have some benefits for battery life.
+* Fix: When no network is available release wake lock to allow
+  the CPU to go into idle. Helps with battery life.
