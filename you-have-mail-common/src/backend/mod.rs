@@ -54,11 +54,12 @@ pub trait Backend: Send + Sync + Debug {
     fn description(&self) -> &str;
 
     /// Login an account.
-    fn login(
+    #[allow(clippy::needless_lifetimes)] // required for automock.
+    fn login<'a>(
         &self,
         username: &str,
         password: &str,
-        proxy: Option<&Proxy>,
+        proxy: Option<&'a Proxy>,
     ) -> BackendResult<AccountState>;
 
     /// Check proxy settings.
@@ -82,7 +83,8 @@ pub trait Account: Send + Sync + Debug {
     fn logout(&mut self) -> BackendResult<()>;
 
     /// Apply the given proxy to the connector. If proxy is none, remove it.
-    fn set_proxy(&mut self, proxy: Option<&Proxy>) -> BackendResult<()>;
+    #[allow(clippy::needless_lifetimes)] // required for automock.
+    fn set_proxy<'a>(&mut self, proxy: Option<&'a Proxy>) -> BackendResult<()>;
 
     /// Load the necessary information to refresh the user's account access credentials.
     fn auth_refresher_config(&self) -> Result<serde_json::Value, anyhow::Error>;
@@ -101,5 +103,7 @@ pub trait AwaitTotp: Send + Sync + Debug {
 /// Trait to refresh the accounts' login credentials.
 #[cfg_attr(test, automock)]
 pub trait AuthRefresher: Send + Sync + Debug {
-    fn refresh(self: Box<Self>, proxy: Option<&Proxy>) -> Result<AccountState, BackendError>;
+    #[allow(clippy::needless_lifetimes)] // required for automock.
+    fn refresh<'a>(self: Box<Self>, proxy: Option<&'a Proxy>)
+        -> Result<AccountState, BackendError>;
 }
