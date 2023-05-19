@@ -6,7 +6,11 @@ use crate::backend::{
 };
 use crate::{AccountState, Proxy, ProxyProtocol};
 use anyhow::{anyhow, Error};
-use proton_api_rs::domain::{EventId, ExposeSecret, LabelID, MessageAction, MoreEvents, UserUid};
+use proton_api_rs::domain::{
+    Boolean, EventId, ExposeSecret, LabelID, MessageAction, MessageEvent, MessageId, MoreEvents,
+    UserUid,
+};
+use proton_api_rs::log::info;
 use proton_api_rs::{
     http, AutoAuthRefreshRequestPolicy, AutoRefreshAuthSession, DefaultSessionRequestPolicy,
     LoginError, SessionType, TotpSession,
@@ -14,6 +18,7 @@ use proton_api_rs::{
 use secrecy::SecretString;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
+use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
@@ -175,7 +180,7 @@ impl Account for ProtonAccount {
                 }
             }
 
-            let mut result = NewEmailReply { emails: vec![] };
+            let mut result = EventState::new();
             let mut account_refreshed = false;
 
             if let Some(event_id) = &mut self.last_event_id {
@@ -190,30 +195,13 @@ impl Account for ProtonAccount {
                             account_refreshed = account_refreshed || session.was_auth_refreshed();
                             if event.event_id != *event_id || has_more == MoreEvents::Yes {
                                 if let Some(message_events) = &event.messages {
-                                    for msg_event in message_events {
-                                        if msg_event.action == MessageAction::Create {
-                                            if let Some(message) = &msg_event.message {
-                                                if message.labels.contains(&LabelID::inbox()) {
-                                                    result.emails.push(EmailInfo {
-                                                        subject: message.subject.clone(),
-                                                        sender: if let Some(name) =
-                                                            &message.sender_name
-                                                        {
-                                                            name.clone()
-                                                        } else {
-                                                            message.sender_address.clone()
-                                                        },
-                                                    })
-                                                }
-                                            }
-                                        }
-                                    }
+                                    result.handle_message_events(message_events);
                                 }
 
                                 *event_id = event.event_id;
                                 has_more = event.more;
                             } else {
-                                return (Ok(result), account_refreshed);
+                                return (Ok(result.into()), account_refreshed);
                             }
                         }
                     }
@@ -348,4 +336,102 @@ fn new_client(proxy: Option<&Proxy>, version: &'static str) -> Result<Client, Ba
         .request_timeout(Duration::from_secs(3 * 60))
         .build::<Client>()
         .map_err(|e| BackendError::Unknown(anyhow!(e)))
+}
+
+struct MsgInfo {
+    id: MessageId,
+    sender: String,
+    subject: String,
+}
+
+/// Track the state of a message in a certain event steam so that we can only display a
+/// a notification if no other client has opened the message.
+struct EventState {
+    new_emails: Vec<MsgInfo>,
+    unseen: HashSet<MessageId>,
+}
+
+impl EventState {
+    fn new() -> Self {
+        Self {
+            new_emails: Vec::new(),
+            unseen: HashSet::new(),
+        }
+    }
+
+    fn handle_message_events(&mut self, msg_events: &[MessageEvent]) {
+        let inbox_label = LabelID::inbox();
+
+        for msg_event in msg_events {
+            match msg_event.action {
+                MessageAction::Create => {
+                    if let Some(message) = &msg_event.message {
+                        // If the newly created message is not unread, it must have been read
+                        // already.
+                        if message.unread == Boolean::False {
+                            return;
+                        }
+
+                        // Check if the message has arrived in the inbox.
+                        if message.labels.contains(&inbox_label) {
+                            self.new_emails.push(MsgInfo {
+                                id: message.id.clone(),
+                                subject: message.subject.clone(),
+                                sender: if let Some(name) = &message.sender_name {
+                                    name.clone()
+                                } else {
+                                    message.sender_address.clone()
+                                },
+                            });
+                            self.unseen.insert(message.id.clone());
+                        }
+                    }
+                }
+                MessageAction::Update | MessageAction::UpdateFlags => {
+                    if let Some(message) = &msg_event.message {
+                        // If message switches to unread state, remove
+                        if message.unread == Boolean::False
+                            || !message.labels.contains(&inbox_label)
+                        {
+                            info!(
+                                "message removed {} {}",
+                                message.unread == Boolean::False,
+                                !message.labels.contains(&inbox_label)
+                            );
+                            self.unseen.remove(&message.id);
+                        }
+                    }
+                }
+                // Message Deleted, remove from the list.
+                MessageAction::Delete => {
+                    self.unseen.remove(&msg_event.id);
+                }
+            };
+        }
+    }
+
+    fn into_new_email_reply(self) -> NewEmailReply {
+        if self.unseen.is_empty() {
+            return NewEmailReply { emails: vec![] };
+        }
+
+        let mut result = Vec::with_capacity(self.unseen.len());
+
+        for msg in self.new_emails {
+            if self.unseen.contains(&msg.id) {
+                result.push(EmailInfo {
+                    sender: msg.sender,
+                    subject: msg.subject,
+                })
+            }
+        }
+
+        NewEmailReply { emails: result }
+    }
+}
+
+impl From<EventState> for NewEmailReply {
+    fn from(value: EventState) -> Self {
+        value.into_new_email_reply()
+    }
 }

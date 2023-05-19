@@ -11,7 +11,7 @@ use you_have_mail_common::{
 
 #[cfg(feature = "proton-backend")]
 fn new_backed() -> Arc<dyn Backend> {
-    return you_have_mail_common::backend::proton::new_backend();
+    return you_have_mail_common::backend::proton::new_backend_version_other();
 }
 
 #[cfg(not(feature = "proton-backend"))]
@@ -51,6 +51,7 @@ fn main() {
             }
             result.push(a);
         }
+
         result
     } else {
         println!("No previous accounts logging in with ENV{{YHM_EMAIL}} and ENV{{YHM_PASSWORD}}");
@@ -80,12 +81,16 @@ fn main() {
 
     println!("Starting observer...");
     let observer = ObserverBuilder::new(Box::new(StdOutNotifier {}))
-        .poll_interval(Duration::from_secs(10))
+        .poll_interval(Duration::from_secs(30))
         .build();
 
     for a in accounts {
         observer.add_account(a).unwrap();
     }
+
+    println!("Saving observer state");
+    let config = observer.generate_config().unwrap();
+    write_config_file(&encryptor, config.as_bytes());
 
     let mut input = [0u8];
     std::io::stdin().read(&mut input).unwrap();
