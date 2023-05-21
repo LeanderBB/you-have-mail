@@ -1,3 +1,9 @@
+// NB: Android Studio can't find the imports; this does not affect the
+// actual build since Gradle can find them just fine.
+import com.android.tools.profgen.ArtProfileKt
+import com.android.tools.profgen.ArtProfileSerializer
+import com.android.tools.profgen.DexFile
+
 plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
@@ -13,8 +19,8 @@ android {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 29
         targetSdk 33
-        versionCode 19
-        versionName "0.7.1"
+        versionCode 20
+        versionName "0.7.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -83,12 +89,22 @@ cargo {
     libname = "youhavemail"
     targets = ["x86_64", "arm64"]
     targetIncludes = ["libyouhavemail.so", "libgo-srp.so"]
-    targetDirectory = "../../target"
+    targetDirectory = "/tmp/build-yhm"
     profile = "release"
     // Uncomment for testing only.
     /*features {
         defaultAnd("null_backend")
     }*/
+
+    // Ensure paths are consistent for reproducible builds.
+    exec { spec, _ ->
+        var home = "$System.env.HOME"
+        var pwd = "$System.env.PWD"
+        spec.environment("RUSTFLAGS", "--remap-path-prefix=${home}=/remap --remap-path-prefix=${pwd}=/remap --remap-path-prefix=${pwd}/you-have-mail=/remap")
+        spec.environment("CARGO_TARGET_DIR", "/tmp/build-yhm")
+    }
+
+    extraCargoBuildArguments = ['--locked']
 }
 
 tasks.whenTaskAdded { task ->
@@ -108,5 +124,32 @@ afterEvaluate {
         }
         def buildType = "${variant.buildType.name.capitalize()}"
         tasks["generate${productFlavor}${buildType}Assets"].dependsOn(tasks["cargoBuild"])
+    }
+}
+
+// Sort .profm files for reproducible builds. Taken from
+// https://gist.github.com/obfusk/eb82a810ed6aad266dab19977b18cee6
+project.afterEvaluate {
+    tasks.each { task ->
+        if (task.name.startsWith("compile") && task.name.endsWith("ReleaseArtProfile")) {
+            task.doLast {
+                outputs.files.each { file ->
+                    if (file.name.endsWith(".profm")) {
+                        println("Sorting ${file} ...")
+                        def version = ArtProfileSerializer.valueOf("METADATA_0_0_2")
+                        def profile = ArtProfileKt.ArtProfile(file)
+                        def keys = new ArrayList(profile.profileData.keySet())
+                        def sortedData = new LinkedHashMap()
+                        Collections.sort keys, new DexFile.Companion()
+                        keys.each { key -> sortedData[key] = profile.profileData[key] }
+                        new FileOutputStream(file).with {
+                            write(version.magicBytes$profgen)
+                            write(version.versionBytes$profgen)
+                            version.write$profgen(it, sortedData, "")
+                        }
+                    }
+                }
+            }
+        }
     }
 }
