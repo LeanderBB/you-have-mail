@@ -10,7 +10,7 @@ all times.
 The application structure has been made backend agnostics, so it should be possible to add different providers in the 
 future. Currently, the following email providers are supported:
 
-* [Proton Mail](https://mail.proton.me) - This backend only reports new messages in the INBOX at the moment.
+* [Proton Mail](https://mail.proton.me) - This backend only reports new messages in the INBOX and **Single Password mode** only at the moment.
 
 ## Structure 
 
