@@ -20,6 +20,15 @@ This repository is split into the following projects:
 * [you-have-mail-mobile](you-have-mail-mobile): Shared code for mobile bindings
 * [you-have-mail-android](you-have-mail-android): Android Application
 
+## Download
+
+Please only download the latest stable releases from:
+
+* Github: [Releases](https://github.com/LeanderBB/you-have-mail/releases)
+* F-Droid: [Link](https://f-droid.org/packages/dev.lbeernaert.youhavemail/)
+
+[<img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="60">](https://f-droid.org/packages/dev.lbeernaert.youhavemail/)
+
 
 ## Donations
 
