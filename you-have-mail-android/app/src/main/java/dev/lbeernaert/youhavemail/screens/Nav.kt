@@ -166,6 +166,7 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                         navController.navigate(Routes.newLoginRoute(backendIndex, null))
                     },
                     proxy = null,
+                    isLoginRequest = true,
                 )
             }
         }
@@ -197,6 +198,7 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                         navController.popBackStack()
                     },
                     proxy = account.proxy,
+                    isLoginRequest = false,
                 )
             }
         }

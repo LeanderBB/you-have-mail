@@ -54,6 +54,7 @@
     <string name="proxy_settings">Proxy Settings</string>
     <string name="proxy_user_password">Proxy User Password</string>
     <string name="proxy_auth">Authentication</string>
+    <string name="proxy_info">This step is optional. If you don\'t normally use a Proxy to connect or don\'t know what a Proxy is, click Next to continue.</string>
     <string name="next">Next</string>
     <string name="apply">Apply</string>
     <string name="account_activity">Activity</string>

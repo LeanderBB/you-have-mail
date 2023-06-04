@@ -31,7 +31,8 @@ fun ProxyScreen(
     onBackClicked: () -> Unit,
     applyButtonText: String,
     onApplyClicked: suspend (Proxy?) -> Unit,
-    proxy: Proxy?
+    proxy: Proxy?,
+    isLoginRequest: Boolean
 ) {
     AsyncScreen(
         title = stringResource(id = R.string.network),
@@ -161,6 +162,12 @@ fun ProxyScreen(
                 }
             }
 
+            if (isLoginRequest) {
+                Text(
+                    text = stringResource(id = R.string.proxy_info),
+                    style = MaterialTheme.typography.subtitle1
+                )
+            }
 
             Row(
                 verticalAlignment = Alignment.CenterVertically
@@ -178,117 +185,122 @@ fun ProxyScreen(
                 })
             }
 
-            TextField(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .clickable { expanded = true },
-                value = proxyProtocols[selectedIndex].toString(),
-                readOnly = true,
-                enabled = useProxy,
-                singleLine = true,
-                onValueChange = {},
-                label = { Text(text = stringResource(id = R.string.proxy_protocol)) },
-                trailingIcon = {
-                    ExposedDropdownMenuDefaults.TrailingIcon(
-                        expanded = expanded,
-                        onIconClick = { expanded = true })
-                },
-                colors = ExposedDropdownMenuDefaults.textFieldColors(),
-            )
-            Box(
-                modifier = Modifier
-                    .fillMaxSize(0.9f)
-                    .wrapContentSize(Alignment.TopStart)
-            ) {
-                DropdownMenu(
-                    expanded = expanded,
-                    onDismissRequest = { expanded = false },
+            if (useProxy) {
+
+                TextField(
                     modifier = Modifier
                         .fillMaxWidth()
+                        .clickable { expanded = true },
+                    value = proxyProtocols[selectedIndex].toString(),
+                    readOnly = true,
+                    enabled = useProxy,
+                    singleLine = true,
+                    onValueChange = {},
+                    label = { Text(text = stringResource(id = R.string.proxy_protocol)) },
+                    trailingIcon = {
+                        ExposedDropdownMenuDefaults.TrailingIcon(
+                            expanded = expanded,
+                            onIconClick = { expanded = true })
+                    },
+                    colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                )
+                Box(
+                    modifier = Modifier
+                        .fillMaxSize(0.9f)
+                        .wrapContentSize(Alignment.TopStart)
                 ) {
-                    proxyProtocols.forEachIndexed { index, s ->
-                        DropdownMenuItem(onClick = {
-                            expanded = false
-                            selectedIndex = index
-                        }) {
-                            Text(text = s.toString())
+                    DropdownMenu(
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false },
+                        modifier = Modifier
+                            .fillMaxWidth()
+                    ) {
+                        proxyProtocols.forEachIndexed { index, s ->
+                            DropdownMenuItem(onClick = {
+                                expanded = false
+                                selectedIndex = index
+                            }) {
+                                Text(text = s.toString())
+                            }
                         }
                     }
                 }
-            }
-            Spacer(modifier = Modifier.height(20.dp))
+                Spacer(modifier = Modifier.height(20.dp))
 
-            TextField(
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = stringResource(id = R.string.ip_address)) },
-                singleLine = true,
-                value = proxyUrl,
-                enabled = useProxy,
-                onValueChange = { proxyUrl = it },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Uri,
-                    imeAction = ImeAction.Next
-                ),
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            TextField(
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = stringResource(id = R.string.ip_port)) },
-                singleLine = true,
-                enabled = useProxy,
-                value = proxyPort,
-                onValueChange = { proxyPort = it },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Number,
-                    imeAction = ImeAction.Next
-                ),
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Row(
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text(
-                    text = stringResource(id = R.string.proxy_auth),
-                    style = MaterialTheme.typography.subtitle1
+                TextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(text = stringResource(id = R.string.ip_address)) },
+                    singleLine = true,
+                    value = proxyUrl,
+                    enabled = useProxy,
+                    onValueChange = { proxyUrl = it },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Uri,
+                        imeAction = ImeAction.Next
+                    ),
                 )
-                Spacer(Modifier.fillMaxWidth(0.9f))
-                Switch(checked = useAuth, enabled = useProxy, onCheckedChange = {
-                    useAuth = it
-                })
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                TextField(
+                    modifier = Modifier.fillMaxWidth(),
+                    label = { Text(text = stringResource(id = R.string.ip_port)) },
+                    singleLine = true,
+                    enabled = useProxy,
+                    value = proxyPort,
+                    onValueChange = { proxyPort = it },
+                    keyboardOptions = KeyboardOptions(
+                        keyboardType = KeyboardType.Number,
+                        imeAction = ImeAction.Next
+                    ),
+                )
+
+                Spacer(modifier = Modifier.height(20.dp))
+
+                Row(
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text(
+                        text = stringResource(id = R.string.proxy_auth),
+                        style = MaterialTheme.typography.subtitle1
+                    )
+                    Spacer(Modifier.fillMaxWidth(0.9f))
+                    Switch(checked = useAuth, enabled = useProxy, onCheckedChange = {
+                        useAuth = it
+                    })
+                }
+
+                if (useAuth) {
+                    TextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(text = stringResource(id = R.string.proxy_user)) },
+                        singleLine = true,
+                        value = proxyUser,
+                        enabled = useAuth,
+                        onValueChange = { proxyUser = it },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Uri,
+                            imeAction = ImeAction.Next
+                        ),
+                    )
+
+                    Spacer(modifier = Modifier.height(20.dp))
+
+                    TextField(
+                        modifier = Modifier.fillMaxWidth(),
+                        label = { Text(text = stringResource(id = R.string.proxy_user_password)) },
+                        singleLine = true,
+                        enabled = useAuth,
+                        value = proxyPassword,
+                        visualTransformation = PasswordVisualTransformation(),
+                        onValueChange = { proxyPassword = it },
+                        keyboardOptions = KeyboardOptions(
+                            keyboardType = KeyboardType.Password,
+                            imeAction = ImeAction.Next
+                        ),
+                    )
+                }
             }
-
-            TextField(
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = stringResource(id = R.string.proxy_user)) },
-                singleLine = true,
-                value = proxyUser,
-                enabled = useAuth,
-                onValueChange = { proxyUser = it },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Uri,
-                    imeAction = ImeAction.Next
-                ),
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            TextField(
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = stringResource(id = R.string.proxy_user_password)) },
-                singleLine = true,
-                enabled = useAuth,
-                value = proxyPassword,
-                visualTransformation = PasswordVisualTransformation(),
-                onValueChange = { proxyPassword = it },
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Next
-                ),
-            )
 
             Spacer(modifier = Modifier.height(20.dp))
 
