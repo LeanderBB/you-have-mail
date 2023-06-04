@@ -1,0 +1,2 @@
+* Auto start foreground service when Phone reboots
+* Clarify that Proxy settings are Optional
