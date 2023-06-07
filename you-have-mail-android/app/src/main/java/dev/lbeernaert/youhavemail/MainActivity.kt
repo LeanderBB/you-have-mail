@@ -121,6 +121,11 @@ class MainActivity : ComponentActivity(), ServiceConnection {
 
 
                     MainNavController(serviceWrapper = mServiceState, requestPermissions = {
+                        Log.d("XXXXXXXXXXXXXXXXXXX", "START ACTIVITY")
+                        var intent = Intent(this, WebView::class.java)
+                        startActivity(intent)
+
+                        Log.d("XXXXXXXXXXXXXXXXXXX", "START ACTIVITY DONE")
                         if (!hasNotificationPermission) {
                             launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
                         }
