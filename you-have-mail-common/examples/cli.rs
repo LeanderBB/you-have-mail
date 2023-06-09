@@ -59,7 +59,7 @@ fn main() {
         let password = std::env::var("YHM_PASSWORD").unwrap();
 
         let mut account = Account::new(backend, &email, None);
-        account.login(&password).unwrap();
+        account.login(&password, None).unwrap();
 
         if account.is_awaiting_totp() {
             let mut stdout = std::io::stdout();

@@ -47,10 +47,10 @@ impl Account {
         self.account.read().unwrap().is_logged_out()
     }
 
-    pub fn login(&self, password: String) -> Result<(), ServiceError> {
+    pub fn login(&self, password: String, hv_data: Option<String>) -> Result<(), ServiceError> {
         let mut accessor = self.account.write().unwrap();
         let account = accessor.deref_mut();
-        account.login(&password)?;
+        account.login(&password, hv_data)?;
         Ok(())
     }
 

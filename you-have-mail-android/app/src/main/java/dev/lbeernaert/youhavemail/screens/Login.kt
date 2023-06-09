@@ -1,6 +1,12 @@
 package dev.lbeernaert.youhavemail.screens
 
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.Text
@@ -34,7 +40,8 @@ fun Login(
             TextFieldValue(accountEmail)
         )
     }
-    val password = remember { mutableStateOf(TextFieldValue()) }
+    val password =
+        remember { mutableStateOf(TextFieldValue()) }
     val loginBackgroundLabel = stringResource(id = R.string.login_to_account, email.value.text)
 
     AsyncScreen(

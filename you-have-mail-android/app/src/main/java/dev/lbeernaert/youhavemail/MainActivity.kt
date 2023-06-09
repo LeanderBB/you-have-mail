@@ -56,6 +56,7 @@ const val activityLogTag = "activity"
 class MainActivity : ComponentActivity(), ServiceConnection {
     private var mBound: Boolean = false
     private var mServiceState = ServiceWrapper()
+    private var mAppState = AppState()
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -120,16 +121,14 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                     }
 
 
-                    MainNavController(serviceWrapper = mServiceState, requestPermissions = {
-                        Log.d("XXXXXXXXXXXXXXXXXXX", "START ACTIVITY")
-                        var intent = Intent(this, WebView::class.java)
-                        startActivity(intent)
-
-                        Log.d("XXXXXXXXXXXXXXXXXXX", "START ACTIVITY DONE")
-                        if (!hasNotificationPermission) {
-                            launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                        }
-                    })
+                    MainNavController(serviceWrapper = mServiceState,
+                        context = this,
+                        appState = mAppState,
+                        requestPermissions = {
+                            if (!hasNotificationPermission) {
+                                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                        })
                 }
             }
         }

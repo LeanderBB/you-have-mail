@@ -130,14 +130,14 @@ impl Account {
     }
 
     /// Login to the account with the given password.
-    pub fn login(&mut self, password: &str) -> AccountResult<()> {
+    pub fn login(&mut self, password: &str, hv_data: Option<String>) -> AccountResult<()> {
         if !self.is_logged_out() {
             return Err(AccountError::InvalidState);
         }
 
         self.state = self
             .backend
-            .login(&self.email, password, self.proxy.as_ref())?;
+            .login(&self.email, password, self.proxy.as_ref(), hv_data)?;
         Ok(())
     }
 

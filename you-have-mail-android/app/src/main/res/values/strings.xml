@@ -58,4 +58,6 @@
     <string name="next">Next</string>
     <string name="apply">Apply</string>
     <string name="account_activity">Activity</string>
+    <string name="captcha_request">Captcha Verification</string>
+    <string name="retry_login_with_captcha">Retrying Login after Captcha Solve</string>
 </resources>

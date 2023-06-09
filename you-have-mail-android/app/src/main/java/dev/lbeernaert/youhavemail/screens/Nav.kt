@@ -1,6 +1,8 @@
 package dev.lbeernaert.youhavemail.screens
 
+import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
 import androidx.navigation.NavType
@@ -8,7 +10,11 @@ import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
+import dev.lbeernaert.youhavemail.AppState
+import dev.lbeernaert.youhavemail.Backend
 import dev.lbeernaert.youhavemail.R
+import dev.lbeernaert.youhavemail.RequestErrorCategory
+import dev.lbeernaert.youhavemail.ServiceException
 import dev.lbeernaert.youhavemail.service.ServiceWrapper
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.withContext
@@ -16,8 +22,56 @@ import kotlinx.coroutines.withContext
 const val navLogTag = "nav"
 
 @Composable
-fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> Unit) {
+fun MainNavController(
+    context: Context,
+    serviceWrapper: ServiceWrapper,
+    appState: AppState,
+    requestPermissions: () -> Unit
+) {
     val navController = rememberNavController()
+
+    val onLoginClicked: suspend (String, String, Backend, String?) -> Unit =
+        { email, password, backend, hv_data ->
+            try {
+                val account = withContext(Dispatchers.Default) {
+                    val account = serviceWrapper.newAccount(backend, email)
+                    account.login(password, hv_data)
+                    account
+                }
+
+                if (account.isAwaitingTotp()) {
+                    navController.navigate(Routes.TOTP.route)
+                } else {
+                    serviceWrapper.addAccount(account)
+                    navController.popBackStack(Routes.Main.route, false)
+                }
+            } catch (e: ServiceException) {
+                when (e) {
+                    is ServiceException.HvCaptchaRequest -> {
+                        // Avoid Loop
+                        if (hv_data != null) {
+                            throw ServiceException.Unknown(msg = "Captcha Request Loop")
+                        }
+                        val route =
+                            Routes.captchaLoginRouteForBackend(backend = backend)
+                        if (route != null) {
+                            appState.CaptchaHTML = e.msg
+                            navController.navigate(Routes.ProtonCaptcha.route)
+                        } else {
+                            throw ServiceException.RequestException(
+                                category = RequestErrorCategory.API,
+                                msg = "No Captcha implementation for the current backend"
+                            )
+                        }
+
+                    }
+
+                    else -> {
+                        throw e
+                    }
+                }
+            }
+        }
     NavHost(navController = navController, startDestination = Routes.Main.route) {
         composable(
             Routes.Login.route,
@@ -30,7 +84,7 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
         ) {
             val args = it.arguments
             val backendIndex = args?.getInt("backend")
-            var accountEmail = args?.getString("email")!!
+            val accountEmail = args?.getString("email")!!
             if (backendIndex == null) {
                 Log.e(navLogTag, "No backend index selected, returning to main screen")
                 navController.popBackStack(Routes.Main.route, false)
@@ -43,17 +97,11 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                         navController.popBackStack()
                     },
                     onLoginClicked = { email, password ->
-                        val account = withContext(Dispatchers.Default) {
-                            var account = serviceWrapper.newAccount(backend, email)
-                            account.login(password)
-                            account
-                        }
-                        if (account.isAwaitingTotp()) {
-                            navController.navigate(Routes.TOTP.route)
-                        } else {
-                            serviceWrapper.addAccount(account)
-                            navController.popBackStack(Routes.Main.route, false)
-                        }
+                        appState.clearLoginState()
+                        appState.UserEmail = email
+                        appState.UserBackend = backend
+                        appState.UserPassword = password
+                        onLoginClicked(email, password, backend, null)
                     }
                 )
             }
@@ -201,6 +249,29 @@ fun MainNavController(serviceWrapper: ServiceWrapper, requestPermissions: () -> 
                     isLoginRequest = false,
                 )
             }
+        }
+        composable(Routes.ProtonCaptcha.route) {
+            ProtonCaptchaScreen(
+                onBackClicked = {
+                    navController.popBackStack()
+                },
+                onCaptchaSuccess = {
+                    if (appState.UserBackend == null || appState.UserEmail == null || appState.UserEmail == null) {
+                        throw Exception("Invalid state")
+                    }
+                    onLoginClicked(
+                        appState.UserEmail!!,
+                        appState.UserPassword!!,
+                        appState.UserBackend!!,
+                        it
+                    )
+                },
+                onCaptchaFail = {
+                    Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
+                    navController.popBackStack()
+                },
+                html = appState.CaptchaHTML!!
+            )
         }
     }
 }

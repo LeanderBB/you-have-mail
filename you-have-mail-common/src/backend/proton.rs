@@ -7,19 +7,19 @@ use crate::backend::{
 use crate::{AccountState, Proxy, ProxyProtocol};
 use anyhow::{anyhow, Error};
 use proton_api_rs::domain::{
-    Boolean, EventId, ExposeSecret, LabelID, MessageAction, MessageEvent, MessageId, MoreEvents,
-    UserUid,
+    Boolean, EventId, ExposeSecret, HumanVerificationLoginData, HumanVerificationType, LabelID,
+    MessageAction, MessageEvent, MessageId, MoreEvents, UserUid,
 };
 use proton_api_rs::log::info;
 use proton_api_rs::{
-    http, AutoAuthRefreshRequestPolicy, AutoRefreshAuthSession, DefaultSessionRequestPolicy,
-    LoginError, SessionType, TotpSession,
+    captcha_get, http, LoginError, OnAuthRefreshed, Session, SessionType, TotpSession,
 };
-use secrecy::SecretString;
+use secrecy::{Secret, SecretString};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashSet;
 use std::fmt::Debug;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -27,7 +27,6 @@ const PROTON_APP_VERSION: &str = "web-mail@5.0.19.5";
 const PROTON_APP_VERSION_OTHER: &str = "Other";
 
 type Client = http::ureq_client::UReqClient;
-type Session = AutoRefreshAuthSession;
 
 /// Create a proton mail backend.
 pub fn new_backend() -> Arc<dyn Backend> {
@@ -58,6 +57,7 @@ struct ProtonAccount {
     session: Option<Session>,
     last_event_id: Option<EventId>,
     version: &'static str,
+    auth_refresh_checker: AuthRefreshChecker,
 }
 
 #[derive(Debug)]
@@ -85,13 +85,20 @@ struct ProtonAuthRefresherInfoRead<'a> {
 }
 
 impl ProtonAccount {
-    fn new(client: Client, session: Session, email: String, version: &'static str) -> Self {
+    fn new(
+        client: Client,
+        session: Session,
+        email: String,
+        version: &'static str,
+        auth_refresh_checker: AuthRefreshChecker,
+    ) -> Self {
         Self {
             email,
             client,
             session: Some(session),
             last_event_id: None,
             version,
+            auth_refresh_checker,
         }
     }
 }
@@ -100,8 +107,46 @@ impl ProtonAccount {
 struct ProtonAwaitTotp {
     email: String,
     client: Client,
-    session: TotpSession<AutoAuthRefreshRequestPolicy<DefaultSessionRequestPolicy>>,
+    session: TotpSession,
+    auth_refresh_checker: AuthRefreshChecker,
     version: &'static str,
+}
+
+#[derive(Debug)]
+struct AuthRefreshChecker {
+    value: Arc<AtomicBool>,
+}
+
+impl AuthRefreshChecker {
+    fn new() -> Self {
+        Self {
+            value: Arc::new(AtomicBool::new(false)),
+        }
+    }
+
+    fn reset(&self) {
+        self.value.store(false, Ordering::SeqCst)
+    }
+
+    fn value(&self) -> bool {
+        self.value.load(Ordering::SeqCst)
+    }
+
+    fn to_on_auth_refreshed(&self) -> Box<dyn OnAuthRefreshed> {
+        Box::new(AuthRefresherCheckerCB {
+            value: self.value.clone(),
+        })
+    }
+}
+
+struct AuthRefresherCheckerCB {
+    value: Arc<AtomicBool>,
+}
+
+impl OnAuthRefreshed for AuthRefresherCheckerCB {
+    fn on_auth_refreshed(&self, _: &Secret<UserUid>, _: &proton_api_rs::domain::SecretString) {
+        self.value.store(true, Ordering::SeqCst);
+    }
 }
 
 impl Backend for ProtonBackend {
@@ -123,22 +168,75 @@ impl Backend for ProtonBackend {
 
     fn login(
         &self,
-        email: &str,
+        username: &str,
         password: &str,
         proxy: Option<&Proxy>,
+        hv_data: Option<String>,
     ) -> BackendResult<AccountState> {
+        #[derive(Deserialize)]
+        struct HVData {
+            hv_type: HumanVerificationType,
+            hv_token: String,
+        }
+
+        let hv_data = if let Some(hv) = hv_data {
+            let hv = serde_json::from_str::<HVData>(&hv)
+                .map_err(|e| BackendError::HVDataInvalid(e.into()))?;
+            if hv.hv_type != HumanVerificationType::Captcha {
+                return Err(BackendError::HVDataInvalid(anyhow!(
+                    "Only captcha based human verification is supported"
+                )));
+            }
+            Some(HumanVerificationLoginData {
+                hv_type: hv.hv_type,
+                token: hv.hv_token,
+            })
+        } else {
+            None
+        };
+
         let client = new_client(proxy, self.version)?;
 
-        match Session::login(&client, email, password)? {
-            SessionType::Authenticated(s) => Ok(AccountState::LoggedIn(Box::new(
-                ProtonAccount::new(client, s, email.to_string(), self.version),
-            ))),
+        let auth_refresh_checker = AuthRefreshChecker::new();
+
+        let login_result = Session::login(
+            &client,
+            username,
+            password,
+            hv_data,
+            Some(auth_refresh_checker.to_on_auth_refreshed()),
+        );
+
+        if let Err(LoginError::HumanVerificationRequired(hv)) = &login_result {
+            if !hv.methods.contains(&HumanVerificationType::Captcha) {
+                return Err(BackendError::Unknown(anyhow!(
+                    "Human Verification request, but no supported type available"
+                )));
+            }
+
+            let html = captcha_get(&client, &hv.token, false)
+                .map_err(|e| BackendError::Request(anyhow!("Failed to retrieve captcha {e}")))?;
+
+            return Err(BackendError::HVCaptchaRequest(html));
+        }
+
+        match login_result? {
+            SessionType::Authenticated(s) => {
+                Ok(AccountState::LoggedIn(Box::new(ProtonAccount::new(
+                    client,
+                    s,
+                    username.to_string(),
+                    self.version,
+                    auth_refresh_checker,
+                ))))
+            }
             SessionType::AwaitingTotp(c) => {
                 Ok(AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp {
                     version: self.version,
                     client,
                     session: c,
-                    email: email.to_string(),
+                    email: username.to_string(),
+                    auth_refresh_checker,
                 })))
             }
         }
@@ -170,10 +268,11 @@ impl Backend for ProtonBackend {
 
 impl Account for ProtonAccount {
     fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
+        self.auth_refresh_checker.reset();
         if let Some(session) = &mut self.session {
             if self.last_event_id.is_none() {
                 match session.get_latest_event(&self.client) {
-                    Err(e) => return (Err(e.into()), false),
+                    Err(e) => return (Err(e.into()), self.auth_refresh_checker.value()),
                     Ok(event_id) => {
                         self.last_event_id = Some(event_id);
                     }
@@ -181,18 +280,14 @@ impl Account for ProtonAccount {
             }
 
             let mut result = EventState::new();
-            let mut account_refreshed = false;
-
             if let Some(event_id) = &mut self.last_event_id {
                 let mut has_more = MoreEvents::No;
                 loop {
                     match session.get_event(&self.client, event_id) {
                         Err(e) => {
-                            account_refreshed = account_refreshed || session.was_auth_refreshed();
-                            return (Err(e.into()), account_refreshed);
+                            return (Err(e.into()), self.auth_refresh_checker.value());
                         }
                         Ok(event) => {
-                            account_refreshed = account_refreshed || session.was_auth_refreshed();
                             if event.event_id != *event_id || has_more == MoreEvents::Yes {
                                 if let Some(message_events) = &event.messages {
                                     result.handle_message_events(message_events);
@@ -201,7 +296,7 @@ impl Account for ProtonAccount {
                                 *event_id = event.event_id;
                                 has_more = event.more;
                             } else {
-                                return (Ok(result.into()), account_refreshed);
+                                return (Ok(result.into()), self.auth_refresh_checker.value());
                             }
                         }
                     }
@@ -258,6 +353,7 @@ impl AwaitTotp for ProtonAwaitTotp {
                 c,
                 self.email,
                 self.version,
+                self.auth_refresh_checker,
             ))),
             Err((c, e)) => {
                 self.session = c;
@@ -270,13 +366,19 @@ impl AwaitTotp for ProtonAwaitTotp {
 impl AuthRefresher for ProtonAuthRefresher {
     fn refresh(self: Box<Self>, proxy: Option<&Proxy>) -> Result<AccountState, BackendError> {
         let client = new_client(proxy, self.version)?;
-
-        let session = Session::refresh(&client, &UserUid::from(self.uid), &self.token)?;
+        let auth_refreshed_checker = AuthRefreshChecker::new();
+        let session = Session::refresh(
+            &client,
+            &UserUid::from(self.uid),
+            &self.token,
+            Some(auth_refreshed_checker.to_on_auth_refreshed()),
+        )?;
         Ok(AccountState::LoggedIn(Box::new(ProtonAccount::new(
             client,
             session,
             self.email,
             self.version,
+            auth_refreshed_checker,
         ))))
     }
 }
@@ -288,6 +390,7 @@ impl From<LoginError> for BackendError {
             LoginError::Request(e) => e.into(),
             LoginError::Unsupported2FA(_) => BackendError::Unknown(anyhow!(value)),
             LoginError::SRPProof(_) => BackendError::Unknown(anyhow!(value)),
+            _ => BackendError::Unknown(anyhow!("Unhandled Login Error")),
         }
     }
 }

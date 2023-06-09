@@ -32,6 +32,10 @@ pub enum ServiceError {
     Config { error: ConfigError },
     #[error("Proxy settings invalid or Proxy is unreachable")]
     ProxyError,
+    #[error("Backend Requested Human Verification with Captcha")]
+    HVCaptchaRequest { msg: String },
+    #[error("Supplied Human Verification Data is not valid: {msg}")]
+    HVDataInvalid { msg: String },
     #[error("Unknown: {msg}")]
     Unknown { msg: String },
 }
@@ -78,6 +82,8 @@ impl From<yhm::backend::BackendError> for ServiceError {
                 category: RequestErrorCategory::API,
                 msg: e.to_string(),
             },
+            BackendError::HVCaptchaRequest(v) => ServiceError::HVCaptchaRequest { msg: v },
+            BackendError::HVDataInvalid(v) => ServiceError::HVDataInvalid { msg: v.to_string() },
         }
     }
 }

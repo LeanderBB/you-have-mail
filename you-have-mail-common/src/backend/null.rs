@@ -66,8 +66,14 @@ impl Backend for NullBacked {
         "Test backend to verify app behavior"
     }
 
-    fn login(&self, email: &str, password: &str, _: Option<&Proxy>) -> BackendResult<AccountState> {
-        if let Some(account) = self.accounts.get(email) {
+    fn login(
+        &self,
+        username: &str,
+        password: &str,
+        _: Option<&Proxy>,
+        _: Option<String>,
+    ) -> BackendResult<AccountState> {
+        if let Some(account) = self.accounts.get(username) {
             if let Some(d) = account.wait_time {
                 std::thread::sleep(d);
             }
@@ -80,13 +86,13 @@ impl Backend for NullBacked {
 
             return if let Some(totp) = &account.totp {
                 Ok(AccountState::AwaitingTotp(Box::new(NullAwaitTotp {
-                    email: email.to_string(),
+                    email: username.to_string(),
                     totp: totp.clone(),
                     wait_time: account.wait_time,
                 })))
             } else {
                 Ok(AccountState::LoggedIn(Box::new(NullAccount {
-                    email: email.to_string(),
+                    email: username.to_string(),
                     wait_time: account.wait_time,
                     counter: 0,
                 })))

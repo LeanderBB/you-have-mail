@@ -5,6 +5,7 @@ fun serviceExceptionToErrorStr(e: ServiceException, email: String?): String {
         is ServiceException.RpcFailed -> {
             return "Failed to communicate with service"
         }
+
         is ServiceException.AccountAlreadyActive -> {
             return if (email != null) {
                 "Account $email is already active"
@@ -12,6 +13,7 @@ fun serviceExceptionToErrorStr(e: ServiceException, email: String?): String {
                 "Account is already active"
             }
         }
+
         is ServiceException.InvalidAccountState -> {
             return if (email != null) {
                 "$email is in an invalid state"
@@ -19,6 +21,7 @@ fun serviceExceptionToErrorStr(e: ServiceException, email: String?): String {
                 return "Invalid account state"
             }
         }
+
         is ServiceException.RequestException -> {
             val errStr = when (e.category) {
                 RequestErrorCategory.TIMEOUT -> "Connection timed out"
@@ -33,6 +36,7 @@ fun serviceExceptionToErrorStr(e: ServiceException, email: String?): String {
                 errStr
             }
         }
+
         is ServiceException.LoggedOut -> {
             return if (email != null) {
                 "Account $email is logged out"
@@ -40,15 +44,27 @@ fun serviceExceptionToErrorStr(e: ServiceException, email: String?): String {
                 "Account is logged out"
             }
         }
+
         is ServiceException.Config -> {
             return "Configuration error"
         }
+
         is ServiceException.AccountNotFound -> {
             return "Account not found"
         }
+
         is ServiceException.ProxyException -> {
             return "Proxy configuration is invalid or Proxy is unreachable"
         }
+
+        is ServiceException.HvCaptchaRequest -> {
+            return "Captcha Human Verification Requested"
+        }
+
+        is ServiceException.HvDataInvalid -> {
+            return "Supplied Human Verification Data is Invalid"
+        }
+
         else -> {
             return "Unknown error occurred"
         }

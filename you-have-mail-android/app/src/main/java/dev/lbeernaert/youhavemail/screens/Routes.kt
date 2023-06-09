@@ -8,9 +8,9 @@ sealed class Routes(val route: String) {
     object Backend : Routes("Backend")
 
     object Settings : Routes("Settings")
-
     object ProxyLogin : Routes("ProxyLogin/{index}")
     object ProxySettings : Routes("ProxySettings/{index}")
+    object ProtonCaptcha : Routes("ProtonCaptcha")
 
     companion object {
         fun newLoginRoute(backendIndex: Int, email: String?): String {
@@ -31,6 +31,16 @@ sealed class Routes(val route: String) {
 
         fun newAccountProxyRoute(accountIndex: Int): String {
             return "ProxySettings/$accountIndex"
+        }
+
+        fun captchaLoginRouteForBackend(backend: dev.lbeernaert.youhavemail.Backend): Routes? {
+            return when (backend.name()) {
+                "Proton Mail" -> ProtonCaptcha
+                "Proton Mail V-Other" -> ProtonCaptcha
+                else -> {
+                    null
+                }
+            }
         }
     }
 }

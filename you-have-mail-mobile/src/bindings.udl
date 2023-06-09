@@ -16,6 +16,8 @@ enum RequestErrorCategory {
 
 [Error]
 interface ServiceError {
+    HVCaptchaRequest(string msg);
+    HVDataInvalid(string msg);
     RPCFailed(string msg);
     AccountAlreadyActive(string email);
     InvalidAccountState();
@@ -51,7 +53,7 @@ interface Backend {
 
 interface Account {
     [Throws=ServiceError]
-    void login(string password);
+    void login(string password, string? hv_data);
 
     [Throws=ServiceError]
     void logout();

@@ -17,6 +17,11 @@ pub mod proton;
 /// Expected backend errors.
 #[derive(Debug, Error)]
 pub enum BackendError {
+    // Note: This is specific to each backend, consult each backend for more info.
+    #[error("Human Verification Captcha Requested")]
+    HVCaptchaRequest(String),
+    #[error("Invalid Human Verification Data Supplied")]
+    HVDataInvalid(#[source] anyhow::Error),
     #[error("The user account has been logged out or the token expired")]
     LoggedOut,
     #[error("The request or connection timed out: {0}")]
@@ -60,6 +65,7 @@ pub trait Backend: Send + Sync + Debug {
         username: &str,
         password: &str,
         proxy: Option<&'a Proxy>,
+        hv_data: Option<String>,
     ) -> BackendResult<AccountState>;
 
     /// Check proxy settings.
