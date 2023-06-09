@@ -1,0 +1,3 @@
+* Feature: Handle Proton Captcha verification
+* Fix: Do not report Logout notification when user is logged out due to user action
+* Fix: Distinguish request parser error from actual network error
