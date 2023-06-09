@@ -131,7 +131,6 @@ impl Worker {
                     let r = account.account.logout().map_err(|e| e.into());
                     if r.is_ok() {
                         account.status = ObserverAccountStatus::LoggedOut;
-                        self.notifier.notify(Notification::AccountLoggedOut(&email));
                     }
                     r
                 } else {
