@@ -13,7 +13,6 @@ future. Currently, the following email providers are supported:
 * [Proton Mail](https://mail.proton.me) - This backend only reports new messages in the INBOX mailbox
 
 ## Known Issues
-* If you are asked for Captcha, please use the `Proton Backend V-Other` until captcha support is available [#12](https://github.com/LeanderBB/you-have-mail/issues/12)
 * If you have U2F/FIDO2 Security key in v0.8.0 or lower, you may encounter a network error after inputing password [#19](https://github.com/LeanderBB/you-have-mail/issues/19)
 
 ## Structure
