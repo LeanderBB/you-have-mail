@@ -180,7 +180,7 @@ fn test_config_store_and_load() {
 
     let account1 = {
         let mut a = Account::new(null_backed.clone(), "foo", Some(proxy.clone()));
-        a.login("foo").unwrap();
+        a.login("foo", None).unwrap();
         a
     };
     let account2 = Account::new(null_backed.clone(), "bar", None);

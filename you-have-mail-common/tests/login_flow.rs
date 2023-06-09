@@ -13,10 +13,10 @@ fn test_login_flow() {
 
     let mut account = Account::new(backend, "foo", None);
     account
-        .login("b")
+        .login("b", None)
         .expect_err("Account should not be logged in");
 
-    account.login("bar").unwrap();
+    account.login("bar", None).unwrap();
     assert!(!account.is_logged_out());
     assert!(!account.is_logged_in());
     assert!(account.is_awaiting_totp());

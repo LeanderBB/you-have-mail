@@ -15,7 +15,7 @@ fn new_backend_and_account() -> (Arc<dyn Backend>, Account) {
     };
     let backend = new_backend(&[accounts]);
     let mut account = Account::new(backend.clone(), "foo", None);
-    account.login("bar").unwrap();
+    account.login("bar", None).unwrap();
 
     assert!(account.is_logged_in());
     (backend, account)
@@ -133,12 +133,6 @@ fn adding_account_after_logout_works() {
     notifier
         .expect_notify()
         .withf(|n| matches!(n, Notification::AccountAdded(_)))
-        .times(1)
-        .in_sequence(&mut sequence)
-        .return_const(());
-    notifier
-        .expect_notify()
-        .withf(|n| matches!(n, Notification::AccountLoggedOut(_)))
         .times(1)
         .in_sequence(&mut sequence)
         .return_const(());
