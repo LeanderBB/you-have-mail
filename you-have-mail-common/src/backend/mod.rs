@@ -28,6 +28,8 @@ pub enum BackendError {
     Timeout(#[source] anyhow::Error),
     #[error("Connection error: {0}")]
     Connection(#[source] anyhow::Error),
+    #[error("Encode/Decode error: {0}")]
+    EncodeOrDecode(#[source] anyhow::Error),
     #[error("{0}")]
     Request(#[source] anyhow::Error),
     #[error("{0}")]

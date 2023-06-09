@@ -409,6 +409,7 @@ impl From<http::Error> for BackendError {
             http::Error::Connection(err) => BackendError::Connection(err),
             http::Error::Request(err) => BackendError::Request(err),
             http::Error::Other(err) => BackendError::Unknown(err),
+            http::Error::EncodeOrDecode(err) => BackendError::EncodeOrDecode(err),
         }
     }
 }

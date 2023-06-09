@@ -36,6 +36,8 @@ pub enum ServiceError {
     HVCaptchaRequest { msg: String },
     #[error("Supplied Human Verification Data is not valid: {msg}")]
     HVDataInvalid { msg: String },
+    #[error("Encode or Decode error: {msg}")]
+    EncodeOrDecode { msg: String },
     #[error("Unknown: {msg}")]
     Unknown { msg: String },
 }
@@ -84,6 +86,7 @@ impl From<yhm::backend::BackendError> for ServiceError {
             },
             BackendError::HVCaptchaRequest(v) => ServiceError::HVCaptchaRequest { msg: v },
             BackendError::HVDataInvalid(v) => ServiceError::HVDataInvalid { msg: v.to_string() },
+            BackendError::EncodeOrDecode(v) => ServiceError::EncodeOrDecode { msg: v.to_string() },
         }
     }
 }

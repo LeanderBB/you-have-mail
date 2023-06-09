@@ -26,6 +26,7 @@ interface ServiceError {
     Unknown(string msg);
     Config(ConfigError error);
     AccountNotFound(string email);
+    EncodeOrDecode(string msg);
     ProxyError();
 };
 

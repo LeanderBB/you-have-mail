@@ -848,6 +848,8 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 [[package]]
 name = "go-srp"
 version = "0.1.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c0f786f81872feaf96e5b01c94bd9224aa2be59db29c6945c4e07a94b6076c53"
 dependencies = [
  "base64 0.21.1",
  "bindgen",
@@ -1468,7 +1470,9 @@ dependencies = [
 
 [[package]]
 name = "proton-api-rs"
-version = "0.9.0"
+version = "0.10.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "4cfe86ebadd99068a24a3ae48862caa17a1123429fdd131ec70c66b63d594cbe"
 dependencies = [
  "anyhow",
  "base64 0.21.1",

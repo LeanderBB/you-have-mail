@@ -22,8 +22,7 @@ secrecy = "0.8"
 crossbeam-channel = "0.5"
 
 [dependencies.proton-api-rs]
-path = "../../proton-api-rs"
-version = "0.9"
+version = "0.10"
 optional = true
 features = ["http-ureq"]
 
