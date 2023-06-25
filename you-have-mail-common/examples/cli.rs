@@ -11,7 +11,7 @@ use you_have_mail_common::{
 
 #[cfg(feature = "proton-backend")]
 fn new_backed() -> Arc<dyn Backend> {
-    return you_have_mail_common::backend::proton::new_backend_version_other();
+    return you_have_mail_common::backend::proton::new_backend();
 }
 
 #[cfg(not(feature = "proton-backend"))]

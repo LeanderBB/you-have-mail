@@ -54,6 +54,14 @@ impl Config {
             backends: &[Arc<dyn Backend>],
             tag: &str,
         ) -> Option<Arc<dyn Backend>> {
+            // Migrate accounts from proton v-other to regular proton account now that there is
+            // captcha support.
+            let tag = if tag == crate::backend::proton::PROTON_BACKEND_NAME_OTHER {
+                crate::backend::proton::PROTON_BACKEND_NAME
+            } else {
+                tag
+            };
+
             for b in backends {
                 if b.name() == tag {
                     return Some(b.clone());

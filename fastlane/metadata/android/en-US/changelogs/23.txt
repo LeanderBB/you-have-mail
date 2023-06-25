@@ -1,1 +1,2 @@
 * Fix deadlock on proton account auto session refresh
+* Remove Proton Other Backend, no longer required with the introduction of Captcha support

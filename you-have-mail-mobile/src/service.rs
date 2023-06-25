@@ -259,7 +259,6 @@ fn get_backends() -> Vec<Arc<Backend>> {
             ])
         },
         yhm::backend::proton::new_backend(),
-        yhm::backend::proton::new_backend_version_other(),
     ]
     .into_iter()
     .map(|x| Arc::new(Backend(x)))
