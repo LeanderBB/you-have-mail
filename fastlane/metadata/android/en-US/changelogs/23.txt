@@ -1,0 +1,1 @@
+* Fix deadlock on proton account auto session refresh
