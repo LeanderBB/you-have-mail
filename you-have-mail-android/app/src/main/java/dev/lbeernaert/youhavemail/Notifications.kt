@@ -96,7 +96,32 @@ fun createServiceErrorNotification(
         .setContentText("$text: $errorString")
         .setContentIntent(pendingIntent)
         .setAutoCancel(true)
-        .setVisibility(Notification.VISIBILITY_PRIVATE)
+        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+        .setSmallIcon(R.drawable.ic_stat_err)
+        .setTicker("You Have Mail Alert")
+        .build()
+}
+
+fun createServiceErrorNotification(
+    context: Context,
+    text: String,
+): Notification {
+    val pendingIntent: PendingIntent =
+        Intent(context, MainActivity::class.java).let { notificationIntent ->
+            PendingIntent.getActivity(context, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
+        }
+
+    val builder: NotificationCompat.Builder = NotificationCompat.Builder(
+        context,
+        NotificationChannelError
+    )
+
+    return builder
+        .setContentTitle("You Have Mail")
+        .setContentText("$text")
+        .setContentIntent(pendingIntent)
+        .setAutoCancel(true)
+        .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
         .setSmallIcon(R.drawable.ic_stat_err)
         .setTicker("You Have Mail Alert")
         .build()

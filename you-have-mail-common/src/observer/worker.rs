@@ -1,6 +1,5 @@
 use crate::backend::BackendError;
 use crate::observer::rpc::ObserverRequest;
-use crate::Notification::{AccountTokenRefresh, ProxyApplied};
 use crate::{
     Account, AccountError, Config, Notification, Notifier, ObserverAccount, ObserverAccountStatus,
     ObserverError,
@@ -227,7 +226,8 @@ impl Worker {
                     match account.account.set_proxy(proxy.as_ref()) {
                         Ok(changed) => {
                             if changed {
-                                self.notifier.notify(ProxyApplied(&email, proxy.as_ref()))
+                                self.notifier
+                                    .notify(Notification::ProxyApplied(&email, proxy.as_ref()))
                             }
                             Ok(())
                         }
@@ -264,6 +264,8 @@ impl Worker {
         if self.paused {
             return;
         }
+
+        let mut refershed_accounts = Vec::new();
 
         for wa in &mut self.accounts.values_mut() {
             // Track logged out status if for some reason something slips through.
@@ -331,9 +333,24 @@ impl Worker {
                     }
                 }
             }
+
             if refreshed {
-                self.notifier
-                    .notify(AccountTokenRefresh(wa.account.email()))
+                refershed_accounts.push(wa.account.email().to_string());
+            }
+        }
+
+        if !refershed_accounts.is_empty() {
+            debug!("Accounts Refreshed Regenerating Config");
+            let r = Config::store(
+                self.poll_interval,
+                self.accounts.values().map(|a| &a.account),
+            );
+
+            match r {
+                Ok(c) => self
+                    .notifier
+                    .notify(Notification::AccountsRefreshed(refershed_accounts, c)),
+                Err(e) => self.notifier.notify(Notification::Error(e.to_string())),
             }
         }
     }
@@ -535,7 +552,7 @@ mod tests {
             .return_const(());
         notifier
             .expect_notify()
-            .withf(|n| matches!(n, Notification::AccountTokenRefresh(_)))
+            .withf(|n| matches!(n, Notification::AccountsRefreshed(_, _)))
             .times(1)
             .in_sequence(&mut sequence)
             .return_const(());
@@ -553,13 +570,17 @@ mod tests {
             .return_const(());
         notifier
             .expect_notify()
-            .withf(|n| matches!(n, Notification::AccountTokenRefresh(_)))
+            .withf(|n| matches!(n, Notification::AccountsRefreshed(_, _)))
             .times(1)
             .in_sequence(&mut sequence)
             .return_const(());
         notifier.expect_notify().times(0).return_const(());
         let mut mock_account = MockAccount::new();
         let mut mock_sequence = Sequence::new();
+        mock_account
+            .expect_auth_refresher_config()
+            .times(2)
+            .returning(|| Ok(serde_json::Value::Object(serde_json::Map::new())));
         mock_account
             .expect_check()
             .times(1)

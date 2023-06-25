@@ -28,8 +28,10 @@ pub enum Notification<'a> {
     AccountError(&'a str, AccountError),
     /// A proxy configuration was applied
     ProxyApplied(&'a str, Option<&'a Proxy>),
-    /// Session Token Refreshed
-    AccountTokenRefresh(&'a str),
+    /// New config file for refreshed accounts
+    AccountsRefreshed(Vec<String>, String),
+    /// Generic Error Message
+    Error(String),
 }
 
 /// When an email has been received the notifier will be called.

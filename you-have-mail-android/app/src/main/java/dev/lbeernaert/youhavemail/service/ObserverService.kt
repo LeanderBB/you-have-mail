@@ -142,7 +142,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     fun setPollInterval(interval: ULong) {
         mService!!.setPollInterval(interval)
         _pollIntervalFlow.value = interval
-        storeConfig(this)
+        storeConfig(this, null)
     }
 
     fun setAccountProxy(email: String, proxy: Proxy?) {
@@ -534,16 +534,34 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         recordAccountActivity(email, "Proxy settings changed")
     }
 
-    override fun accountTokenRefreshed(email: String) {
-        Log.d(serviceLogTag, "Account $email access token refreshed")
-        updateAccountList()
+    override fun accountRefreshed(emails: List<String>, config: String) {
+        Log.d(serviceLogTag, "Accounts refreshed: $emails")
+        for (email in emails) {
+            recordAccountActivity(email, "Account Refreshed")
+        }
+
+        val context = this
+        coroutineScope.launch {
+            if (mService != null) {
+                storeConfig(context, null)
+            }
+        }
+    }
+
+    override fun error(msg: String) {
+        try {
+            Log.e(serviceLogTag, "Service Error: $msg")
+            createAndDisplayServiceErrorNotification(msg)
+        } catch (e: Exception) {
+            Log.e(serviceLogTag, "Failed to display notification: $e")
+        }
     }
 
     private fun updateAccountList() {
         val context = this
         coroutineScope.launch {
             if (mService != null) {
-                storeConfig(context)
+                storeConfig(context, null)
                 try {
                     val accounts = mService!!.getObservedAccounts()
                     _accountListFlow.value = accounts
@@ -560,13 +578,13 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         return preferences.getString("CONFIG", null)
     }
 
-    private fun storeConfig(context: Context) {
+    private fun storeConfig(context: Context, config: String?) {
         if (mService != null) {
             try {
                 Log.d(serviceLogTag, "Saving Config")
-                val config = mService!!.getConfig()
+                val configStr = config ?: mService!!.getConfig()
                 val preferences = getSharedPreferences(context)
-                preferences.edit().putString("CONFIG", config).apply()
+                preferences.edit().putString("CONFIG", configStr).apply()
             } catch (e: ServiceException) {
                 Log.e(serviceLogTag, "Failed to store config: $e")
             } catch (e: java.lang.Exception) {
@@ -610,6 +628,17 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         exception: ServiceException
     ) {
         val notification = createServiceErrorNotification(this, text, exception)
+        with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+            if (this.areNotificationsEnabled()) {
+                notify(ServiceErrorNotificationID, notification)
+            }
+        }
+    }
+
+    private fun createAndDisplayServiceErrorNotification(
+        text: String,
+    ) {
+        val notification = createServiceErrorNotification(this, text)
         with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
             if (this.areNotificationsEnabled()) {
                 notify(ServiceErrorNotificationID, notification)

@@ -1470,9 +1470,9 @@ dependencies = [
 
 [[package]]
 name = "proton-api-rs"
-version = "0.10.0"
+version = "0.10.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "4cfe86ebadd99068a24a3ae48862caa17a1123429fdd131ec70c66b63d594cbe"
+checksum = "4d2365f4d1e93293fbaa260d05b06633b4ee25a930ed5690b457c5d2091c3f81"
 dependencies = [
  "anyhow",
  "base64 0.21.1",
@@ -2542,7 +2542,7 @@ dependencies = [
 
 [[package]]
 name = "you-have-mail-common"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "anyhow",
  "chacha20poly1305",
@@ -2561,7 +2561,7 @@ dependencies = [
 
 [[package]]
 name = "you-have-mail-mobile"
-version = "0.6.0"
+version = "0.6.1"
 dependencies = [
  "android_logger",
  "thiserror",

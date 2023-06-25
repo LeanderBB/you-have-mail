@@ -104,7 +104,8 @@ callback interface Notifier {
     void account_online(string email);
     void account_error(string email, ServiceError error);
     void proxy_applied(string email, Proxy? proxy);
-    void account_token_refreshed(string email);
+    void account_refreshed(sequence<string> emails, string config);
+    void error(string msg);
 };
 
 callback interface ServiceFromConfigCallback {
