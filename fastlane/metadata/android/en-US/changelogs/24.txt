@@ -1,0 +1,1 @@
+* Fix login for Proton accounts which have both TOTP and FIDO2 as 2FA
