@@ -1,6 +1,6 @@
 [package]
 name = "you-have-mail-common"
-version = "0.6.1"
+version = "0.6.2"
 edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
@@ -22,7 +22,7 @@ secrecy = "0.8"
 crossbeam-channel = "0.5"
 
 [dependencies.proton-api-rs]
-version = "0.10.1"
+version = "0.10.2"
 optional = true
 features = ["http-ureq"]
 
