@@ -1,11 +1,12 @@
 [package]
 name = "you-have-mail-common"
-version = "0.6.2"
+version = "0.7.0"
 edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
-categories = ["api-bindings", "email"]
+categories = ["email"]
 readme = "README.md"
+repository= "https://github.com/LeanderBB/you-have-mail-common"
 
 [features]
 default = ["proton-backend"]
@@ -20,9 +21,12 @@ serde_json = "1"
 serde = {version="1", features=["derive"]}
 secrecy = "0.8"
 crossbeam-channel = "0.5"
+parking_lot = "0.12"
+base64 = "0.21"
 
 [dependencies.proton-api-rs]
-version = "0.10.2"
+version = "0.11"
+path = "../proton-api-rs"
 optional = true
 features = ["http-ureq"]
 
@@ -30,8 +34,9 @@ features = ["http-ureq"]
 mockall = "0.11"
 dirs = "5.0.0"
 keyring = "2"
-hex = "0.4"
 env_logger = "0.10"
+temp-dir = "0.1"
+ctrlc = "3"
 
 [[example]]
 name = "cli"

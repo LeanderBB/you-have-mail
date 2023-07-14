@@ -1,7 +1,7 @@
 //! Collection of Traits expected to be implemented by the respective application targets.
 
 use crate::backend::EmailInfo;
-use crate::{AccountError, Proxy};
+use crate::{AccountError, ConfigError, Proxy};
 #[cfg(test)]
 use mockall::automock;
 
@@ -28,8 +28,8 @@ pub enum Notification<'a> {
     AccountError(&'a str, AccountError),
     /// A proxy configuration was applied
     ProxyApplied(&'a str, Option<&'a Proxy>),
-    /// New config file for refreshed accounts
-    AccountsRefreshed(Vec<String>, String),
+    /// ConfigError
+    ConfigError(ConfigError),
     /// Generic Error Message
     Error(String),
 }

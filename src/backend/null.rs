@@ -1,13 +1,16 @@
 //! Null backend implementation, useful for testing.
 use crate::backend::{
-    Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, EmailInfo,
-    NewEmailReply,
+    Account, AccountRefreshedNotifier, AuthRefresher, AwaitTotp, Backend, BackendError,
+    BackendResult, CheckTask, EmailInfo, NewEmailReply,
 };
 use crate::{AccountState, Proxy};
 use anyhow::{anyhow, Error};
+use proton_api_rs::domain::SecretString;
+use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::collections::HashMap;
+use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -18,6 +21,7 @@ pub struct NullTestAccount {
     pub password: String,
     pub totp: Option<String>,
     pub wait_time: Option<Duration>,
+    pub refresh: bool,
 }
 
 #[doc(hidden)]
@@ -38,7 +42,8 @@ struct NullBacked {
 struct NullAccount {
     email: String,
     wait_time: Option<Duration>,
-    counter: usize,
+    counter: Arc<AtomicUsize>,
+    refresh: bool,
 }
 
 #[doc(hidden)]
@@ -47,12 +52,14 @@ struct NullAwaitTotp {
     email: String,
     totp: String,
     wait_time: Option<Duration>,
+    refresh: bool,
 }
 
 #[doc(hidden)]
 #[derive(Debug)]
 struct NullAuthRefresher {
     email: String,
+    counter: usize,
 }
 
 const NULL_BACKEND_NAME: &str = "Null Backend";
@@ -69,7 +76,7 @@ impl Backend for NullBacked {
     fn login(
         &self,
         username: &str,
-        password: &str,
+        password: &SecretString,
         _: Option<&Proxy>,
         _: Option<String>,
     ) -> BackendResult<AccountState> {
@@ -78,7 +85,7 @@ impl Backend for NullBacked {
                 std::thread::sleep(d);
             }
 
-            if account.password != password {
+            if account.password.as_str() != password.expose_secret() {
                 return Err(BackendError::Request(anyhow!(
                     "invalid user name or password"
                 )));
@@ -89,12 +96,14 @@ impl Backend for NullBacked {
                     email: username.to_string(),
                     totp: totp.clone(),
                     wait_time: account.wait_time,
+                    refresh: account.refresh,
                 })))
             } else {
                 Ok(AccountState::LoggedIn(Box::new(NullAccount {
                     email: username.to_string(),
                     wait_time: account.wait_time,
-                    counter: 0,
+                    counter: Arc::new(AtomicUsize::new(0)),
+                    refresh: account.refresh,
                 })))
             };
         }
@@ -110,23 +119,35 @@ impl Backend for NullBacked {
 
     fn auth_refresher_from_config(&self, value: Value) -> Result<Box<dyn AuthRefresher>, Error> {
         let cfg = serde_json::from_value::<NullAuthRefresherInfo>(value).map_err(|e| anyhow!(e))?;
-        Ok(Box::new(NullAuthRefresher { email: cfg.email }))
+        Ok(Box::new(NullAuthRefresher {
+            email: cfg.email,
+            counter: cfg.counter,
+        }))
     }
 }
 
 impl AuthRefresher for NullAuthRefresher {
-    fn refresh(self: Box<Self>, _: Option<&Proxy>) -> Result<AccountState, BackendError> {
+    fn refresh(&self, _: Option<&Proxy>) -> Result<AccountState, BackendError> {
         Ok(AccountState::LoggedIn(Box::new(NullAccount {
-            email: self.email,
+            email: self.email.clone(),
             wait_time: None,
-            counter: 0,
+            counter: Arc::new(AtomicUsize::new(self.counter)),
+            refresh: false,
         })))
+    }
+
+    fn to_json(&self) -> serde_json::Result<Value> {
+        serde_json::to_value(NullAuthRefresherInfo {
+            email: self.email.clone(),
+            counter: self.counter,
+        })
     }
 }
 
 #[derive(Debug, Serialize, Deserialize)]
 struct NullAuthRefresherInfo {
     email: String,
+    counter: usize,
 }
 
 impl NullAccount {
@@ -144,10 +165,45 @@ impl NullAccount {
     }
 }
 
+#[derive(Debug)]
+struct NullTask {
+    email: String,
+    counter: Arc<AtomicUsize>,
+    refresh: bool,
+}
+
+impl CheckTask for NullTask {
+    fn email(&self) -> &str {
+        &self.email
+    }
+
+    fn backend_name(&self) -> &str {
+        NULL_BACKEND_NAME
+    }
+
+    fn check(&self, r: &mut dyn AccountRefreshedNotifier) -> BackendResult<NewEmailReply> {
+        let val = self.counter.fetch_add(1, Ordering::SeqCst) + 1;
+        if self.refresh {
+            r.notify_account_refreshed(self);
+        }
+        Ok(NullAccount::create_email_reply(val))
+    }
+
+    fn to_refresher(&self) -> Box<dyn AuthRefresher> {
+        Box::new(NullAuthRefresher {
+            email: self.email.clone(),
+            counter: self.counter.load(Ordering::SeqCst),
+        })
+    }
+}
+
 impl Account for NullAccount {
-    fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
-        self.counter += 1;
-        (Ok(Self::create_email_reply(self.counter)), false)
+    fn new_task(&self) -> Box<dyn CheckTask> {
+        Box::new(NullTask {
+            email: self.email.clone(),
+            counter: self.counter.clone(),
+            refresh: self.refresh,
+        })
     }
 
     fn logout(&mut self) -> BackendResult<()> {
@@ -161,31 +217,29 @@ impl Account for NullAccount {
         Ok(())
     }
 
-    fn auth_refresher_config(&self) -> Result<Value, Error> {
-        serde_json::to_value(NullAuthRefresherInfo {
+    fn to_refresher(&self) -> Box<dyn AuthRefresher> {
+        Box::new(NullAuthRefresher {
             email: self.email.clone(),
+            counter: self.counter.load(Ordering::SeqCst),
         })
-        .map_err(|e| anyhow!(e))
     }
 }
 
 impl AwaitTotp for NullAwaitTotp {
-    fn submit_totp(
-        self: Box<NullAwaitTotp>,
-        totp: &str,
-    ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)> {
+    fn submit_totp(&self, totp: &str) -> Result<Box<dyn Account>, BackendError> {
         if let Some(d) = self.wait_time {
             std::thread::sleep(d);
         }
 
         if self.totp != totp {
-            return Err((self, BackendError::Request(anyhow!("Invalid totp"))));
+            return Err(BackendError::Request(anyhow!("Invalid totp")));
         }
 
         Ok(Box::new(NullAccount {
-            email: self.email,
+            email: self.email.clone(),
             wait_time: self.wait_time,
-            counter: 0,
+            counter: Arc::new(AtomicUsize::new(0)),
+            refresh: self.refresh,
         }))
     }
 }

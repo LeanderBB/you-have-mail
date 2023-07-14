@@ -1,3 +1,4 @@
+use secrecy::SecretString;
 use you_have_mail_common::backend::null::NullTestAccount;
 use you_have_mail_common::Account;
 
@@ -8,15 +9,18 @@ fn test_login_flow() {
         password: "bar".to_string(),
         totp: Some("1234".to_string()),
         wait_time: None,
+        refresh: false,
     };
     let backend = you_have_mail_common::backend::null::new_backend(&[accounts]);
 
     let mut account = Account::new(backend, "foo", None);
     account
-        .login("b", None)
+        .login(&SecretString::new("b".into()), None)
         .expect_err("Account should not be logged in");
 
-    account.login("bar", None).unwrap();
+    account
+        .login(&SecretString::new("bar".into()), None)
+        .unwrap();
     assert!(!account.is_logged_out());
     assert!(!account.is_logged_in());
     assert!(account.is_awaiting_totp());

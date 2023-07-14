@@ -1,9 +1,9 @@
-//! Observer Module, background worker that checks every active account.
+mod config;
 mod public;
-mod rpc;
+mod stateful_notifier;
+#[cfg(test)]
+mod tests;
 mod worker;
 
+pub use config::*;
 pub use public::*;
-
-#[cfg(test)]
-mod observer_tests;

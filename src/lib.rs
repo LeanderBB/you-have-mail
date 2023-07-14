@@ -31,14 +31,12 @@
 
 mod account;
 pub mod backend;
-mod config;
 mod encryption;
 mod observer;
 mod proxy;
 mod traits;
 
 pub use account::*;
-pub use config::*;
 pub use encryption::*;
 pub use observer::*;
 pub use proxy::*;

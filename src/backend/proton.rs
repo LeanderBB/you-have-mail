@@ -1,25 +1,25 @@
 //! You have mail implementation for proton mail accounts.
 
 use crate::backend::{
-    Account, AuthRefresher, AwaitTotp, Backend, BackendError, BackendResult, EmailInfo,
-    NewEmailReply,
+    Account, AccountRefreshedNotifier, AuthRefresher, AwaitTotp, Backend, BackendError,
+    BackendResult, CheckTask, EmailInfo, NewEmailReply,
 };
 use crate::{AccountState, Proxy, ProxyProtocol};
 use anyhow::{anyhow, Error};
+use parking_lot::Mutex;
 use proton_api_rs::domain::{
     Boolean, EventId, ExposeSecret, HumanVerificationLoginData, HumanVerificationType, LabelID,
     MessageAction, MessageEvent, MessageId, MoreEvents, UserUid,
 };
-use proton_api_rs::log::info;
+use proton_api_rs::http::Sequence;
+use proton_api_rs::log::{debug, info};
 use proton_api_rs::{
-    captcha_get, http, LoginError, OnAuthRefreshed, Session, SessionType, TotpSession,
+    captcha_get, http, LoginError, Session, SessionRefreshData, SessionType, TotpSession,
 };
 use secrecy::{Secret, SecretString};
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashSet;
 use std::fmt::Debug;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -39,48 +39,83 @@ pub const PROTON_BACKEND_NAME: &str = "Proton Mail";
 pub const PROTON_BACKEND_NAME_OTHER: &str = "Proton Mail V-Other";
 
 #[derive(Debug)]
+struct TaskState {
+    last_event_id: Option<EventId>,
+}
+
+impl TaskState {
+    fn new() -> Arc<Mutex<Self>> {
+        Arc::new(Mutex::new(TaskState {
+            last_event_id: None,
+        }))
+    }
+}
+
+#[derive(Debug)]
 struct ProtonAccount {
     email: String,
     client: Client,
-    session: Option<Session>,
-    last_event_id: Option<EventId>,
-    auth_refresh_checker: AuthRefreshChecker,
+    session: Session,
+    task_state: Arc<Mutex<TaskState>>,
+}
+
+#[derive(Debug)]
+struct ProtonTask {
+    client: Client,
+    email: String,
+    session: Session,
+    task_state: Arc<Mutex<TaskState>>,
 }
 
 #[derive(Debug)]
 struct ProtonAuthRefresher {
     email: String,
-    uid: String,
-    token: String,
+    uid: Secret<UserUid>,
+    token: SecretString,
 }
 
-#[derive(Deserialize)]
-struct ProtonAuthRefresherInfo {
-    email: String,
-    uid: String,
-    token: String,
-}
+impl ProtonAuthRefresher {
+    fn to_json(&self) -> serde_json::Result<serde_json::Value> {
+        #[derive(Serialize)]
+        struct W<'a> {
+            email: &'a str,
+            uid: &'a str,
+            token: &'a str,
+        }
 
-#[derive(Serialize)]
-struct ProtonAuthRefresherInfoRead<'a> {
-    email: &'a str,
-    uid: &'a str,
-    token: &'a str,
+        let data = W {
+            email: &self.email,
+            uid: self.uid.expose_secret().as_str(),
+            token: self.token.expose_secret(),
+        };
+
+        serde_json::to_value(data)
+    }
+
+    fn from_json(value: serde_json::Value) -> serde_json::Result<Self> {
+        #[derive(Deserialize)]
+        struct R {
+            email: String,
+            uid: String,
+            token: String,
+        }
+
+        let r = serde_json::from_value::<R>(value)?;
+        Ok(Self {
+            email: r.email,
+            uid: Secret::new(UserUid::from(r.uid)),
+            token: SecretString::new(r.token),
+        })
+    }
 }
 
 impl ProtonAccount {
-    fn new(
-        client: Client,
-        session: Session,
-        email: String,
-        auth_refresh_checker: AuthRefreshChecker,
-    ) -> Self {
+    fn new(client: Client, session: Session, email: String) -> Self {
         Self {
             email,
             client,
-            session: Some(session),
-            last_event_id: None,
-            auth_refresh_checker,
+            session,
+            task_state: TaskState::new(),
         }
     }
 }
@@ -90,44 +125,6 @@ struct ProtonAwaitTotp {
     email: String,
     client: Client,
     session: TotpSession,
-    auth_refresh_checker: AuthRefreshChecker,
-}
-
-#[derive(Debug)]
-struct AuthRefreshChecker {
-    value: Arc<AtomicBool>,
-}
-
-impl AuthRefreshChecker {
-    fn new() -> Self {
-        Self {
-            value: Arc::new(AtomicBool::new(false)),
-        }
-    }
-
-    fn reset(&self) {
-        self.value.store(false, Ordering::SeqCst)
-    }
-
-    fn value(&self) -> bool {
-        self.value.load(Ordering::SeqCst)
-    }
-
-    fn to_on_auth_refreshed(&self) -> Box<dyn OnAuthRefreshed> {
-        Box::new(AuthRefresherCheckerCB {
-            value: self.value.clone(),
-        })
-    }
-}
-
-struct AuthRefresherCheckerCB {
-    value: Arc<AtomicBool>,
-}
-
-impl OnAuthRefreshed for AuthRefresherCheckerCB {
-    fn on_auth_refreshed(&self, _: &Secret<UserUid>, _: &proton_api_rs::domain::SecretString) {
-        self.value.store(true, Ordering::SeqCst);
-    }
 }
 
 impl Backend for ProtonBackend {
@@ -142,10 +139,11 @@ impl Backend for ProtonBackend {
     fn login(
         &self,
         username: &str,
-        password: &str,
+        password: &SecretString,
         proxy: Option<&Proxy>,
         hv_data: Option<String>,
     ) -> BackendResult<AccountState> {
+        debug!("Logging into proton account {username}");
         #[derive(Deserialize)]
         struct HVData {
             hv_type: HumanVerificationType,
@@ -170,15 +168,7 @@ impl Backend for ProtonBackend {
 
         let client = new_client(proxy)?;
 
-        let auth_refresh_checker = AuthRefreshChecker::new();
-
-        let login_result = Session::login(
-            &client,
-            username,
-            password,
-            hv_data,
-            Some(auth_refresh_checker.to_on_auth_refreshed()),
-        );
+        let login_result = Session::login(username, password, hv_data).do_sync(&client);
 
         if let Err(LoginError::HumanVerificationRequired(hv)) = &login_result {
             if !hv.methods.contains(&HumanVerificationType::Captcha) {
@@ -187,7 +177,8 @@ impl Backend for ProtonBackend {
                 )));
             }
 
-            let html = captcha_get(&client, &hv.token, false)
+            let html = captcha_get(&hv.token, false)
+                .do_sync(&client)
                 .map_err(|e| BackendError::Request(anyhow!("Failed to retrieve captcha {e}")))?;
 
             return Err(BackendError::HVCaptchaRequest(html));
@@ -195,14 +186,13 @@ impl Backend for ProtonBackend {
 
         match login_result? {
             SessionType::Authenticated(s) => Ok(AccountState::LoggedIn(Box::new(
-                ProtonAccount::new(client, s, username.to_string(), auth_refresh_checker),
+                ProtonAccount::new(client, s, username.to_string()),
             ))),
             SessionType::AwaitingTotp(c) => {
                 Ok(AccountState::AwaitingTotp(Box::new(ProtonAwaitTotp {
                     client,
                     session: c,
                     email: username.to_string(),
-                    auth_refresh_checker,
                 })))
             }
         }
@@ -210,72 +200,31 @@ impl Backend for ProtonBackend {
 
     fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()> {
         let client = new_client(Some(proxy))?;
-        proton_api_rs::ping(&client).map_err(|e| e.into())
+        proton_api_rs::ping().do_sync(&client).map_err(|e| e.into())
     }
 
-    fn auth_refresher_from_config(&self, value: Value) -> Result<Box<dyn AuthRefresher>, Error> {
-        let config =
-            serde_json::from_value::<ProtonAuthRefresherInfo>(value).map_err(|e| anyhow!(e))?;
-
-        Ok(Box::new(ProtonAuthRefresher {
-            email: config.email,
-            uid: config.uid,
-            token: config.token,
-        }))
+    fn auth_refresher_from_config(
+        &self,
+        value: serde_json::Value,
+    ) -> Result<Box<dyn AuthRefresher>, Error> {
+        let config = ProtonAuthRefresher::from_json(value).map_err(|e| anyhow!(e))?;
+        Ok(Box::new(config))
     }
 }
 
 impl Account for ProtonAccount {
-    fn check(&mut self) -> (BackendResult<NewEmailReply>, bool) {
-        self.auth_refresh_checker.reset();
-        if let Some(session) = &mut self.session {
-            if self.last_event_id.is_none() {
-                match session.get_latest_event(&self.client) {
-                    Err(e) => return (Err(e.into()), self.auth_refresh_checker.value()),
-                    Ok(event_id) => {
-                        self.last_event_id = Some(event_id);
-                    }
-                }
-            }
-
-            let mut result = EventState::new();
-            if let Some(event_id) = &mut self.last_event_id {
-                let mut has_more = MoreEvents::No;
-                loop {
-                    match session.get_event(&self.client, event_id) {
-                        Err(e) => {
-                            return (Err(e.into()), self.auth_refresh_checker.value());
-                        }
-                        Ok(event) => {
-                            if event.event_id != *event_id || has_more == MoreEvents::Yes {
-                                if let Some(message_events) = &event.messages {
-                                    result.handle_message_events(message_events);
-                                }
-
-                                *event_id = event.event_id;
-                                has_more = event.more;
-                            } else {
-                                return (Ok(result.into()), self.auth_refresh_checker.value());
-                            }
-                        }
-                    }
-                }
-            }
-        }
-
-        (
-            Err(BackendError::Unknown(anyhow!("Client is no longer active"))),
-            false,
-        )
+    fn new_task(&self) -> Box<dyn CheckTask> {
+        Box::new(ProtonTask {
+            client: self.client.clone(),
+            email: self.email.clone(),
+            session: self.session.clone(),
+            task_state: self.task_state.clone(),
+        })
     }
 
     fn logout(&mut self) -> BackendResult<()> {
-        if let Some(session) = self.session.take() {
-            if let Err(err) = session.logout(&self.client) {
-                self.session = Some(session);
-                return Err(err.into());
-            }
-        }
+        debug!("Logging out of proton account {}", self.email);
+        self.session.logout().do_sync(&self.client)?;
         Ok(())
     }
 
@@ -285,57 +234,115 @@ impl Account for ProtonAccount {
         Ok(())
     }
 
-    fn auth_refresher_config(&self) -> Result<Value, Error> {
-        let Some(session) = &self.session else {
-            return Err(anyhow!("invalid state"));
-        };
-        let refresh_data = session.get_refresh_data();
-        let info = ProtonAuthRefresherInfoRead {
-            email: &self.email,
-            uid: refresh_data.user_uid.expose_secret().as_str(),
-            token: refresh_data.token.expose_secret().as_str(),
-        };
-
-        serde_json::to_value(info).map_err(|e| anyhow!(e))
+    fn to_refresher(&self) -> Box<dyn AuthRefresher> {
+        let refresh_data = self.session.get_refresh_data();
+        Box::new(ProtonAuthRefresher {
+            email: self.email.clone(),
+            uid: refresh_data.user_uid,
+            token: refresh_data.token,
+        })
     }
 }
 
 impl AwaitTotp for ProtonAwaitTotp {
-    fn submit_totp(
-        mut self: Box<Self>,
-        totp: &str,
-    ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)> {
-        match self.session.submit_totp(&self.client, totp) {
+    fn submit_totp(&self, totp: &str) -> Result<Box<dyn Account>, BackendError> {
+        match self.session.submit_totp(totp).do_sync(&self.client) {
             Ok(c) => Ok(Box::new(ProtonAccount::new(
-                self.client,
+                self.client.clone(),
                 c,
-                self.email,
-                self.auth_refresh_checker,
+                self.email.clone(),
             ))),
-            Err((c, e)) => {
-                self.session = c;
-                Err((self, e.into()))
-            }
+            Err(e) => Err(e.into()),
         }
     }
 }
 
 impl AuthRefresher for ProtonAuthRefresher {
-    fn refresh(self: Box<Self>, proxy: Option<&Proxy>) -> Result<AccountState, BackendError> {
+    fn refresh(&self, proxy: Option<&Proxy>) -> Result<AccountState, BackendError> {
         let client = new_client(proxy)?;
-        let auth_refreshed_checker = AuthRefreshChecker::new();
-        let session = Session::refresh(
-            &client,
-            &UserUid::from(self.uid),
-            &self.token,
-            Some(auth_refreshed_checker.to_on_auth_refreshed()),
-        )?;
+        let session = Session::refresh(self.uid.expose_secret(), self.token.expose_secret())
+            .do_sync(&client)?;
         Ok(AccountState::LoggedIn(Box::new(ProtonAccount::new(
             client,
             session,
-            self.email,
-            auth_refreshed_checker,
+            self.email.clone(),
         ))))
+    }
+
+    fn to_json(&self) -> serde_json::Result<serde_json::Value> {
+        self.to_json()
+    }
+}
+
+impl CheckTask for ProtonTask {
+    fn email(&self) -> &str {
+        &self.email
+    }
+
+    fn backend_name(&self) -> &str {
+        PROTON_BACKEND_NAME
+    }
+
+    fn check(&self, notifier: &mut dyn AccountRefreshedNotifier) -> BackendResult<NewEmailReply> {
+        let mut accessor = self.task_state.lock();
+        let refresh_data = self.session.get_refresh_data();
+
+        struct RefreshCheck<'a> {
+            task: &'a ProtonTask,
+            initial_state: SessionRefreshData,
+            session: &'a Session,
+            notifier: &'a mut dyn AccountRefreshedNotifier,
+        }
+
+        impl<'a> Drop for RefreshCheck<'a> {
+            fn drop(&mut self) {
+                let current_state = self.session.get_refresh_data();
+                if current_state != self.initial_state {
+                    self.notifier.notify_account_refreshed(self.task);
+                }
+            }
+        }
+
+        let _refresh_checker = RefreshCheck {
+            task: self,
+            initial_state: refresh_data,
+            session: &self.session,
+            notifier,
+        };
+
+        if accessor.last_event_id.is_none() {
+            let event_id = self.session.get_latest_event().do_sync(&self.client)?;
+            accessor.last_event_id = Some(event_id);
+        }
+
+        let mut result = EventState::new();
+        if let Some(event_id) = &mut accessor.last_event_id {
+            let mut has_more = MoreEvents::No;
+            loop {
+                let event = self.session.get_event(event_id).do_sync(&self.client)?;
+                if event.event_id != *event_id || has_more == MoreEvents::Yes {
+                    if let Some(message_events) = &event.messages {
+                        result.handle_message_events(message_events);
+                    }
+
+                    *event_id = event.event_id;
+                    has_more = event.more;
+                } else {
+                    return Ok(result.into());
+                }
+            }
+        } else {
+            Err(BackendError::Unknown(anyhow!("Unexpected state")))
+        }
+    }
+
+    fn to_refresher(&self) -> Box<dyn AuthRefresher> {
+        let session_data = self.session.get_refresh_data();
+        Box::new(ProtonAuthRefresher {
+            email: self.email.clone(),
+            uid: session_data.user_uid,
+            token: session_data.token,
+        })
     }
 }
 

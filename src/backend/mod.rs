@@ -4,6 +4,7 @@
 use crate::{AccountState, Proxy};
 #[cfg(test)]
 use mockall::automock;
+use secrecy::SecretString;
 use std::fmt::Debug;
 use thiserror::Error;
 
@@ -65,7 +66,7 @@ pub trait Backend: Send + Sync + Debug {
     fn login<'a>(
         &self,
         username: &str,
-        password: &str,
+        password: &SecretString,
         proxy: Option<&'a Proxy>,
         hv_data: Option<String>,
     ) -> BackendResult<AccountState>;
@@ -83,9 +84,7 @@ pub trait Backend: Send + Sync + Debug {
 /// Trait that needs to be implemented for all backend accounts
 #[cfg_attr(test, automock)]
 pub trait Account: Send + Sync + Debug {
-    /// Execute the code that will check whether new mail is available.
-    /// If the account token was refreshed the second member of the tuple will be true.
-    fn check(&mut self) -> (BackendResult<NewEmailReply>, bool);
+    fn new_task(&self) -> Box<dyn CheckTask>;
 
     /// Logout the account.
     fn logout(&mut self) -> BackendResult<()>;
@@ -95,23 +94,36 @@ pub trait Account: Send + Sync + Debug {
     fn set_proxy<'a>(&mut self, proxy: Option<&'a Proxy>) -> BackendResult<()>;
 
     /// Load the necessary information to refresh the user's account access credentials.
-    fn auth_refresher_config(&self) -> Result<serde_json::Value, anyhow::Error>;
+    fn to_refresher(&self) -> Box<dyn AuthRefresher>;
+}
+
+pub trait AccountRefreshedNotifier {
+    fn notify_account_refreshed(&mut self, task: &dyn CheckTask);
+}
+/// Task that will be run in a different thread
+pub trait CheckTask: Send + Sync + Debug {
+    fn email(&self) -> &str;
+    fn backend_name(&self) -> &str;
+
+    /// Execute the code that will check whether new mail is available.
+    /// If the account token was refreshed the second member of the tuple will be true.
+    fn check(&self, notifier: &mut dyn AccountRefreshedNotifier) -> BackendResult<NewEmailReply>;
+
+    fn to_refresher(&self) -> Box<dyn AuthRefresher>;
 }
 
 /// Trait for accounts that require 2FA support
 #[cfg_attr(test, automock)]
 pub trait AwaitTotp: Send + Sync + Debug {
     /// Called when TOTP code will be submitted.
-    fn submit_totp(
-        self: Box<Self>,
-        totp: &str,
-    ) -> Result<Box<dyn Account>, (Box<dyn AwaitTotp>, BackendError)>;
+    fn submit_totp(&self, totp: &str) -> Result<Box<dyn Account>, BackendError>;
 }
 
 /// Trait to refresh the accounts' login credentials.
 #[cfg_attr(test, automock)]
 pub trait AuthRefresher: Send + Sync + Debug {
     #[allow(clippy::needless_lifetimes)] // required for automock.
-    fn refresh<'a>(self: Box<Self>, proxy: Option<&'a Proxy>)
-        -> Result<AccountState, BackendError>;
+    fn refresh<'a>(&self, proxy: Option<&'a Proxy>) -> Result<AccountState, BackendError>;
+
+    fn to_json(&self) -> serde_json::Result<serde_json::Value>;
 }

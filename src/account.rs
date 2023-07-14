@@ -1,6 +1,7 @@
-use crate::backend::{AuthRefresher, NewEmailReply};
+use crate::backend::{AuthRefresher, CheckTask};
 use crate::Proxy;
 use proton_api_rs::log::error;
+use secrecy::SecretString;
 use std::sync::Arc;
 use thiserror::Error;
 
@@ -36,6 +37,8 @@ pub enum AccountError {
     Backend(#[from] crate::backend::BackendError),
     #[error("Proxy configuration is invalid or Proxy is unreachable")]
     Proxy,
+    #[error("Unknown error: {0}")]
+    Unknown(anyhow::Error),
 }
 
 impl AccountError {
@@ -113,24 +116,8 @@ impl Account {
         self.backend.as_ref()
     }
 
-    /// Run check on the account to see if new emails have arrived.
-    pub fn check(&mut self) -> (AccountResult<NewEmailReply>, bool) {
-        match &mut self.state {
-            AccountState::LoggedIn(a) => match a.check() {
-                (Ok(r), b) => (Ok(r), b),
-                (Err(e), b) => {
-                    if matches!(e, crate::backend::BackendError::LoggedOut) {
-                        self.state = AccountState::LoggedOut;
-                    }
-                    (Err(e.into()), b)
-                }
-            },
-            _ => (Err(AccountError::InvalidState), false),
-        }
-    }
-
     /// Login to the account with the given password.
-    pub fn login(&mut self, password: &str, hv_data: Option<String>) -> AccountResult<()> {
+    pub fn login(&mut self, password: &SecretString, hv_data: Option<String>) -> AccountResult<()> {
         if !self.is_logged_out() {
             return Err(AccountError::InvalidState);
         }
@@ -159,23 +146,13 @@ impl Account {
     /// Submit totp. If the account is not in the awaiting totp state, the
     /// `AccountError::InvalidState` error will be returned.
     pub fn submit_totp(&mut self, totp: &str) -> AccountResult<()> {
-        let old_state = std::mem::replace(&mut self.state, AccountState::LoggedOut);
-        match old_state {
-            AccountState::LoggedOut => Err(AccountError::InvalidState),
-            AccountState::AwaitingTotp(t) => match t.submit_totp(totp) {
-                Ok(a) => {
-                    self.state = AccountState::LoggedIn(a);
-                    Ok(())
-                }
-                Err((t, e)) => {
-                    let _ = std::mem::replace(&mut self.state, AccountState::AwaitingTotp(t));
-                    Err(e.into())
-                }
-            },
-            AccountState::LoggedIn(a) => {
-                let _ = std::mem::replace(&mut self.state, AccountState::LoggedIn(a));
-                Err(AccountError::InvalidState)
+        match &mut self.state {
+            AccountState::AwaitingTotp(t) => {
+                let account = t.submit_totp(totp)?;
+                self.state = AccountState::LoggedIn(account);
+                Ok(())
             }
+            _ => Err(AccountError::InvalidState),
         }
     }
 
@@ -214,6 +191,14 @@ impl Account {
     /// Get current proxy applied to this account.
     pub fn get_proxy(&self) -> &Option<Proxy> {
         &self.proxy
+    }
+
+    /// Get new instance of a task to run a check on the account to see if new emails have arrived.
+    pub fn get_task(&self) -> AccountResult<Box<dyn CheckTask>> {
+        match &self.state {
+            AccountState::LoggedIn(a) => Ok(a.new_task()),
+            _ => Err(AccountError::InvalidState),
+        }
     }
 
     pub(crate) fn get_impl(&self) -> Option<&dyn crate::backend::Account> {
