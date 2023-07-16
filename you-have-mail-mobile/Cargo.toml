@@ -1,10 +1,10 @@
 [package]
 name = "you-have-mail-mobile"
-version = "0.6.2"
+version = "0.7.0"
 edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
-categories = ["api-bindings", "email"]
+categories = ["email", "api-bindings"]
 readme = "README.md"
 description= "You-Have-Mail mobile API bindings"
 
@@ -13,9 +13,10 @@ crate-type = ["cdylib"]
 name = "youhavemail"
 
 [dependencies]
-uniffi = {version ="0.23"}
-you-have-mail-common = {path = "../you-have-mail-common", version = "0.6.2" }
+uniffi = "0.23.0"
+you-have-mail-common = {git= "https://github.com/LeanderBB/you-have-mail-common" }
 thiserror = "1"
+parking_lot = "0.12"
 
 [features]
 default = []
@@ -25,4 +26,11 @@ null_backend =[]
 android_logger = "0.13.1"
 
 [build-dependencies]
-uniffi = {version ="0.23", features=["build", "cli"]}
+uniffi = {version ="0.23.0", features=["build", "cli"]}
+
+[profile.release]
+strip = true
+opt-level = "z"  # Optimize for size.
+lto = true
+codegen-units = 1
+panic = "abort"

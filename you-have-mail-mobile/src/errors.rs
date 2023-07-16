@@ -44,22 +44,14 @@ pub enum ServiceError {
 
 #[derive(Debug, Error)]
 pub enum ConfigError {
-    #[error("Backend '{backend}' for account '{account}' was not found")]
-    BackendNotFound { account: String, backend: String },
-    #[error(
-    "An error occurred while deserializing auth info for '{backend}' with account '{account}': {error}"
-    )]
-    BackendConfig {
-        account: String,
-        backend: String,
-        error: String,
-    },
-    #[error("An encryption/decryption occurred: {msg}")]
+    #[error("{msg}")]
     Crypto { msg: String },
-    #[error("A JSON serialization/deserialization error occurred: {msg}")]
+    #[error("{msg}")]
     JSON { msg: String },
-    #[error("RPC failed: {msg}")]
-    RPCFailed { msg: String },
+    #[error("{msg}")]
+    IO { msg: String },
+    #[error("{msg}")]
+    Unknown { msg: String },
 }
 
 impl From<yhm::backend::BackendError> for ServiceError {
@@ -97,6 +89,7 @@ impl From<yhm::AccountError> for ServiceError {
             yhm::AccountError::InvalidState => ServiceError::InvalidAccountState,
             yhm::AccountError::Backend(e) => e.into(),
             yhm::AccountError::Proxy => ServiceError::ProxyError,
+            yhm::AccountError::Unknown(e) => ServiceError::Unknown { msg: e.to_string() },
         }
     }
 }
@@ -106,24 +99,10 @@ impl From<yhm::ObserverError> for ServiceError {
         match value {
             yhm::ObserverError::AccountError(e) => e.into(),
             yhm::ObserverError::Unknown(e) => ServiceError::Unknown { msg: e.to_string() },
-            yhm::ObserverError::AccountAlreadyActive(a) => ServiceError::AccountAlreadyActive {
-                email: a.email().to_string(),
-            },
-            yhm::ObserverError::NoSuchAccount(e) => ServiceError::AccountNotFound { email: e },
-        }
-    }
-}
-
-impl<T, E: Into<ServiceError>> From<yhm::ObserverRPCError<T, E>> for ServiceError {
-    fn from(value: yhm::ObserverRPCError<T, E>) -> Self {
-        match value {
-            yhm::ObserverRPCError::Error(e) => e.into(),
-            yhm::ObserverRPCError::SendFailed(_)
-            | yhm::ObserverRPCError::SendFailedUnexpectedType => ServiceError::RPCFailed {
-                msg: "Failed to send RPC request".to_string(),
-            },
-            yhm::ObserverRPCError::NoReply => ServiceError::RPCFailed {
-                msg: "Received no reply to request".to_string(),
+            yhm::ObserverError::AccountNotFound(e) => ServiceError::AccountNotFound { email: e },
+            yhm::ObserverError::Config(e) => ServiceError::Config { error: e.into() },
+            _ => ServiceError::Unknown {
+                msg: "Unknown error".into(),
             },
         }
     }
@@ -137,50 +116,13 @@ impl From<()> for ServiceError {
     }
 }
 
-impl<T, E: Into<ConfigError>> From<yhm::ObserverRPCError<T, E>> for ConfigError {
-    fn from(value: yhm::ObserverRPCError<T, E>) -> Self {
+impl From<yhm::ConfigError> for ConfigError {
+    fn from(value: yhm::ConfigError) -> Self {
         match value {
-            yhm::ObserverRPCError::Error(e) => e.into(),
-            yhm::ObserverRPCError::SendFailed(_)
-            | yhm::ObserverRPCError::SendFailedUnexpectedType => ConfigError::RPCFailed {
-                msg: "Failed to send RPC request".to_string(),
-            },
-            yhm::ObserverRPCError::NoReply => ConfigError::RPCFailed {
-                msg: "Received no reply to request".to_string(),
-            },
-        }
-    }
-}
-
-impl From<yhm::ConfigLoadError> for ConfigError {
-    fn from(value: yhm::ConfigLoadError) -> Self {
-        match value {
-            yhm::ConfigLoadError::BackendNotFound { account, backend } => {
-                ConfigError::BackendNotFound { account, backend }
-            }
-            yhm::ConfigLoadError::BackendConfig {
-                account,
-                backend,
-                error,
-            } => ConfigError::BackendConfig {
-                account,
-                backend,
-                error: error.to_string(),
-            },
-            yhm::ConfigLoadError::JSON(e) => ConfigError::JSON { msg: e.to_string() },
-        }
-    }
-}
-
-impl From<yhm::ConfigGenError> for ConfigError {
-    fn from(value: yhm::ConfigGenError) -> Self {
-        match value {
-            yhm::ConfigGenError::BackendConfig { account, error } => ConfigError::BackendConfig {
-                account,
-                backend: String::new(),
-                error: error.to_string(),
-            },
-            yhm::ConfigGenError::JSON(e) => ConfigError::JSON { msg: e.to_string() },
+            yhm::ConfigError::IO(e) => ConfigError::IO { msg: e.to_string() },
+            yhm::ConfigError::JSON(e) => ConfigError::JSON { msg: e.to_string() },
+            yhm::ConfigError::Crypto(e) => ConfigError::Crypto { msg: e.to_string() },
+            yhm::ConfigError::Unknown(e) => ConfigError::Unknown { msg: e.to_string() },
         }
     }
 }

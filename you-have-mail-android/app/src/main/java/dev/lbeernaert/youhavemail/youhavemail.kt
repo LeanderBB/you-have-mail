@@ -44,7 +44,7 @@ open class RustBuffer : Structure() {
 
     companion object {
         internal fun alloc(size: Int = 0) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_youhavemail_2da6_rustbuffer_alloc(size, status).also {
+            _UniFFILib.INSTANCE.ffi_youhavemail_591c_rustbuffer_alloc(size, status).also {
                 if(it.data == null) {
                    throw RuntimeException("RustBuffer.alloc() returned null data pointer (size=${size})")
                }
@@ -52,7 +52,7 @@ open class RustBuffer : Structure() {
         }
 
         internal fun free(buf: RustBuffer.ByValue) = rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_youhavemail_2da6_rustbuffer_free(buf, status)
+            _UniFFILib.INSTANCE.ffi_youhavemail_591c_rustbuffer_free(buf, status)
         }
     }
 
@@ -259,145 +259,140 @@ internal interface _UniFFILib : Library {
             loadIndirect<_UniFFILib>(componentName = "youhavemail")
             .also { lib: _UniFFILib ->
                 FfiConverterTypeNotifier.register(lib)
-                FfiConverterTypeServiceFromConfigCallback.register(lib)
                 }
             
         }
     }
 
-    fun ffi_youhavemail_2da6_Backend_object_free(`ptr`: Pointer,
+    fun ffi_youhavemail_591c_Backend_object_free(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Backend_name(`ptr`: Pointer,
+    fun youhavemail_591c_Backend_name(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun youhavemail_2da6_Backend_description(`ptr`: Pointer,
+    fun youhavemail_591c_Backend_description(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_youhavemail_2da6_Account_object_free(`ptr`: Pointer,
+    fun ffi_youhavemail_591c_Account_object_free(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Account_login(`ptr`: Pointer,`password`: RustBuffer.ByValue,`hvData`: RustBuffer.ByValue,
+    fun youhavemail_591c_Account_login(`ptr`: Pointer,`password`: RustBuffer.ByValue,`hvData`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Account_logout(`ptr`: Pointer,
+    fun youhavemail_591c_Account_logout(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Account_submit_totp(`ptr`: Pointer,`totp`: RustBuffer.ByValue,
+    fun youhavemail_591c_Account_submit_totp(`ptr`: Pointer,`totp`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Account_is_logged_in(`ptr`: Pointer,
+    fun youhavemail_591c_Account_is_logged_in(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Byte
 
-    fun youhavemail_2da6_Account_is_awaiting_totp(`ptr`: Pointer,
+    fun youhavemail_591c_Account_is_awaiting_totp(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Byte
 
-    fun youhavemail_2da6_Account_is_logged_out(`ptr`: Pointer,
+    fun youhavemail_591c_Account_is_logged_out(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Byte
 
-    fun youhavemail_2da6_Account_email(`ptr`: Pointer,
+    fun youhavemail_591c_Account_email(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_youhavemail_2da6_Service_object_free(`ptr`: Pointer,
+    fun ffi_youhavemail_591c_Service_object_free(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Service_get_backends(`ptr`: Pointer,
+    fun youhavemail_591c_Service_get_backends(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun youhavemail_2da6_Service_new_account(`ptr`: Pointer,`backend`: Pointer,`email`: RustBuffer.ByValue,`proxy`: RustBuffer.ByValue,
+    fun youhavemail_591c_Service_new_account(`ptr`: Pointer,`backend`: Pointer,`email`: RustBuffer.ByValue,`proxy`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Pointer
 
-    fun youhavemail_2da6_Service_check_proxy(`ptr`: Pointer,`backend`: Pointer,`proxy`: RustBuffer.ByValue,
+    fun youhavemail_591c_Service_check_proxy(`ptr`: Pointer,`backend`: Pointer,`proxy`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Service_get_observed_accounts(`ptr`: Pointer,
+    fun youhavemail_591c_Service_get_observed_accounts(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun youhavemail_2da6_Service_add_account(`ptr`: Pointer,`account`: Pointer,
+    fun youhavemail_591c_Service_add_account(`ptr`: Pointer,`account`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Service_logout_account(`ptr`: Pointer,`email`: RustBuffer.ByValue,
+    fun youhavemail_591c_Service_logout_account(`ptr`: Pointer,`email`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Service_remove_account(`ptr`: Pointer,`email`: RustBuffer.ByValue,
+    fun youhavemail_591c_Service_remove_account(`ptr`: Pointer,`email`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Service_set_account_proxy(`ptr`: Pointer,`email`: RustBuffer.ByValue,`proxy`: RustBuffer.ByValue,
+    fun youhavemail_591c_Service_set_account_proxy(`ptr`: Pointer,`email`: RustBuffer.ByValue,`proxy`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_Service_pause(`ptr`: Pointer,
-    _uniffi_out_err: RustCallStatus
-    ): Unit
-
-    fun youhavemail_2da6_Service_resume(`ptr`: Pointer,
-    _uniffi_out_err: RustCallStatus
-    ): Unit
-
-    fun youhavemail_2da6_Service_shutdown(`ptr`: Pointer,
-    _uniffi_out_err: RustCallStatus
-    ): Unit
-
-    fun youhavemail_2da6_Service_get_config(`ptr`: Pointer,
-    _uniffi_out_err: RustCallStatus
-    ): RustBuffer.ByValue
-
-    fun youhavemail_2da6_Service_get_poll_interval(`ptr`: Pointer,
+    fun youhavemail_591c_Service_get_poll_interval(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Long
 
-    fun youhavemail_2da6_Service_set_poll_interval(`ptr`: Pointer,`interval`: Long,
+    fun youhavemail_591c_Service_set_poll_interval(`ptr`: Pointer,`interval`: Long,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun ffi_youhavemail_2da6_Notifier_init_callback(`callbackStub`: ForeignCallback,
+    fun youhavemail_591c_Service_quit(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun ffi_youhavemail_2da6_ServiceFromConfigCallback_init_callback(`callbackStub`: ForeignCallback,
+    fun youhavemail_591c_Service_pause(`ptr`: Pointer,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun youhavemail_2da6_new_service(`notifier`: Long,
+    fun youhavemail_591c_Service_resume(`ptr`: Pointer,
+    _uniffi_out_err: RustCallStatus
+    ): Unit
+
+    fun ffi_youhavemail_591c_Notifier_init_callback(`callbackStub`: ForeignCallback,
+    _uniffi_out_err: RustCallStatus
+    ): Unit
+
+    fun youhavemail_591c_new_service(`notifier`: Long,`encryptionKey`: RustBuffer.ByValue,`configPath`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Pointer
 
-    fun youhavemail_2da6_new_service_from_config(`notifier`: Long,`cb`: Long,`bytes`: RustBuffer.ByValue,
-    _uniffi_out_err: RustCallStatus
-    ): Pointer
-
-    fun ffi_youhavemail_2da6_rustbuffer_alloc(`size`: Int,
+    fun youhavemail_591c_new_encryption_key(
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
-    fun ffi_youhavemail_2da6_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,
-    _uniffi_out_err: RustCallStatus
-    ): RustBuffer.ByValue
-
-    fun ffi_youhavemail_2da6_rustbuffer_free(`buf`: RustBuffer.ByValue,
+    fun youhavemail_591c_migrate_old_config(`encryptionKey`: RustBuffer.ByValue,`config`: RustBuffer.ByValue,`configPath`: RustBuffer.ByValue,
     _uniffi_out_err: RustCallStatus
     ): Unit
 
-    fun ffi_youhavemail_2da6_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Int,
+    fun ffi_youhavemail_591c_rustbuffer_alloc(`size`: Int,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun ffi_youhavemail_591c_rustbuffer_from_bytes(`bytes`: ForeignBytes.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): RustBuffer.ByValue
+
+    fun ffi_youhavemail_591c_rustbuffer_free(`buf`: RustBuffer.ByValue,
+    _uniffi_out_err: RustCallStatus
+    ): Unit
+
+    fun ffi_youhavemail_591c_rustbuffer_reserve(`buf`: RustBuffer.ByValue,`additional`: Int,
     _uniffi_out_err: RustCallStatus
     ): RustBuffer.ByValue
 
@@ -711,7 +706,7 @@ class Account(
      */
     override protected fun freeRustArcPtr() {
         rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_youhavemail_2da6_Account_object_free(this.pointer, status)
+            _UniFFILib.INSTANCE.ffi_youhavemail_591c_Account_object_free(this.pointer, status)
         }
     }
 
@@ -719,7 +714,7 @@ class Account(
     @Throws(ServiceException::class)override fun `login`(`password`: String, `hvData`: String?) =
         callWithPointer {
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Account_login(it, FfiConverterString.lower(`password`), FfiConverterOptionalString.lower(`hvData`),  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Account_login(it, FfiConverterString.lower(`password`), FfiConverterOptionalString.lower(`hvData`),  _status)
 }
         }
     
@@ -727,7 +722,7 @@ class Account(
     @Throws(ServiceException::class)override fun `logout`() =
         callWithPointer {
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Account_logout(it,  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Account_logout(it,  _status)
 }
         }
     
@@ -735,14 +730,14 @@ class Account(
     @Throws(ServiceException::class)override fun `submitTotp`(`totp`: String) =
         callWithPointer {
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Account_submit_totp(it, FfiConverterString.lower(`totp`),  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Account_submit_totp(it, FfiConverterString.lower(`totp`),  _status)
 }
         }
     
     override fun `isLoggedIn`(): Boolean =
         callWithPointer {
     rustCall() { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Account_is_logged_in(it,  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Account_is_logged_in(it,  _status)
 }
         }.let {
             FfiConverterBoolean.lift(it)
@@ -750,7 +745,7 @@ class Account(
     override fun `isAwaitingTotp`(): Boolean =
         callWithPointer {
     rustCall() { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Account_is_awaiting_totp(it,  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Account_is_awaiting_totp(it,  _status)
 }
         }.let {
             FfiConverterBoolean.lift(it)
@@ -758,7 +753,7 @@ class Account(
     override fun `isLoggedOut`(): Boolean =
         callWithPointer {
     rustCall() { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Account_is_logged_out(it,  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Account_is_logged_out(it,  _status)
 }
         }.let {
             FfiConverterBoolean.lift(it)
@@ -766,7 +761,7 @@ class Account(
     override fun `email`(): String =
         callWithPointer {
     rustCall() { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Account_email(it,  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Account_email(it,  _status)
 }
         }.let {
             FfiConverterString.lift(it)
@@ -823,14 +818,14 @@ class Backend(
      */
     override protected fun freeRustArcPtr() {
         rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_youhavemail_2da6_Backend_object_free(this.pointer, status)
+            _UniFFILib.INSTANCE.ffi_youhavemail_591c_Backend_object_free(this.pointer, status)
         }
     }
 
     override fun `name`(): String =
         callWithPointer {
     rustCall() { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Backend_name(it,  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Backend_name(it,  _status)
 }
         }.let {
             FfiConverterString.lift(it)
@@ -838,7 +833,7 @@ class Backend(
     override fun `description`(): String =
         callWithPointer {
     rustCall() { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Backend_description(it,  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Backend_description(it,  _status)
 }
         }.let {
             FfiConverterString.lift(it)
@@ -882,7 +877,6 @@ public interface ServiceInterface {
     @Throws(ServiceException::class)
     fun `checkProxy`(`backend`: Backend, `proxy`: Proxy?)
     
-    @Throws(ServiceException::class)
     fun `getObservedAccounts`(): List<ObserverAccount>
     
     @Throws(ServiceException::class)
@@ -897,23 +891,16 @@ public interface ServiceInterface {
     @Throws(ServiceException::class)
     fun `setAccountProxy`(`email`: String, `proxy`: Proxy?)
     
-    @Throws(ServiceException::class)
-    fun `pause`()
-    
-    @Throws(ServiceException::class)
-    fun `resume`()
-    
-    @Throws(ServiceException::class)
-    fun `shutdown`()
-    
-    @Throws(ConfigException::class)
-    fun `getConfig`(): String
-    
-    @Throws(ServiceException::class)
     fun `getPollInterval`(): ULong
     
     @Throws(ServiceException::class)
     fun `setPollInterval`(`interval`: ULong)
+    
+    fun `quit`()
+    
+    fun `pause`()
+    
+    fun `resume`()
     
 }
 
@@ -931,14 +918,14 @@ class Service(
      */
     override protected fun freeRustArcPtr() {
         rustCall() { status ->
-            _UniFFILib.INSTANCE.ffi_youhavemail_2da6_Service_object_free(this.pointer, status)
+            _UniFFILib.INSTANCE.ffi_youhavemail_591c_Service_object_free(this.pointer, status)
         }
     }
 
     override fun `getBackends`(): List<Backend> =
         callWithPointer {
     rustCall() { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_get_backends(it,  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_get_backends(it,  _status)
 }
         }.let {
             FfiConverterSequenceTypeBackend.lift(it)
@@ -946,7 +933,7 @@ class Service(
     override fun `newAccount`(`backend`: Backend, `email`: String, `proxy`: Proxy?): Account =
         callWithPointer {
     rustCall() { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_new_account(it, FfiConverterTypeBackend.lower(`backend`), FfiConverterString.lower(`email`), FfiConverterOptionalTypeProxy.lower(`proxy`),  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_new_account(it, FfiConverterTypeBackend.lower(`backend`), FfiConverterString.lower(`email`), FfiConverterOptionalTypeProxy.lower(`proxy`),  _status)
 }
         }.let {
             FfiConverterTypeAccount.lift(it)
@@ -955,15 +942,14 @@ class Service(
     @Throws(ServiceException::class)override fun `checkProxy`(`backend`: Backend, `proxy`: Proxy?) =
         callWithPointer {
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_check_proxy(it, FfiConverterTypeBackend.lower(`backend`), FfiConverterOptionalTypeProxy.lower(`proxy`),  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_check_proxy(it, FfiConverterTypeBackend.lower(`backend`), FfiConverterOptionalTypeProxy.lower(`proxy`),  _status)
 }
         }
     
-    
-    @Throws(ServiceException::class)override fun `getObservedAccounts`(): List<ObserverAccount> =
+    override fun `getObservedAccounts`(): List<ObserverAccount> =
         callWithPointer {
-    rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_get_observed_accounts(it,  _status)
+    rustCall() { _status ->
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_get_observed_accounts(it,  _status)
 }
         }.let {
             FfiConverterSequenceTypeObserverAccount.lift(it)
@@ -972,7 +958,7 @@ class Service(
     @Throws(ServiceException::class)override fun `addAccount`(`account`: Account) =
         callWithPointer {
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_add_account(it, FfiConverterTypeAccount.lower(`account`),  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_add_account(it, FfiConverterTypeAccount.lower(`account`),  _status)
 }
         }
     
@@ -980,7 +966,7 @@ class Service(
     @Throws(ServiceException::class)override fun `logoutAccount`(`email`: String) =
         callWithPointer {
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_logout_account(it, FfiConverterString.lower(`email`),  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_logout_account(it, FfiConverterString.lower(`email`),  _status)
 }
         }
     
@@ -988,7 +974,7 @@ class Service(
     @Throws(ServiceException::class)override fun `removeAccount`(`email`: String) =
         callWithPointer {
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_remove_account(it, FfiConverterString.lower(`email`),  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_remove_account(it, FfiConverterString.lower(`email`),  _status)
 }
         }
     
@@ -996,48 +982,14 @@ class Service(
     @Throws(ServiceException::class)override fun `setAccountProxy`(`email`: String, `proxy`: Proxy?) =
         callWithPointer {
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_set_account_proxy(it, FfiConverterString.lower(`email`), FfiConverterOptionalTypeProxy.lower(`proxy`),  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_set_account_proxy(it, FfiConverterString.lower(`email`), FfiConverterOptionalTypeProxy.lower(`proxy`),  _status)
 }
         }
     
-    
-    @Throws(ServiceException::class)override fun `pause`() =
+    override fun `getPollInterval`(): ULong =
         callWithPointer {
-    rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_pause(it,  _status)
-}
-        }
-    
-    
-    @Throws(ServiceException::class)override fun `resume`() =
-        callWithPointer {
-    rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_resume(it,  _status)
-}
-        }
-    
-    
-    @Throws(ServiceException::class)override fun `shutdown`() =
-        callWithPointer {
-    rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_shutdown(it,  _status)
-}
-        }
-    
-    
-    @Throws(ConfigException::class)override fun `getConfig`(): String =
-        callWithPointer {
-    rustCallWithError(ConfigException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_get_config(it,  _status)
-}
-        }.let {
-            FfiConverterString.lift(it)
-        }
-    
-    @Throws(ServiceException::class)override fun `getPollInterval`(): ULong =
-        callWithPointer {
-    rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_get_poll_interval(it,  _status)
+    rustCall() { _status ->
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_get_poll_interval(it,  _status)
 }
         }.let {
             FfiConverterULong.lift(it)
@@ -1046,7 +998,28 @@ class Service(
     @Throws(ServiceException::class)override fun `setPollInterval`(`interval`: ULong) =
         callWithPointer {
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_Service_set_poll_interval(it, FfiConverterULong.lower(`interval`),  _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_set_poll_interval(it, FfiConverterULong.lower(`interval`),  _status)
+}
+        }
+    
+    override fun `quit`() =
+        callWithPointer {
+    rustCall() { _status ->
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_quit(it,  _status)
+}
+        }
+    
+    override fun `pause`() =
+        callWithPointer {
+    rustCall() { _status ->
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_pause(it,  _status)
+}
+        }
+    
+    override fun `resume`() =
+        callWithPointer {
+    rustCall() { _status ->
+    _UniFFILib.INSTANCE.youhavemail_591c_Service_resume(it,  _status)
 }
         }
     
@@ -1183,8 +1156,107 @@ public object FfiConverterTypeProxyAuth: FfiConverterRustBuffer<ProxyAuth> {
 
 
 
+sealed class ConfigError {
+    data class Crypto(
+        val `msg`: String
+        ) : ConfigError()
+    data class Json(
+        val `msg`: String
+        ) : ConfigError()
+    data class Io(
+        val `msg`: String
+        ) : ConfigError()
+    data class Unknown(
+        val `msg`: String
+        ) : ConfigError()
+    
+
+    
+}
+
+public object FfiConverterTypeConfigError : FfiConverterRustBuffer<ConfigError>{
+    override fun read(buf: ByteBuffer): ConfigError {
+        return when(buf.getInt()) {
+            1 -> ConfigError.Crypto(
+                FfiConverterString.read(buf),
+                )
+            2 -> ConfigError.Json(
+                FfiConverterString.read(buf),
+                )
+            3 -> ConfigError.Io(
+                FfiConverterString.read(buf),
+                )
+            4 -> ConfigError.Unknown(
+                FfiConverterString.read(buf),
+                )
+            else -> throw RuntimeException("invalid enum value, something is very wrong!!")
+        }
+    }
+
+    override fun allocationSize(value: ConfigError) = when(value) {
+        is ConfigError.Crypto -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
+        }
+        is ConfigError.Json -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
+        }
+        is ConfigError.Io -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
+        }
+        is ConfigError.Unknown -> {
+            // Add the size for the Int that specifies the variant plus the size needed for all fields
+            (
+                4
+                + FfiConverterString.allocationSize(value.`msg`)
+            )
+        }
+    }
+
+    override fun write(value: ConfigError, buf: ByteBuffer) {
+        when(value) {
+            is ConfigError.Crypto -> {
+                buf.putInt(1)
+                FfiConverterString.write(value.`msg`, buf)
+                Unit
+            }
+            is ConfigError.Json -> {
+                buf.putInt(2)
+                FfiConverterString.write(value.`msg`, buf)
+                Unit
+            }
+            is ConfigError.Io -> {
+                buf.putInt(3)
+                FfiConverterString.write(value.`msg`, buf)
+                Unit
+            }
+            is ConfigError.Unknown -> {
+                buf.putInt(4)
+                FfiConverterString.write(value.`msg`, buf)
+                Unit
+            }
+        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
+    }
+}
+
+
+
+
+
+
 enum class ObserverAccountStatus {
-    OFFLINE,LOGGED_OUT,ONLINE,ERROR;
+    OFFLINE,LOGGED_OUT,ONLINE;
 }
 
 public object FfiConverterTypeObserverAccountStatus: FfiConverterRustBuffer<ObserverAccountStatus> {
@@ -1253,154 +1325,6 @@ public object FfiConverterTypeRequestErrorCategory: FfiConverterRustBuffer<Reque
 
 
 
-sealed class ConfigException: Exception() {
-    // Each variant is a nested class
-    
-    class BackendNotFound(
-        val `account`: String, 
-        val `backend`: String
-        ) : ConfigException() {
-        override val message
-            get() = "account=${ `account` }, backend=${ `backend` }"
-    }
-    
-    class BackendConfig(
-        val `account`: String, 
-        val `backend`: String, 
-        val `error`: String
-        ) : ConfigException() {
-        override val message
-            get() = "account=${ `account` }, backend=${ `backend` }, error=${ `error` }"
-    }
-    
-    class Crypto(
-        val `msg`: String
-        ) : ConfigException() {
-        override val message
-            get() = "msg=${ `msg` }"
-    }
-    
-    class Json(
-        val `msg`: String
-        ) : ConfigException() {
-        override val message
-            get() = "msg=${ `msg` }"
-    }
-    
-    class RpcFailed(
-        val `msg`: String
-        ) : ConfigException() {
-        override val message
-            get() = "msg=${ `msg` }"
-    }
-    
-
-    companion object ErrorHandler : CallStatusErrorHandler<ConfigException> {
-        override fun lift(error_buf: RustBuffer.ByValue): ConfigException = FfiConverterTypeConfigError.lift(error_buf)
-    }
-
-    
-}
-
-public object FfiConverterTypeConfigError : FfiConverterRustBuffer<ConfigException> {
-    override fun read(buf: ByteBuffer): ConfigException {
-        
-
-        return when(buf.getInt()) {
-            1 -> ConfigException.BackendNotFound(
-                FfiConverterString.read(buf),
-                FfiConverterString.read(buf),
-                )
-            2 -> ConfigException.BackendConfig(
-                FfiConverterString.read(buf),
-                FfiConverterString.read(buf),
-                FfiConverterString.read(buf),
-                )
-            3 -> ConfigException.Crypto(
-                FfiConverterString.read(buf),
-                )
-            4 -> ConfigException.Json(
-                FfiConverterString.read(buf),
-                )
-            5 -> ConfigException.RpcFailed(
-                FfiConverterString.read(buf),
-                )
-            else -> throw RuntimeException("invalid error enum value, something is very wrong!!")
-        }
-    }
-
-    override fun allocationSize(value: ConfigException): Int {
-        return when(value) {
-            is ConfigException.BackendNotFound -> (
-                // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
-                + FfiConverterString.allocationSize(value.`account`)
-                + FfiConverterString.allocationSize(value.`backend`)
-            )
-            is ConfigException.BackendConfig -> (
-                // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
-                + FfiConverterString.allocationSize(value.`account`)
-                + FfiConverterString.allocationSize(value.`backend`)
-                + FfiConverterString.allocationSize(value.`error`)
-            )
-            is ConfigException.Crypto -> (
-                // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
-                + FfiConverterString.allocationSize(value.`msg`)
-            )
-            is ConfigException.Json -> (
-                // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
-                + FfiConverterString.allocationSize(value.`msg`)
-            )
-            is ConfigException.RpcFailed -> (
-                // Add the size for the Int that specifies the variant plus the size needed for all fields
-                4
-                + FfiConverterString.allocationSize(value.`msg`)
-            )
-        }
-    }
-
-    override fun write(value: ConfigException, buf: ByteBuffer) {
-        when(value) {
-            is ConfigException.BackendNotFound -> {
-                buf.putInt(1)
-                FfiConverterString.write(value.`account`, buf)
-                FfiConverterString.write(value.`backend`, buf)
-                Unit
-            }
-            is ConfigException.BackendConfig -> {
-                buf.putInt(2)
-                FfiConverterString.write(value.`account`, buf)
-                FfiConverterString.write(value.`backend`, buf)
-                FfiConverterString.write(value.`error`, buf)
-                Unit
-            }
-            is ConfigException.Crypto -> {
-                buf.putInt(3)
-                FfiConverterString.write(value.`msg`, buf)
-                Unit
-            }
-            is ConfigException.Json -> {
-                buf.putInt(4)
-                FfiConverterString.write(value.`msg`, buf)
-                Unit
-            }
-            is ConfigException.RpcFailed -> {
-                buf.putInt(5)
-                FfiConverterString.write(value.`msg`, buf)
-                Unit
-            }
-        }.let { /* this makes the `when` an expression, which ensures it is exhaustive */ }
-    }
-
-}
-
-
-
-
-
 sealed class ServiceException: Exception() {
     // Each variant is a nested class
     
@@ -1460,7 +1384,7 @@ sealed class ServiceException: Exception() {
     }
     
     class Config(
-        val `error`: ConfigException
+        val `error`: ConfigError
         ) : ServiceException() {
         override val message
             get() = "error=${ `error` }"
@@ -1751,7 +1675,6 @@ public interface Notifier {
     fun `accountOnline`(`email`: String)
     fun `accountError`(`email`: String, `error`: ServiceException)
     fun `proxyApplied`(`email`: String, `proxy`: Proxy?)
-    fun `accountRefreshed`(`emails`: List<String>, `config`: String)
     fun `error`(`msg`: String)
     
 }
@@ -1924,25 +1847,6 @@ internal class ForeignCallbackTypeNotifier : ForeignCallback {
                 // Call the method, write to outBuf and return a status code
                 // See docs of ForeignCallback in `uniffi/src/ffi/foreigncallbacks.rs` for info
                 try {
-                    val buffer = this.`invokeAccountRefreshed`(cb, args)
-                    // Success
-                    outBuf.setValue(buffer)
-                    1
-                } catch (e: Throwable) {
-                    // Unexpected error
-                    try {
-                        // Try to serialize the error into a string
-                        outBuf.setValue(FfiConverterString.lower(e.toString()))
-                    } catch (e: Throwable) {
-                        // If that fails, then it's time to give up and just return
-                    }
-                    -1
-                }
-            }
-            10 -> {
-                // Call the method, write to outBuf and return a status code
-                // See docs of ForeignCallback in `uniffi/src/ffi/foreigncallbacks.rs` for info
-                try {
                     val buffer = this.`invokeError`(cb, args)
                     // Success
                     outBuf.setValue(buffer)
@@ -2091,21 +1995,6 @@ internal class ForeignCallbackTypeNotifier : ForeignCallback {
         }
 
     
-    private fun `invokeAccountRefreshed`(kotlinCallbackInterface: Notifier, args: RustBuffer.ByValue): RustBuffer.ByValue =
-        try {
-            val buf = args.asByteBuffer() ?: throw InternalException("No ByteBuffer in RustBuffer; this is a Uniffi bug")
-            kotlinCallbackInterface.`accountRefreshed`(
-                    FfiConverterSequenceString.read(buf), 
-                    FfiConverterString.read(buf)
-                    )
-            .let { RustBuffer.ByValue() }
-                // TODO catch errors and report them back to Rust.
-                // https://github.com/mozilla/uniffi-rs/issues/351
-        } finally {
-            RustBuffer.free(args)
-        }
-
-    
     private fun `invokeError`(kotlinCallbackInterface: Notifier, args: RustBuffer.ByValue): RustBuffer.ByValue =
         try {
             val buf = args.asByteBuffer() ?: throw InternalException("No ByteBuffer in RustBuffer; this is a Uniffi bug")
@@ -2128,94 +2017,7 @@ public object FfiConverterTypeNotifier: FfiConverterCallbackInterface<Notifier>(
 ) {
     override fun register(lib: _UniFFILib) {
         rustCall() { status ->
-            lib.ffi_youhavemail_2da6_Notifier_init_callback(this.foreignCallback, status)
-        }
-    }
-}
-
-
-
-
-
-
-// Declaration and FfiConverters for ServiceFromConfigCallback Callback Interface
-
-public interface ServiceFromConfigCallback {
-    fun `notifyError`(`email`: String, `error`: ServiceException)
-    
-}
-
-// The ForeignCallback that is passed to Rust.
-internal class ForeignCallbackTypeServiceFromConfigCallback : ForeignCallback {
-    @Suppress("TooGenericExceptionCaught")
-    override fun invoke(handle: Handle, method: Int, args: RustBuffer.ByValue, outBuf: RustBufferByReference): Int {
-        val cb = FfiConverterTypeServiceFromConfigCallback.lift(handle)
-        return when (method) {
-            IDX_CALLBACK_FREE -> {
-                FfiConverterTypeServiceFromConfigCallback.drop(handle)
-                // No return value.
-                // See docs of ForeignCallback in `uniffi/src/ffi/foreigncallbacks.rs`
-                0
-            }
-            1 -> {
-                // Call the method, write to outBuf and return a status code
-                // See docs of ForeignCallback in `uniffi/src/ffi/foreigncallbacks.rs` for info
-                try {
-                    val buffer = this.`invokeNotifyError`(cb, args)
-                    // Success
-                    outBuf.setValue(buffer)
-                    1
-                } catch (e: Throwable) {
-                    // Unexpected error
-                    try {
-                        // Try to serialize the error into a string
-                        outBuf.setValue(FfiConverterString.lower(e.toString()))
-                    } catch (e: Throwable) {
-                        // If that fails, then it's time to give up and just return
-                    }
-                    -1
-                }
-            }
-            
-            else -> {
-                // An unexpected error happened.
-                // See docs of ForeignCallback in `uniffi/src/ffi/foreigncallbacks.rs`
-                try {
-                    // Try to serialize the error into a string
-                    outBuf.setValue(FfiConverterString.lower("Invalid Callback index"))
-                } catch (e: Throwable) {
-                    // If that fails, then it's time to give up and just return
-                }
-                -1
-            }
-        }
-    }
-
-    
-    private fun `invokeNotifyError`(kotlinCallbackInterface: ServiceFromConfigCallback, args: RustBuffer.ByValue): RustBuffer.ByValue =
-        try {
-            val buf = args.asByteBuffer() ?: throw InternalException("No ByteBuffer in RustBuffer; this is a Uniffi bug")
-            kotlinCallbackInterface.`notifyError`(
-                    FfiConverterString.read(buf), 
-                    FfiConverterTypeServiceError.read(buf)
-                    )
-            .let { RustBuffer.ByValue() }
-                // TODO catch errors and report them back to Rust.
-                // https://github.com/mozilla/uniffi-rs/issues/351
-        } finally {
-            RustBuffer.free(args)
-        }
-
-    
-}
-
-// The ffiConverter which transforms the Callbacks in to Handles to pass to Rust.
-public object FfiConverterTypeServiceFromConfigCallback: FfiConverterCallbackInterface<ServiceFromConfigCallback>(
-    foreignCallback = ForeignCallbackTypeServiceFromConfigCallback()
-) {
-    override fun register(lib: _UniFFILib) {
-        rustCall() { status ->
-            lib.ffi_youhavemail_2da6_ServiceFromConfigCallback_init_callback(this.foreignCallback, status)
+            lib.ffi_youhavemail_591c_Notifier_init_callback(this.foreignCallback, status)
         }
     }
 }
@@ -2310,31 +2112,6 @@ public object FfiConverterOptionalTypeProxyAuth: FfiConverterRustBuffer<ProxyAut
 
 
 
-public object FfiConverterSequenceString: FfiConverterRustBuffer<List<String>> {
-    override fun read(buf: ByteBuffer): List<String> {
-        val len = buf.getInt()
-        return List<String>(len) {
-            FfiConverterString.read(buf)
-        }
-    }
-
-    override fun allocationSize(value: List<String>): Int {
-        val sizeForLength = 4
-        val sizeForItems = value.map { FfiConverterString.allocationSize(it) }.sum()
-        return sizeForLength + sizeForItems
-    }
-
-    override fun write(value: List<String>, buf: ByteBuffer) {
-        buf.putInt(value.size)
-        value.forEach {
-            FfiConverterString.write(it, buf)
-        }
-    }
-}
-
-
-
-
 public object FfiConverterSequenceTypeBackend: FfiConverterRustBuffer<List<Backend>> {
     override fun read(buf: ByteBuffer): List<Backend> {
         val len = buf.getInt()
@@ -2383,23 +2160,30 @@ public object FfiConverterSequenceTypeObserverAccount: FfiConverterRustBuffer<Li
 }
 @Throws(ServiceException::class)
 
-fun `newService`(`notifier`: Notifier): Service {
+fun `newService`(`notifier`: Notifier, `encryptionKey`: String, `configPath`: String): Service {
     return FfiConverterTypeService.lift(
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_new_service(FfiConverterTypeNotifier.lower(`notifier`), _status)
+    _UniFFILib.INSTANCE.youhavemail_591c_new_service(FfiConverterTypeNotifier.lower(`notifier`), FfiConverterString.lower(`encryptionKey`), FfiConverterString.lower(`configPath`), _status)
+})
+}
+
+
+
+fun `newEncryptionKey`(): String {
+    return FfiConverterString.lift(
+    rustCall() { _status ->
+    _UniFFILib.INSTANCE.youhavemail_591c_new_encryption_key( _status)
 })
 }
 
 
 @Throws(ServiceException::class)
 
-fun `newServiceFromConfig`(`notifier`: Notifier, `cb`: ServiceFromConfigCallback, `bytes`: String): Service {
-    return FfiConverterTypeService.lift(
+fun `migrateOldConfig`(`encryptionKey`: String, `config`: String, `configPath`: String) =
+    
     rustCallWithError(ServiceException) { _status ->
-    _UniFFILib.INSTANCE.youhavemail_2da6_new_service_from_config(FfiConverterTypeNotifier.lower(`notifier`), FfiConverterTypeServiceFromConfigCallback.lower(`cb`), FfiConverterString.lower(`bytes`), _status)
-})
+    _UniFFILib.INSTANCE.youhavemail_591c_migrate_old_config(FfiConverterString.lower(`encryptionKey`), FfiConverterString.lower(`config`), FfiConverterString.lower(`configPath`), _status)
 }
-
 
 
 

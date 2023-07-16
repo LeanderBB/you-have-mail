@@ -1,9 +1,11 @@
 namespace youhavemail {
     [Throws=ServiceError]
-    Service new_service(Notifier notifier);
+    Service new_service(Notifier notifier, string encryption_key, string config_path);
+
+    string new_encryption_key();
 
     [Throws=ServiceError]
-    Service new_service_from_config(Notifier notifier, ServiceFromConfigCallback cb, [ByRef]string bytes);
+    void migrate_old_config(string encryption_key, string config, string config_path);
 };
 
 
@@ -12,6 +14,14 @@ enum RequestErrorCategory {
     "Connection",
     "Request",
     "API"
+};
+
+[Enum]
+interface ConfigError {
+    Crypto(string msg);
+    JSON(string msg);
+    IO(string msg);
+    Unknown(string msg);
 };
 
 [Error]
@@ -30,26 +40,15 @@ interface ServiceError {
     ProxyError();
 };
 
-[Error]
-interface ConfigError {
-    BackendNotFound(string account, string backend);
-    BackendConfig(string account, string backend, string error);
-    Crypto(string msg);
-    JSON(string msg);
-    RPCFailed(string msg);
-};
-
 enum ObserverAccountStatus {
     "Offline",
     "LoggedOut",
     "Online",
-    "Error",
 };
 
 interface Backend {
     string name();
     string description();
-
 };
 
 interface Account {
@@ -104,14 +103,8 @@ callback interface Notifier {
     void account_online(string email);
     void account_error(string email, ServiceError error);
     void proxy_applied(string email, Proxy? proxy);
-    void account_refreshed(sequence<string> emails, string config);
     void error(string msg);
 };
-
-callback interface ServiceFromConfigCallback {
-    void notify_error(string email, ServiceError error);
-};
-
 
 interface Service {
     sequence<Backend> get_backends();
@@ -122,7 +115,6 @@ interface Service {
     [Throws=ServiceError]
     void check_proxy([ByRef]Backend backend, Proxy? proxy);
 
-    [Throws=ServiceError]
     sequence<ObserverAccount> get_observed_accounts();
 
     [Throws=ServiceError]
@@ -137,21 +129,14 @@ interface Service {
     [Throws=ServiceError]
     void set_account_proxy(string email, Proxy? proxy);
 
-    [Throws=ServiceError]
-    void pause();
-
-    [Throws=ServiceError]
-    void resume();
-
-    [Throws=ServiceError]
-    void shutdown();
-
-    [Throws=ConfigError]
-    string get_config();
-
-    [Throws=ServiceError]
     u64 get_poll_interval();
 
     [Throws=ServiceError]
     void set_poll_interval(u64 interval);
+
+    void quit();
+
+    void pause();
+
+    void resume();
 };

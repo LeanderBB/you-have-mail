@@ -17,7 +17,6 @@ import android.os.PowerManager
 import android.text.Html
 import android.text.Spanned
 import android.util.Log
-import android.widget.Toast
 import androidx.core.app.NotificationCompat
 import androidx.core.content.ContextCompat
 import androidx.security.crypto.EncryptedSharedPreferences
@@ -38,16 +37,15 @@ import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.ServiceAccountNotificationsStartID
 import dev.lbeernaert.youhavemail.ServiceErrorNotificationID
 import dev.lbeernaert.youhavemail.ServiceException
-import dev.lbeernaert.youhavemail.ServiceFromConfigCallback
 import dev.lbeernaert.youhavemail.ServiceNotificationID
 import dev.lbeernaert.youhavemail.createAccountErrorNotification
 import dev.lbeernaert.youhavemail.createAccountStatusNotification
 import dev.lbeernaert.youhavemail.createNotificationChannels
 import dev.lbeernaert.youhavemail.createServiceErrorNotification
 import dev.lbeernaert.youhavemail.createServiceNotification
+import dev.lbeernaert.youhavemail.migrateOldConfig
+import dev.lbeernaert.youhavemail.newEncryptionKey
 import dev.lbeernaert.youhavemail.newService
-import dev.lbeernaert.youhavemail.newServiceFromConfig
-import dev.lbeernaert.youhavemail.serviceExceptionToErrorStr
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
@@ -67,7 +65,7 @@ data class AccountActivity(val dateTime: LocalDateTime, val status: String)
 
 data class UnreadState(var unreadCount: UInt, var lines: ArrayList<Spanned>)
 
-class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
+class ObserverService : Service(), Notifier {
     private var wakeLock: PowerManager.WakeLock? = null
     private var isServiceStarted = false
     private val binder = LocalBinder()
@@ -142,7 +140,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     fun setPollInterval(interval: ULong) {
         mService!!.setPollInterval(interval)
         _pollIntervalFlow.value = interval
-        storeConfig(this, null)
     }
 
     fun setAccountProxy(email: String, proxy: Proxy?) {
@@ -164,6 +161,7 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         Log.d(serviceLogTag, "Network restored")
         try {
             mService!!.resume()
+            updateServiceNotificationStatus("Paused (no network)")
             updateServiceNotificationStatus("Running")
         } catch (e: ServiceException) {
             Log.e(serviceLogTag, "Failed to resume service: $e")
@@ -208,6 +206,10 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         return START_STICKY
     }
 
+    private fun getConfigFilePathV2(): String {
+        return filesDir.canonicalPath + "/config_v2"
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -216,17 +218,28 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
 
         createNotificationChannels(notificationManager)
 
+        val configPath = getConfigFilePathV2()
+        val encryptionKey = loadEncryptionKey(this)
+
+        try {
+            val config = loadConfig(this)
+            if (config != null) {
+                Log.d(serviceLogTag, "Found old config migrating")
+                migrateOldConfig(encryptionKey, config, configPath)
+                deleteOldConfig(this)
+            }
+        } catch (e: ServiceException) {
+            Log.e(serviceLogTag, "Failed to migrate old file $e")
+            createAndDisplayServiceErrorNotification(
+                "Failed to migrate old config, state will be reset",
+                e
+            )
+        }
+
         Log.d(serviceLogTag, "Service has been created")
         startForeground(ServiceNotificationID, createServiceNotification(this, "Running"))
         try {
-            val config = loadConfig(this)
-            mService = if (config == null) {
-                Log.d(serviceLogTag, "No config found, starting fresh")
-                newService(this)
-            } else {
-                Log.d(serviceLogTag, "Starting service with config")
-                newServiceFromConfig(this, this, config)
-            }
+            mService = newService(this, encryptionKey, configPath)
             mBackends.addAll(mService!!.getBackends())
             _pollIntervalFlow.value = mService!!.getPollInterval()
             updateAccountList()
@@ -534,20 +547,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
         recordAccountActivity(email, "Proxy settings changed")
     }
 
-    override fun accountRefreshed(emails: List<String>, config: String) {
-        Log.d(serviceLogTag, "Accounts refreshed: $emails")
-        for (email in emails) {
-            recordAccountActivity(email, "Account Refreshed")
-        }
-
-        val context = this
-        coroutineScope.launch {
-            if (mService != null) {
-                storeConfig(context, null)
-            }
-        }
-    }
-
     override fun error(msg: String) {
         try {
             Log.e(serviceLogTag, "Service Error: $msg")
@@ -558,10 +557,8 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     }
 
     private fun updateAccountList() {
-        val context = this
         coroutineScope.launch {
             if (mService != null) {
-                storeConfig(context, null)
                 try {
                     val accounts = mService!!.getObservedAccounts()
                     _accountListFlow.value = accounts
@@ -573,23 +570,28 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
     }
 
     private fun loadConfig(context: Context): String? {
-        Log.d(serviceLogTag, "Loading Config")
+        Log.d(serviceLogTag, "Loading Old Config")
         val preferences = getSharedPreferences(context)
         return preferences.getString("CONFIG", null)
     }
 
-    private fun storeConfig(context: Context, config: String?) {
-        if (mService != null) {
-            try {
-                Log.d(serviceLogTag, "Saving Config")
-                val configStr = config ?: mService!!.getConfig()
-                val preferences = getSharedPreferences(context)
-                preferences.edit().putString("CONFIG", configStr).apply()
-            } catch (e: ServiceException) {
-                Log.e(serviceLogTag, "Failed to store config: $e")
-            } catch (e: java.lang.Exception) {
-                Log.e(serviceLogTag, "Failed to store config: $e")
-            }
+    private fun deleteOldConfig(context: Context) {
+        Log.d(serviceLogTag, "Deleting Old Config")
+        val preferences = getSharedPreferences(context)
+        preferences.edit().remove("CONFIG").apply()
+    }
+
+    private fun loadEncryptionKey(context: Context): String {
+        Log.d(serviceLogTag, "Loading Encryption key")
+        val preferences = getSharedPreferences(context)
+        val key = preferences.getString("KEY", null)
+        return if (key == null) {
+            Log.d(serviceLogTag, "No key exists, recording")
+            val newKey = newEncryptionKey()
+            preferences.edit().putString("KEY", newKey).apply()
+            newKey
+        } else {
+            key
         }
     }
 
@@ -606,12 +608,6 @@ class ObserverService : Service(), Notifier, ServiceFromConfigCallback {
             EncryptedSharedPreferences.PrefKeyEncryptionScheme.AES256_SIV,
             EncryptedSharedPreferences.PrefValueEncryptionScheme.AES256_GCM
         )
-    }
-
-    override fun notifyError(email: String, error: ServiceException) {
-        Toast.makeText(this, serviceExceptionToErrorStr(error, email), Toast.LENGTH_SHORT).show()
-        recordAccountActivity(email, "Load from config: $error")
-        Log.e(serviceLogTag, "Failed to load '$email' from config: $error")
     }
 
     private fun updateServiceNotificationStatus(newState: String) {
