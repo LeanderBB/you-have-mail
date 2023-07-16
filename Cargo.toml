@@ -26,7 +26,6 @@ base64 = "0.21"
 
 [dependencies.proton-api-rs]
 version = "0.11"
-path = "../proton-api-rs"
 optional = true
 features = ["http-ureq"]
 
