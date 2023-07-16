@@ -19,7 +19,7 @@ impl secrecy::CloneableSecret for EncryptionKey {}
 
 impl EncryptionKey {
     pub fn new() -> Secret<Self> {
-        let mut rng = OsRng::default();
+        let mut rng = OsRng {};
         Secret::new(Self(ChaCha20Poly1305::generate_key(&mut rng)))
     }
 
@@ -76,7 +76,7 @@ pub fn encrypt(key: &Secret<EncryptionKey>, bytes: &[u8]) -> Result<Vec<u8>, any
     if bytes.is_empty() {
         return Err(anyhow!("Empty data"));
     }
-    let mut rng = OsRng::default();
+    let mut rng = OsRng {};
     let nonce = ChaCha20Poly1305::generate_nonce(&mut rng);
     let cipher = ChaCha20Poly1305::new(&key.expose_secret().0);
     let mut encrypted = cipher.encrypt(&nonce, bytes).map_err(|e| anyhow!(e))?;
