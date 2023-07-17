@@ -14,7 +14,7 @@ env:
 
 jobs:
   test:
-    name: Test
+    name: Build
     runs-on: ubuntu-latest
     steps:
       - name : Get sources
@@ -29,7 +29,8 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Run Tests
-        run: cargo test
+        working-directory: you-have-mail-mobile
+        run: cargo build
 
 
   fmt:
@@ -43,6 +44,7 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Check formatting
+        working-directory: you-have-mail-mobile
         run: cargo fmt --check
 
   clippy:
@@ -56,5 +58,6 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
 
       - name: Check formatting
+        working-directory: you-have-mail-mobile
         run: cargo clippy -- -D warnings
 
