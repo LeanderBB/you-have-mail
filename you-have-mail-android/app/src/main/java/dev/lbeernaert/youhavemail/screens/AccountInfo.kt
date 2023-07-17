@@ -9,12 +9,10 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.mutableStateOf
-import androidx.compose.runtime.remember
+import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -23,22 +21,19 @@ import dev.lbeernaert.youhavemail.ObserverAccountStatus
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
-import dev.lbeernaert.youhavemail.service.AccountActivity
+import dev.lbeernaert.youhavemail.service.ServiceAccount
 
 
 @Composable
 fun AccountInfo(
-    accountEmail: String,
-    backendName: String,
-    accountStatus: ObserverAccountStatus,
-    activity: List<AccountActivity>,
+    account: ServiceAccount,
     onBackClicked: () -> Unit,
     onLogout: suspend () -> Unit,
     onLogin: () -> Unit,
     onDelete: suspend () -> Unit,
     onProxyClicked: () -> Unit,
 ) {
-    val accountState = remember { mutableStateOf(accountStatus) }
+    val accountState = account.state.collectAsState()
 
     AsyncScreen(
         title = stringResource(id = R.string.account_title),
@@ -49,7 +44,7 @@ fun AccountInfo(
         val onLogoutImpl: () -> Unit = {
             runTask(logOutBackgroundLabel) {
                 onLogout()
-                accountState.value = ObserverAccountStatus.LOGGED_OUT
+                //accountState.value = ObserverAccountStatus.LOGGED_OUT
             }
         }
 
@@ -70,7 +65,7 @@ fun AccountInfo(
         ) {
 
             Text(
-                text = accountEmail,
+                text = account.email,
                 modifier = Modifier.fillMaxWidth(),
                 style = MaterialTheme.typography.h4,
             )
@@ -78,7 +73,7 @@ fun AccountInfo(
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Backend: $backendName",
+                text = "Backend: ${account.backend}",
                 modifier = Modifier.fillMaxWidth()
             )
 
@@ -117,32 +112,6 @@ fun AccountInfo(
             ActionButton(text = stringResource(id = R.string.delete_account), onDeleteImpl)
 
             Spacer(modifier = Modifier.height(40.dp))
-
-            Divider()
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            Text(
-                text = stringResource(id = R.string.account_activity),
-                modifier = Modifier.fillMaxWidth()
-            )
-
-            Spacer(modifier = Modifier.height(20.dp))
-
-            for (a in activity.reversed()) {
-                Text(
-                    text = a.dateTime.toString(),
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.subtitle2
-                )
-                Text(
-                    text = a.status,
-                    modifier = Modifier.fillMaxWidth(),
-                    style = MaterialTheme.typography.caption,
-                )
-                Spacer(modifier = Modifier.height(20.dp))
-            }
         }
-
     }
 }

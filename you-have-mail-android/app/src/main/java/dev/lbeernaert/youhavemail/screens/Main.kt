@@ -37,10 +37,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import dev.lbeernaert.youhavemail.ObserverAccount
 import dev.lbeernaert.youhavemail.ObserverAccountStatus
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.BackgroundTask
+import dev.lbeernaert.youhavemail.service.ServiceAccount
 import dev.lbeernaert.youhavemail.service.ServiceWrapper
 
 @Composable
@@ -135,7 +135,7 @@ fun AccountList(
 
 
 @Composable
-fun ActiveAccount(account: ObserverAccount, index: Int, onClicked: (Int) -> Unit) {
+fun ActiveAccount(account: ServiceAccount, index: Int, onClicked: (Int) -> Unit) {
     Row(
         modifier = Modifier
             .padding(10.dp)
@@ -143,6 +143,8 @@ fun ActiveAccount(account: ObserverAccount, index: Int, onClicked: (Int) -> Unit
             .clickable { onClicked(index) },
     ) {
         val email = account.email
+        var status = account.state.collectAsState()
+
         Column(
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
@@ -165,7 +167,7 @@ fun ActiveAccount(account: ObserverAccount, index: Int, onClicked: (Int) -> Unit
                 style = MaterialTheme.typography.subtitle1,
                 fontWeight = FontWeight.Bold
             )
-            val statusString = when (account.status) {
+            val statusString = when (status.value) {
                 ObserverAccountStatus.OFFLINE -> stringResource(id = R.string.status_offline)
                 ObserverAccountStatus.LOGGED_OUT -> stringResource(id = R.string.status_logged_out)
                 ObserverAccountStatus.ONLINE -> stringResource(id = R.string.status_online)

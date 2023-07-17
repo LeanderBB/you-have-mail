@@ -1,4 +1,6 @@
 namespace youhavemail {
+    string? init_log(string log_path);
+
     [Throws=ServiceError]
     Service new_service(Notifier notifier, string encryption_key, string config_path);
 
@@ -96,7 +98,7 @@ dictionary Proxy {
 
 callback interface Notifier {
     void new_email (string account, string backend, string sender, string subject);
-    void account_added(string email);
+    void account_added(string email, string backend, Proxy? proxy);
     void account_logged_out(string email);
     void account_removed(string email);
     void account_offline(string email);

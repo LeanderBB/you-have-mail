@@ -1,7 +1,11 @@
 package dev.lbeernaert.youhavemail.service
 
 import android.util.Log
-import dev.lbeernaert.youhavemail.*
+import dev.lbeernaert.youhavemail.Account
+import dev.lbeernaert.youhavemail.Backend
+import dev.lbeernaert.youhavemail.Proxy
+import dev.lbeernaert.youhavemail.Service
+import dev.lbeernaert.youhavemail.ServiceException
 import kotlinx.coroutines.flow.StateFlow
 
 class ServiceWrapper {
@@ -22,12 +26,12 @@ class ServiceWrapper {
         mService = null
     }
 
-    fun getAccountsStateFlow(): StateFlow<List<ObserverAccount>> {
-        return mObserverService!!.accountList
+    fun getAccountsStateFlow(): StateFlow<List<ServiceAccount>> {
+        return mObserverService!!.mServiceState.getAccounts()
     }
 
     fun getPollIntervalValueStateFlow(): StateFlow<ULong> {
-        return mObserverService!!.pollInterval
+        return mObserverService!!.mServiceState.getPollInterval()
     }
 
     fun getBackends(): List<Backend> {
@@ -86,9 +90,9 @@ class ServiceWrapper {
         return null
     }
 
-    fun getAccount(index: Int): ObserverAccount? {
+    fun getAccount(index: Int): ServiceAccount? {
         try {
-            val accounts = mObserverService!!.accountList.value
+            val accounts = mObserverService!!.mServiceState.getAccounts().value
             if (index < accounts.size) {
                 return accounts[index]
             }
@@ -102,9 +106,5 @@ class ServiceWrapper {
 
     fun setPollInterval(intervalSeconds: ULong) {
         mObserverService!!.setPollInterval(intervalSeconds)
-    }
-
-    fun getAccountActivity(email: String): List<AccountActivity> {
-        return mObserverService!!.getAccountActivity(email)
     }
 }

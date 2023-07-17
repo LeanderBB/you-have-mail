@@ -31,7 +31,6 @@ import dev.lbeernaert.youhavemail.NotificationIntentAppNameKey
 import dev.lbeernaert.youhavemail.NotificationIntentBackendKey
 import dev.lbeernaert.youhavemail.NotificationIntentEmailKey
 import dev.lbeernaert.youhavemail.Notifier
-import dev.lbeernaert.youhavemail.ObserverAccount
 import dev.lbeernaert.youhavemail.Proxy
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.ServiceAccountNotificationsStartID
@@ -43,15 +42,13 @@ import dev.lbeernaert.youhavemail.createAccountStatusNotification
 import dev.lbeernaert.youhavemail.createNotificationChannels
 import dev.lbeernaert.youhavemail.createServiceErrorNotification
 import dev.lbeernaert.youhavemail.createServiceNotification
+import dev.lbeernaert.youhavemail.initLog
 import dev.lbeernaert.youhavemail.migrateOldConfig
 import dev.lbeernaert.youhavemail.newEncryptionKey
 import dev.lbeernaert.youhavemail.newService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
-import kotlinx.coroutines.flow.MutableStateFlow
-import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.launch
 import java.time.LocalDateTime
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
@@ -76,23 +73,11 @@ class ObserverService : Service(), Notifier {
     // System listeners
     private val networkListener = NetworkListener(this)
 
-    // State Flows
-    private var _accountListFlow: MutableStateFlow<List<ObserverAccount>> =
-        MutableStateFlow(ArrayList())
-    val accountList: StateFlow<List<ObserverAccount>> get() = _accountListFlow
-    private var _pollIntervalFlow: MutableStateFlow<ULong> =
-        MutableStateFlow(15UL)
-    val pollInterval: StateFlow<ULong> get() = _pollIntervalFlow
-
     // Notification State
     private var notificationIDCounter: Int = ServiceAccountNotificationsStartID
     private var notificationMap: HashMap<String, NotificationIds> = HashMap()
     private var unreadState: HashMap<String, UnreadState> = HashMap()
     private var unreadMessageStateMutex: Lock = ReentrantLock()
-
-    // Account Activity
-    private var accountActivity = HashMap<String, ArrayList<AccountActivity>>()
-    private var accountActivityLock: Lock = ReentrantLock()
 
     // Have to keep this here or it won't survive activity refreshes
     private var mInLoginAccount: Account? = null
@@ -100,6 +85,8 @@ class ObserverService : Service(), Notifier {
     private var mBackends: ArrayList<Backend> = ArrayList()
 
     var mService: dev.lbeernaert.youhavemail.Service? = null
+
+    var mServiceState: ObserverServiceState = ObserverServiceState()
 
     inner class LocalBinder : Binder() {
         fun getService(): ObserverService = this@ObserverService
@@ -139,7 +126,7 @@ class ObserverService : Service(), Notifier {
 
     fun setPollInterval(interval: ULong) {
         mService!!.setPollInterval(interval)
-        _pollIntervalFlow.value = interval
+        mServiceState.onPollIntervalChanged(interval)
     }
 
     fun setAccountProxy(email: String, proxy: Proxy?) {
@@ -148,16 +135,17 @@ class ObserverService : Service(), Notifier {
 
     fun pauseServiceNoNetwork() {
         Log.d(serviceLogTag, "Pause service")
+        mServiceState.onNetworkLost()
         try {
             mService!!.pause()
             updateServiceNotificationStatus("Paused (no network)")
         } catch (e: ServiceException) {
             Log.e(serviceLogTag, "Failed to pause service: $e")
         }
-        recordAccountActivityAll("Paused due to lack of network")
     }
 
     fun resumeService() {
+        mServiceState.onNetworkRestored()
         Log.d(serviceLogTag, "Network restored")
         try {
             mService!!.resume()
@@ -170,7 +158,6 @@ class ObserverService : Service(), Notifier {
                 e
             )
         }
-        recordAccountActivityAll("Resumed, network restored")
     }
 
     fun acquireWakeLock() {
@@ -210,6 +197,10 @@ class ObserverService : Service(), Notifier {
         return filesDir.canonicalPath + "/config_v2"
     }
 
+    private fun getLogPath(): String {
+        return filesDir.canonicalPath + "/logs"
+    }
+
     override fun onCreate() {
         super.onCreate()
 
@@ -217,6 +208,11 @@ class ObserverService : Service(), Notifier {
             getSystemService(NOTIFICATION_SERVICE) as NotificationManager
 
         createNotificationChannels(notificationManager)
+
+        val logErr = initLog(getLogPath())
+        if (logErr != null) {
+            createAndDisplayServiceErrorNotification(logErr)
+        }
 
         val configPath = getConfigFilePathV2()
         val encryptionKey = loadEncryptionKey(this)
@@ -241,8 +237,6 @@ class ObserverService : Service(), Notifier {
         try {
             mService = newService(this, encryptionKey, configPath)
             mBackends.addAll(mService!!.getBackends())
-            _pollIntervalFlow.value = mService!!.getPollInterval()
-            updateAccountList()
             registerNetworkListener()
         } catch (e: ServiceException) {
             Log.e(serviceLogTag, "Failed to create service:$e")
@@ -250,7 +244,11 @@ class ObserverService : Service(), Notifier {
                 "Failed to create Service",
                 e
             )
+            return
         }
+
+        mServiceState.setFrom(mService!!.getObservedAccounts())
+        mServiceState.onPollIntervalChanged(mService!!.getPollInterval())
     }
 
     override fun onDestroy() {
@@ -483,17 +481,15 @@ class ObserverService : Service(), Notifier {
         }
     }
 
-    override fun accountAdded(email: String) {
+    override fun accountAdded(email: String, backend: String, proxy: Proxy?) {
+        mServiceState.onAccountAdded(email, backend, proxy)
         Log.d(serviceLogTag, "Account added: $email")
-        addAccountActivity(email)
-        updateAccountList()
     }
 
     override fun accountLoggedOut(email: String) {
+        mServiceState.onAccountLoggedOut(email)
         Log.d(serviceLogTag, "Account Logged Out: $email")
         try {
-            recordAccountActivity(email, "Session Expired")
-            updateAccountList()
             val notification =
                 createAccountStatusNotification(this, "Account $email session expired")
             val ids = getOrCreateNotificationIDs(email)
@@ -508,27 +504,23 @@ class ObserverService : Service(), Notifier {
     }
 
     override fun accountRemoved(email: String) {
+        mServiceState.onAccountRemoved(email)
         Log.d(serviceLogTag, "Account Removed: $email")
-        updateAccountList()
-        removeAccountActivity(email)
     }
 
     override fun accountOffline(email: String) {
+        mServiceState.onAccountOffline(email)
         Log.d(serviceLogTag, "Account Offline: $email")
-        recordAccountActivity(email, "Offline")
-        updateAccountList()
     }
 
     override fun accountOnline(email: String) {
+        mServiceState.onAccountOnline(email)
         Log.d(serviceLogTag, "Account Online: $email")
-        recordAccountActivity(email, "Online")
-        updateAccountList()
     }
 
     override fun accountError(email: String, error: ServiceException) {
         Log.e(serviceLogTag, "Account Error: $email => $error")
         try {
-            recordAccountActivity(email, error.toString())
             val notification = createAccountErrorNotification(this, email, error)
             val ids = getOrCreateNotificationIDs(email)
             with(this.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
@@ -542,9 +534,8 @@ class ObserverService : Service(), Notifier {
     }
 
     override fun proxyApplied(email: String, proxy: Proxy?) {
+        mServiceState.onAccountProxyChanged(email, proxy)
         Log.d(serviceLogTag, "Account $email applied Proxy $proxy")
-        updateAccountList()
-        recordAccountActivity(email, "Proxy settings changed")
     }
 
     override fun error(msg: String) {
@@ -553,19 +544,6 @@ class ObserverService : Service(), Notifier {
             createAndDisplayServiceErrorNotification(msg)
         } catch (e: Exception) {
             Log.e(serviceLogTag, "Failed to display notification: $e")
-        }
-    }
-
-    private fun updateAccountList() {
-        coroutineScope.launch {
-            if (mService != null) {
-                try {
-                    val accounts = mService!!.getObservedAccounts()
-                    _accountListFlow.value = accounts
-                } catch (e: ServiceException) {
-                    Log.e(serviceLogTag, "Failed to refresh account list")
-                }
-            }
         }
     }
 
@@ -639,82 +617,6 @@ class ObserverService : Service(), Notifier {
             if (this.areNotificationsEnabled()) {
                 notify(ServiceErrorNotificationID, notification)
             }
-        }
-    }
-
-
-    fun getAccountActivity(email: String): List<AccountActivity> {
-        accountActivityLock.lock()
-
-        var result = if (accountActivity.containsKey(email)) {
-            ArrayList(accountActivity[email]!!)
-        } else {
-            ArrayList()
-        }
-
-        accountActivityLock.unlock()
-        return result
-    }
-
-    private fun recordAccountActivity(email: String, message: String) {
-        try {
-            accountActivityLock.lock()
-
-            val newActivity = AccountActivity(dateTime = LocalDateTime.now(), message)
-
-            var list = accountActivity.getOrPut(email) { ArrayList() }
-
-            if (list.size > 20) {
-                list.removeAt(0)
-            }
-            list.add(newActivity)
-
-        } catch (e: Exception) {
-            Log.e(serviceLogTag, "Failed to record activity: $e")
-        } finally {
-            accountActivityLock.unlock()
-        }
-    }
-
-    private fun recordAccountActivityAll(message: String) {
-        try {
-            accountActivityLock.lock()
-
-            val newActivity = AccountActivity(dateTime = LocalDateTime.now(), message)
-
-            for (list in accountActivity.values) {
-                if (list.size > 20) {
-                    list.removeAt(0)
-                }
-                list.add(newActivity)
-            }
-
-        } catch (e: Exception) {
-            Log.e(serviceLogTag, "Failed to record activity: $e")
-        } finally {
-            accountActivityLock.unlock()
-        }
-    }
-
-    private fun removeAccountActivity(email: String) {
-        try {
-            accountActivityLock.lock()
-            accountActivity.remove(email)
-        } catch (e: Exception) {
-            Log.e(serviceLogTag, "Failed to remove activity: $e")
-        } finally {
-            accountActivityLock.unlock()
-        }
-    }
-
-    private fun addAccountActivity(email: String) {
-        try {
-            accountActivityLock.lock()
-            accountActivity[email] = kotlin.collections.ArrayList()
-        } catch (e: Exception) {
-            Log.e(serviceLogTag, "Failed to remove activity: $e")
-        } finally {
-            accountActivityLock.unlock()
         }
     }
 }

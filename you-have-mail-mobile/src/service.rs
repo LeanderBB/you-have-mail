@@ -3,10 +3,11 @@
 use crate::{ConfigError, Notifier, NotifierWrapper, Proxy, ServiceError};
 use parking_lot::{Mutex, RwLock};
 use std::ops::DerefMut;
+use std::path::PathBuf;
 use std::sync::mpsc::{RecvTimeoutError, Sender};
 use std::sync::Arc;
 use std::time::Duration;
-use uniffi::deps::log::{debug, error};
+use uniffi::deps::log::{debug, error, info};
 use you_have_mail_common as yhm;
 use you_have_mail_common::{EncryptionKey, ExposeSecret, Secret};
 
@@ -220,9 +221,7 @@ pub fn new_service(
     encryption_key: String,
     config_path: String,
 ) -> Result<Arc<Service>, ServiceError> {
-    #[cfg(target_os = "android")]
-    init_android_logger();
-
+    info!("Initializing new service");
     let backends = get_backends();
 
     let encryption_key = Secret::new(yhm::EncryptionKey::with_base64(encryption_key).map_err(
@@ -334,6 +333,14 @@ pub fn migrate_old_config(
     Ok(())
 }
 
+pub fn init_log(filepath:String) -> Option<String> {
+    if let Err(e) = you_have_mail_common::log::init_log(PathBuf::from(filepath)) {
+        return Some(e.to_string());
+    }
+    info!("Log file initialized");
+    None
+}
+
 fn get_backends() -> Vec<Arc<Backend>> {
     [
         #[cfg(feature = "null_backend")]
@@ -360,23 +367,4 @@ fn get_backends() -> Vec<Arc<Backend>> {
     .into_iter()
     .map(|x| Arc::new(Backend(x)))
     .collect::<Vec<_>>()
-}
-
-#[cfg(target_os = "android")]
-fn init_android_logger() {
-    use android_logger::{Config, FilterBuilder};
-    use uniffi::deps::log::LevelFilter;
-    android_logger::init_once(
-        Config::default()
-            .with_max_level(LevelFilter::Debug) // limit log level
-            .with_tag("yhm-rs")
-            .with_filter(
-                FilterBuilder::new()
-                    .filter(None, LevelFilter::Error)
-                    .filter(Some("you_have_mail_common"), LevelFilter::Debug)
-                    .filter(Some("youhavemail::service"), LevelFilter::Debug)
-                    .filter(Some("proton_api_rs"), LevelFilter::Debug)
-                    .build(),
-            ),
-    );
 }

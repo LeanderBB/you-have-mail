@@ -5,7 +5,7 @@ use crate::{Proxy, ServiceError};
 ///  Trait through which notifications will be delivered to the mobile clients.
 pub trait Notifier: Send + Sync {
     fn new_email(&self, account: String, backend: String, sender: String, subject: String);
-    fn account_added(&self, email: String);
+    fn account_added(&self, email: String, backend: String, proxy: Option<Proxy>);
     fn account_logged_out(&self, email: String);
     fn account_removed(&self, email: String);
     fn account_offline(&self, email: String);
@@ -34,7 +34,10 @@ impl you_have_mail_common::Notifier for NotifierWrapper {
                     );
                 }
             }
-            Not::AccountAdded(e) => self.0.account_added(e.to_string()),
+            Not::AccountAdded(email, backend, proxy) => {
+                self.0
+                    .account_added(email.to_string(), backend.to_string(), proxy.cloned())
+            }
             Not::AccountLoggedOut(e) => self.0.account_logged_out(e.to_string()),
             Not::AccountRemoved(e) => self.0.account_removed(e.to_string()),
             Not::AccountOffline(e) => self.0.account_offline(e.to_string()),

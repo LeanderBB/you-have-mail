@@ -146,10 +146,7 @@ fun MainNavController(
             } else {
                 val email = account.email
                 AccountInfo(
-                    accountEmail = email,
-                    backendName = account.backend,
-                    accountStatus = account.status,
-                    activity = serviceWrapper.getAccountActivity(email),
+                    account = account,
                     onBackClicked = {
                         navController.popBackStack(Routes.Main.route, false)
                     },
@@ -161,7 +158,7 @@ fun MainNavController(
                     onLogin = {
                         val backendIndex = serviceWrapper.backendIndexByName(account.backend)
                         if (backendIndex != null) {
-                            serviceWrapper.setInLoginProxy(account.proxy)
+                            serviceWrapper.setInLoginProxy(account.proxy.value)
                             navController.navigate(Routes.newLoginRoute(backendIndex, email))
                         } else {
                             Log.e(navLogTag, "Could not find backend named: ${account.backend}")
@@ -245,7 +242,7 @@ fun MainNavController(
                         }
                         navController.popBackStack()
                     },
-                    proxy = account.proxy,
+                    proxy = account.proxy.value,
                     isLoginRequest = false,
                 )
             }
