@@ -1,5 +1,7 @@
 # Features
 * Log files: Application can now record and share logs for debugging
+* Password field visibility toggle
+* Monochrome Icon (Android 13+)
 
 # Fixes
 * Improve app state management
