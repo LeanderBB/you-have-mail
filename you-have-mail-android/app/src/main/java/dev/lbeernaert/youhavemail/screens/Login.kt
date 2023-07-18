@@ -7,7 +7,6 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.text.KeyboardActions
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
@@ -20,12 +19,12 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
+import dev.lbeernaert.youhavemail.components.PasswordField
 
 
 @Composable
@@ -82,21 +81,7 @@ fun Login(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            TextField(
-                modifier = Modifier.fillMaxWidth(),
-                label = { Text(text = "Password") },
-                value = password.value,
-                singleLine = true,
-                visualTransformation = PasswordVisualTransformation(),
-                keyboardOptions = KeyboardOptions(
-                    keyboardType = KeyboardType.Password,
-                    imeAction = ImeAction.Done
-                ),
-                onValueChange = { password.value = it },
-                keyboardActions = KeyboardActions(onDone = {
-                    onClick()
-                })
-            )
+            PasswordField(placeHolder = "Password", state = password, onClick = onClick)
 
             Spacer(modifier = Modifier.height(20.dp))
 

@@ -15,7 +15,6 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
-import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
 import dev.lbeernaert.youhavemail.Proxy
@@ -24,6 +23,7 @@ import dev.lbeernaert.youhavemail.ProxyProtocol
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
+import dev.lbeernaert.youhavemail.components.PasswordField
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
@@ -91,7 +91,7 @@ fun ProxyScreen(
                     )
                 )
             }
-            var proxyPassword by remember {
+            var proxyPassword = remember {
                 mutableStateOf(
                     TextFieldValue(
                         if (proxy != null && proxy.auth != null) {
@@ -152,7 +152,7 @@ fun ProxyScreen(
                         proxyPort.text,
                         useAuth,
                         proxyUser.text,
-                        proxyPassword.text,
+                        proxyPassword.value.text,
                     )
                     runTask(onApplyLabel) {
                         onApplyClicked(proxyConfig)
@@ -286,19 +286,10 @@ fun ProxyScreen(
 
                     Spacer(modifier = Modifier.height(20.dp))
 
-                    TextField(
-                        modifier = Modifier.fillMaxWidth(),
-                        label = { Text(text = stringResource(id = R.string.proxy_user_password)) },
-                        singleLine = true,
-                        enabled = useAuth,
-                        value = proxyPassword,
-                        visualTransformation = PasswordVisualTransformation(),
-                        onValueChange = { proxyPassword = it },
-                        keyboardOptions = KeyboardOptions(
-                            keyboardType = KeyboardType.Password,
-                            imeAction = ImeAction.Next
-                        ),
-                    )
+                    PasswordField(
+                        placeHolder = stringResource(id = R.string.proxy_user_password),
+                        state = proxyPassword,
+                        onClick = {})
                 }
             }
 
