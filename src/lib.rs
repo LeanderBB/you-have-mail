@@ -32,6 +32,7 @@
 mod account;
 pub mod backend;
 mod encryption;
+pub mod log;
 mod observer;
 mod proxy;
 mod traits;

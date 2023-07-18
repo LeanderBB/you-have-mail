@@ -1,5 +1,5 @@
 use proton_api_rs::domain::SecretString;
-use proton_api_rs::log::{error, info, warn, LevelFilter};
+use proton_api_rs::log::{error, info, warn};
 use secrecy::{ExposeSecret, Secret};
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
@@ -74,11 +74,7 @@ impl Notifier for StdOutNotifier {
 }
 
 fn main() {
-    env_logger::builder()
-        .filter_level(LevelFilter::Error)
-        .filter_module("cli", LevelFilter::Info)
-        .filter_module("you_have_mail_common", LevelFilter::Debug)
-        .init();
+    you_have_mail_common::log::init_log(get_log_path()).expect("Failed to init log");
     let should_quit = Arc::new(AtomicBool::new(false));
     let should_quit_copy = should_quit.clone();
     ctrlc::set_handler(move || should_quit_copy.store(true, Ordering::SeqCst))
@@ -174,4 +170,8 @@ const CONFIG_FILE_NAME: &str = "you-have-mail-common-cli.conf";
 
 fn get_config_file_path() -> PathBuf {
     dirs::config_dir().unwrap().join(CONFIG_FILE_NAME)
+}
+
+fn get_log_path() -> PathBuf {
+    dirs::data_dir().unwrap()
 }
