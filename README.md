@@ -12,14 +12,10 @@ future. Currently, the following email providers are supported:
 
 * [Proton Mail](https://mail.proton.me) - This backend only reports new messages in the INBOX mailbox
 
-## Known Issues
-* If you have U2F/FIDO2 Security key in v0.8.0 or lower, you may encounter a network error after inputing password [#19](https://github.com/LeanderBB/you-have-mail/issues/19)
-
 ## Structure
 
 This repository is split into the following projects:
 
-* [you-have-mail-common](you-have-mail-common): Shared code for the project
 * [you-have-mail-mobile](you-have-mail-mobile): Shared code for mobile bindings
 * [you-have-mail-android](you-have-mail-android): Android Application
 
