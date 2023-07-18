@@ -9,7 +9,10 @@ use log4rs::encode::pattern::PatternEncoder;
 use proton_api_rs::log::LevelFilter;
 use std::path::Path;
 
-pub fn init_log(file_path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
+pub fn init_log(
+    file_path: impl AsRef<Path>,
+    debug_module_list: impl IntoIterator<Item = String>,
+) -> Result<(), anyhow::Error> {
     let pattern = "{d(%Y-%m-%d %H:%M:%S)} | {({l}):5.5} | {m}{n}";
     let console = ConsoleAppender::builder()
         .encoder(Box::new(PatternEncoder::new(pattern)))
@@ -32,6 +35,16 @@ pub fn init_log(file_path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
         )
         .map_err(|e| anyhow!("Failed to build file logger: {e}"))?;
 
+    let loggers = debug_module_list
+        .into_iter()
+        .map(|name| {
+            Logger::builder()
+                .additive(false)
+                .appender("logfile")
+                .build(name, LevelFilter::Debug)
+        })
+        .collect::<Vec<_>>();
+
     let config = log4rs::Config::builder()
         .appender(Appender::builder().build("console", Box::new(console)))
         .appender(Appender::builder().build("logfile", Box::new(log_file)))
@@ -41,6 +54,7 @@ pub fn init_log(file_path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
                 .appender("logfile")
                 .build("you_have_mail_common", LevelFilter::Debug),
         )
+        .loggers(loggers)
         .build(
             Root::builder()
                 .appender("console")
