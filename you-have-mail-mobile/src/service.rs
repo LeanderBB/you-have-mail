@@ -88,6 +88,12 @@ pub struct Service {
     auto_poller_sender: Mutex<Sender<AutoPollerMessage>>,
 }
 
+impl Drop for Service {
+    fn drop(&mut self) {
+        debug!("Service destroyed")
+    }
+}
+
 impl Service {
     pub fn new_account(
         self: Arc<Self>,
@@ -317,6 +323,7 @@ pub fn migrate_old_config(
     config: String,
     file_path: String,
 ) -> Result<(), ServiceError> {
+    debug!("Migrating old config");
     let key = Secret::new(EncryptionKey::with_base64(encryption_key).map_err(|e| {
         ServiceError::Config {
             error: ConfigError::Crypto {
@@ -334,7 +341,9 @@ pub fn migrate_old_config(
 }
 
 pub fn init_log(filepath: String) -> Option<String> {
-    if let Err(e) = you_have_mail_common::log::init_log(PathBuf::from(filepath)) {
+    if let Err(e) =
+        you_have_mail_common::log::init_log(PathBuf::from(filepath), ["youhavemail".to_string()])
+    {
         return Some(e.to_string());
     }
     info!("Log file initialized");

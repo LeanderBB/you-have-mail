@@ -1611,7 +1611,7 @@ checksum = "1a515f5799fe4961cb532f983ce2b23082366b898e52ffbce459c86f67c8378a"
 [[package]]
 name = "you-have-mail-common"
 version = "0.7.0"
-source = "git+https://github.com/LeanderBB/you-have-mail-common#2d1b7a41632883b4215ce4c8d47cc64438a3d440"
+source = "git+https://github.com/LeanderBB/you-have-mail-common#9ffdb0f42dc236bfe114263a9a7695437afb8c8a"
 dependencies = [
  "anyhow",
  "base64",
