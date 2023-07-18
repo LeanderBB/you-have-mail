@@ -1,0 +1,5 @@
+# Features
+* Log files: Application can now record and share logs for debugging
+
+# Fixes
+* Improve app state management
