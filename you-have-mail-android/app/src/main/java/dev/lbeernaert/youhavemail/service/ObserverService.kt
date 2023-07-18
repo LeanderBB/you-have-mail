@@ -50,7 +50,6 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import java.io.File
-import java.time.LocalDateTime
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
@@ -58,8 +57,6 @@ import java.util.concurrent.locks.ReentrantLock
 const val serviceLogTag = "observer"
 
 data class NotificationIds(val newMessages: Int, val statusUpdate: Int, val errors: Int)
-
-data class AccountActivity(val dateTime: LocalDateTime, val status: String)
 
 data class UnreadState(var unreadCount: UInt, var lines: ArrayList<Spanned>)
 
