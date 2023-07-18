@@ -4,16 +4,19 @@ use log4rs::append::rolling_file::policy::compound::roll::fixed_window::FixedWin
 use log4rs::append::rolling_file::policy::compound::trigger::size::SizeTrigger;
 use log4rs::append::rolling_file::policy::compound::CompoundPolicy;
 use log4rs::append::rolling_file::RollingFileAppender;
-use log4rs::config::{Appender, Root};
+use log4rs::config::{Appender, Logger, Root};
 use log4rs::encode::pattern::PatternEncoder;
-use log4rs::filter::threshold::ThresholdFilter;
 use proton_api_rs::log::LevelFilter;
 use std::path::Path;
 
 pub fn init_log(file_path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
-    let console = ConsoleAppender::builder().target(Target::Stdout).build();
+    let pattern = "{d(%Y-%m-%d %H:%M:%S)} | {({l}):5.5} | {m}{n}";
+    let console = ConsoleAppender::builder()
+        .encoder(Box::new(PatternEncoder::new(pattern)))
+        .target(Target::Stdout)
+        .build();
     let log_file = RollingFileAppender::builder()
-        .encoder(Box::new(PatternEncoder::new("[{l}][{d}][{t}]: {m}{n}")))
+        .encoder(Box::new(PatternEncoder::new(pattern)))
         .append(true)
         .build(
             file_path.as_ref().join("yhm.log"),
@@ -30,17 +33,19 @@ pub fn init_log(file_path: impl AsRef<Path>) -> Result<(), anyhow::Error> {
         .map_err(|e| anyhow!("Failed to build file logger: {e}"))?;
 
     let config = log4rs::Config::builder()
-        .appender(
-            Appender::builder()
-                .filter(Box::new(ThresholdFilter::new(LevelFilter::Info)))
-                .build("console", Box::new(console)),
-        )
+        .appender(Appender::builder().build("console", Box::new(console)))
         .appender(Appender::builder().build("logfile", Box::new(log_file)))
+        .logger(
+            Logger::builder()
+                .additive(false)
+                .appender("logfile")
+                .build("you_have_mail_common", LevelFilter::Debug),
+        )
         .build(
             Root::builder()
                 .appender("console")
                 .appender("logfile")
-                .build(LevelFilter::Debug),
+                .build(LevelFilter::Info),
         )
         .map_err(|e| anyhow!("Failed to build log config: {e}"))?;
 

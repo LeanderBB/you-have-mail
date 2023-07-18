@@ -27,7 +27,7 @@ base64 = "0.21"
 [dependencies.log4rs]
 version = "1.2"
 default-features = false
-features = ["console_appender", "file_appender", "rolling_file_appender", "fixed_window_roller", "size_trigger", "compound_policy", "threshold_filter"]
+features = ["console_appender", "file_appender", "rolling_file_appender", "fixed_window_roller", "size_trigger", "compound_policy"]
 
 [dependencies.proton-api-rs]
 version = "0.11"
