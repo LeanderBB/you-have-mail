@@ -54,7 +54,7 @@ impl Notifier for StatefulNotifier {
                     }
                 };
             }
-            Notification::AccountAdded(email) => {
+            Notification::AccountAdded(email, _, _) => {
                 self.account_state
                     .lock()
                     .insert(email.to_string(), AccountState::Online);

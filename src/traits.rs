@@ -14,8 +14,8 @@ pub enum Notification<'a> {
         backend: &'a str,
         emails: &'a [EmailInfo],
     },
-    /// A new account was recently added
-    AccountAdded(&'a str),
+    /// A new account was recently added (email, backend, proxy)
+    AccountAdded(&'a str, &'a str, Option<&'a Proxy>),
     /// An account got logged out
     AccountLoggedOut(&'a str),
     /// An Account got removed

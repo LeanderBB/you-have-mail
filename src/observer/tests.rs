@@ -35,7 +35,7 @@ fn notifier_called() {
     let mut notifier = MockNotifier::new();
     notifier
         .expect_notify()
-        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .withf(|n| matches!(n, Notification::AccountAdded(_, _, _)))
         .times(1)
         .return_const(());
     notifier
@@ -61,7 +61,7 @@ fn adding_account_after_logout_works() {
     let mut sequence = Sequence::new();
     notifier
         .expect_notify()
-        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .withf(|n| matches!(n, Notification::AccountAdded(_, _, _)))
         .times(1)
         .in_sequence(&mut sequence)
         .return_const(());
@@ -101,7 +101,7 @@ fn removing_account_produces_remove_notification() {
     let mut sequence = Sequence::new();
     notifier
         .expect_notify()
-        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .withf(|n| matches!(n, Notification::AccountAdded(_, _, _)))
         .times(1)
         .in_sequence(&mut sequence)
         .return_const(());
@@ -129,7 +129,7 @@ fn test_proxy_settings() {
     let mut sequence = Sequence::new();
     notifier
         .expect_notify()
-        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .withf(|n| matches!(n, Notification::AccountAdded(_, _, _)))
         .times(1)
         .in_sequence(&mut sequence)
         .return_const(());
@@ -183,7 +183,7 @@ fn test_account_refreshed() {
     let mut sequence = Sequence::new();
     notifier
         .expect_notify()
-        .withf(|n| matches!(n, Notification::AccountAdded(_)))
+        .withf(|n| matches!(n, Notification::AccountAdded(_, _, _)))
         .times(1)
         .in_sequence(&mut sequence)
         .return_const(());

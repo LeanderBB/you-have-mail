@@ -42,8 +42,8 @@ impl Notifier for StdOutNotifier {
                     info!("--> Sender={} Subject={}", info.sender, info.subject);
                 }
             }
-            Notification::AccountAdded(email) => {
-                info!("Account Added {email}");
+            Notification::AccountAdded(email, backend, _) => {
+                info!("Account Added {email} ({backend})");
             }
             Notification::AccountLoggedOut(email) => {
                 info!("Account Logged out {email}");

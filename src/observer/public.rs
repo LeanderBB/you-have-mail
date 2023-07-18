@@ -224,7 +224,11 @@ impl Observer {
                 Ok(())
             }
             Entry::Vacant(v) => {
-                self.notifier.notify(AccountAdded(account.email()));
+                self.notifier.notify(AccountAdded(
+                    account.email(),
+                    account.backend().name(),
+                    account.get_proxy().as_ref(),
+                ));
                 self.config
                     .write(|inner| inner.add_or_update_account(&account))?;
                 v.insert(account);
