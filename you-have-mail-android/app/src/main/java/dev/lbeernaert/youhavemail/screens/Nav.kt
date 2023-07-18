@@ -1,5 +1,6 @@
 package dev.lbeernaert.youhavemail.screens
 
+import android.app.Activity
 import android.content.Context
 import android.util.Log
 import android.widget.Toast
@@ -23,7 +24,7 @@ const val navLogTag = "nav"
 
 @Composable
 fun MainNavController(
-    context: Context,
+    context: Activity,
     serviceWrapper: ServiceWrapper,
     appState: AppState,
     requestPermissions: () -> Unit
@@ -178,7 +179,9 @@ fun MainNavController(
         }
 
         composable(Routes.Settings.route) {
-            Settings(serviceWrapper,
+            Settings(
+                service = serviceWrapper,
+                context = context,
                 onBackClicked = {
                     navController.popBackStack()
                 },

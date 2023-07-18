@@ -49,6 +49,7 @@ import dev.lbeernaert.youhavemail.newService
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
+import java.io.File
 import java.time.LocalDateTime
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
@@ -61,6 +62,10 @@ data class NotificationIds(val newMessages: Int, val statusUpdate: Int, val erro
 data class AccountActivity(val dateTime: LocalDateTime, val status: String)
 
 data class UnreadState(var unreadCount: UInt, var lines: ArrayList<Spanned>)
+
+fun getLogPath(context: Context): File {
+    return File(context.filesDir.canonicalPath, "logs")
+}
 
 class ObserverService : Service(), Notifier {
     private var wakeLock: PowerManager.WakeLock? = null
@@ -197,10 +202,6 @@ class ObserverService : Service(), Notifier {
         return filesDir.canonicalPath + "/config_v2"
     }
 
-    private fun getLogPath(): String {
-        return filesDir.canonicalPath + "/logs"
-    }
-
     override fun onCreate() {
         super.onCreate()
 
@@ -209,9 +210,13 @@ class ObserverService : Service(), Notifier {
 
         createNotificationChannels(notificationManager)
 
-        val logErr = initLog(getLogPath())
-        if (logErr != null) {
-            createAndDisplayServiceErrorNotification(logErr)
+        try {
+            val logErr = initLog(getLogPath(this).canonicalPath)
+            if (logErr != null) {
+                createAndDisplayServiceErrorNotification(logErr)
+            }
+        } catch (e: Exception) {
+            createAndDisplayServiceErrorNotification("Failed to init log: ${e}")
         }
 
         val configPath = getConfigFilePathV2()

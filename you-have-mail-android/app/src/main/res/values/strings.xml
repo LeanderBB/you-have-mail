@@ -60,4 +60,7 @@
     <string name="account_activity">Activity</string>
     <string name="captcha_request">Captcha Verification</string>
     <string name="retry_login_with_captcha">Retrying Login after Captcha Solve</string>
+    <string name="export_logs">Export Logs</string>
+    <string name="export_logs_success">Logs successfully exported</string>
+    <string name="export_logs_failed">Failed to export logs: %1$s</string>
 </resources>

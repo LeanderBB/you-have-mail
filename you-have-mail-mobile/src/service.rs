@@ -333,7 +333,7 @@ pub fn migrate_old_config(
     Ok(())
 }
 
-pub fn init_log(filepath:String) -> Option<String> {
+pub fn init_log(filepath: String) -> Option<String> {
     if let Err(e) = you_have_mail_common::log::init_log(PathBuf::from(filepath)) {
         return Some(e.to_string());
     }

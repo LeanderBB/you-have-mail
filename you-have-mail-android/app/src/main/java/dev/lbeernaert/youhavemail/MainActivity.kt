@@ -43,9 +43,11 @@ import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
 import dev.lbeernaert.youhavemail.screens.MainNavController
 import dev.lbeernaert.youhavemail.service.Actions
+import dev.lbeernaert.youhavemail.service.LOG_EXPORT_REQUEST
 import dev.lbeernaert.youhavemail.service.ObserverService
 import dev.lbeernaert.youhavemail.service.ServiceState
 import dev.lbeernaert.youhavemail.service.ServiceWrapper
+import dev.lbeernaert.youhavemail.service.exportLogs
 import dev.lbeernaert.youhavemail.service.getServiceState
 import dev.lbeernaert.youhavemail.service.serviceLogTag
 import dev.lbeernaert.youhavemail.ui.theme.YouHaveMailTheme
@@ -217,7 +219,15 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                 Log.e(activityLogTag, "Failed to launch $appName for backend $backend: $e")
             }
         }
+    }
 
+    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
+        super.onActivityResult(requestCode, resultCode, data)
+        when (requestCode) {
+            LOG_EXPORT_REQUEST -> data?.data?.let {
+                exportLogs(this, it)
+            }
+        }
     }
 }
 
