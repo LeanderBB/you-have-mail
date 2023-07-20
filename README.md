@@ -5,6 +5,8 @@ you only wish to be notified when your email account has a new message and the d
 does not work (e.g: Android without Google Play Services) or do not wish to have the web interface/email client open at
 all times.
 
+If you want these features in CLI package, please see [You Have Mail CLI](https://github.com/LeanderBB/you-have-mail-cli).
+
 ## Supported Backends
 
 The application structure has been made backend agnostics, so it should be possible to add different providers in the
