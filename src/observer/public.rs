@@ -35,7 +35,6 @@ pub struct ObserverBuilder {
     notifier: Arc<dyn Notifier>,
     backends: Vec<Arc<dyn Backend>>,
     config: Config,
-    poll_interval: Duration,
 }
 
 pub type ObserverResult<T> = Result<T, ObserverError>;
@@ -43,17 +42,10 @@ pub type ObserverResult<T> = Result<T, ObserverError>;
 impl ObserverBuilder {
     pub fn new(notifier: Arc<dyn Notifier>, config: Config) -> Self {
         Self {
-            poll_interval: Duration::from_secs(5),
             notifier,
             backends: Default::default(),
             config,
         }
-    }
-
-    /// Polling interval for the observer.
-    pub fn poll_interval(mut self, poll_interval: Duration) -> Self {
-        self.poll_interval = poll_interval;
-        self
     }
 
     /// Initialize observer with default list of backends.
@@ -69,9 +61,8 @@ impl ObserverBuilder {
     }
 
     /// Build the observer, but do no load existing accounts from the config file.
-    pub fn build(self) -> Result<Observer, ObserverError> {
+    pub fn build(self, poll_interval: Duration) -> Result<Observer, ObserverError> {
         debug!("Creating observer with emtpy state");
-        let poll_interval = self.poll_interval;
         let mut observer = self.build_without_poll_interval()?;
         observer.set_poll_interval(poll_interval)?;
         Ok(observer)

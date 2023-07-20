@@ -238,8 +238,7 @@ where
         Config::create_or_load(encryption_key, config_path).expect("failed to load config");
 
     let observer = ObserverBuilder::new(notifier, config)
-        .poll_interval(poll_interval)
-        .build()
+        .build(poll_interval)
         .expect("Failed to build observer");
 
     (f)(observer);
