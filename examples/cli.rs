@@ -74,7 +74,7 @@ impl Notifier for StdOutNotifier {
 }
 
 fn main() {
-    you_have_mail_common::log::init_log(get_log_path(), []).expect("Failed to init log");
+    env_logger::init();
     let should_quit = Arc::new(AtomicBool::new(false));
     let should_quit_copy = should_quit.clone();
     ctrlc::set_handler(move || should_quit_copy.store(true, Ordering::SeqCst))
@@ -170,8 +170,4 @@ const CONFIG_FILE_NAME: &str = "you-have-mail-common-cli.conf";
 
 fn get_config_file_path() -> PathBuf {
     dirs::config_dir().unwrap().join(CONFIG_FILE_NAME)
-}
-
-fn get_log_path() -> PathBuf {
-    dirs::data_dir().unwrap()
 }

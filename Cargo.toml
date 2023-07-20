@@ -40,6 +40,7 @@ dirs = "5.0.0"
 keyring = "2"
 temp-dir = "0.1"
 ctrlc = "3"
+env_logger = "0.10"
 
 [[example]]
 name = "cli"
