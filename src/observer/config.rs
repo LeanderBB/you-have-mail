@@ -130,6 +130,22 @@ impl ConfigInner {
 }
 
 impl Config {
+    pub fn new(
+        encryption_key: Secret<EncryptionKey>,
+        file_path: impl Into<PathBuf>,
+        poll_interval: Duration,
+    ) -> ConfigResult<Self> {
+        let config = Self(Arc::new(RwLock::new(ConfigInner {
+            file_path: file_path.into(),
+            encryption_key,
+            poll_interval,
+            accounts: Default::default(),
+            dirty: true,
+        })));
+        config.write(|_| {})?;
+        Ok(config)
+    }
+
     pub fn create_or_load(
         encryption_key: Secret<EncryptionKey>,
         file_path: impl Into<PathBuf>,
