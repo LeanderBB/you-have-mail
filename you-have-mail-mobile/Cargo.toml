@@ -1,6 +1,6 @@
 [package]
 name = "you-have-mail-mobile"
-version = "0.7.0"
+version = "0.7.1"
 edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
@@ -17,6 +17,7 @@ uniffi = "0.23.0"
 you-have-mail-common = {git= "https://github.com/LeanderBB/you-have-mail-common" }
 thiserror = "1"
 parking_lot = "0.12"
+log4rs = "1"
 
 [features]
 default = []

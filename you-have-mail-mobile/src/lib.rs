@@ -32,6 +32,7 @@
 mod bindings;
 mod errors;
 mod interfaces;
+mod logging;
 mod proxy;
 mod service;
 

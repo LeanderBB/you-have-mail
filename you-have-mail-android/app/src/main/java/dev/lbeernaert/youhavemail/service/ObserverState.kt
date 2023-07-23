@@ -42,7 +42,7 @@ class ObserverServiceState {
             proxy = MutableStateFlow(proxy)
         )
         mAccounts.add(newAccount)
-        mAccounts.sortedBy { serviceAccount -> serviceAccount.email }
+        mAccounts.sortBy { serviceAccount -> serviceAccount.email }
         mAccountsFlow.value = mAccounts
     }
 

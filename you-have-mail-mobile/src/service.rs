@@ -3,7 +3,6 @@
 use crate::{ConfigError, Notifier, NotifierWrapper, Proxy, ServiceError};
 use parking_lot::{Mutex, RwLock};
 use std::ops::DerefMut;
-use std::path::PathBuf;
 use std::sync::mpsc::{RecvTimeoutError, Sender};
 use std::sync::Arc;
 use std::time::Duration;
@@ -341,13 +340,10 @@ pub fn migrate_old_config(
 }
 
 pub fn init_log(filepath: String) -> Option<String> {
-    if let Err(e) =
-        you_have_mail_common::log::init_log(PathBuf::from(filepath), ["youhavemail".to_string()])
-    {
-        return Some(e.to_string());
+    match crate::logging::init_log(filepath) {
+        Ok(_) => None,
+        Err(e) => Some(e.to_string()),
     }
-    info!("Log file initialized");
-    None
 }
 
 fn get_backends() -> Vec<Arc<Backend>> {

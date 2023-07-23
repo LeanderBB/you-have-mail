@@ -1,0 +1,5 @@
+# Fixes
+* Fix account ordering after adding new account
+
+# Misc
+* Tweak log output
