@@ -1,0 +1,3 @@
+# Features
+
+* Improve battery life by using Android Work Manager to drive the polling of accounts.

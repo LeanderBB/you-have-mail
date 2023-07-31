@@ -42,7 +42,7 @@ class OneTimePollWorker(ctx: Context, params: WorkerParameters) :
             val localIntent = Intent(POLL_INTENT_NAME)
             LocalBroadcastManager.getInstance(applicationContext).sendBroadcast(localIntent)
 
-            registerWorker(applicationContext, inputData.getLong("INTERVAL", 15 * 60))
+            registerWorker(applicationContext, inputData.getLong("INTERVAL", 15 * 60), false)
 
             Result.success()
         } catch (e: Exception) {
@@ -52,10 +52,14 @@ class OneTimePollWorker(ctx: Context, params: WorkerParameters) :
     }
 }
 
-fun registerWorker(ctx: Context, minutes: Long) {
-    WorkManager.getInstance(ctx).cancelAllWorkByTag(TAG)
+fun registerWorker(ctx: Context, minutes: Long, cancel: Boolean) {
     val inputData = Data.Builder().putLong("INTERVAL", minutes).build()
     val constraints = Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
+    val wm = WorkManager.getInstance(ctx)
+
+    if (cancel) {
+        wm.cancelAllWorkByTag(TAG)
+    }
 
     if (minutes >= 15) {
         Log.d(TAG, "Registering Periodic work with $minutes min interval")
@@ -66,7 +70,7 @@ fun registerWorker(ctx: Context, minutes: Long) {
                 .setInputData(inputData)
                 .setConstraints(constraints)
                 .build()
-        WorkManager.getInstance(ctx)
+        wm
             .enqueueUniquePeriodicWork(
                 POLL_WORKER_JOB_NAME,
                 ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
@@ -74,12 +78,11 @@ fun registerWorker(ctx: Context, minutes: Long) {
             )
     } else {
         Log.d(TAG, "Registering One Time work with $minutes min interval")
-
         val work = OneTimeWorkRequest.Builder(OneTimePollWorker::class.java).addTag(TAG)
             .setInputData(inputData).setConstraints(constraints)
             .setInitialDelay(minutes, TimeUnit.MINUTES)
             .build()
 
-        WorkManager.getInstance(ctx).enqueue(work)
+        wm.enqueue(work)
     }
 }

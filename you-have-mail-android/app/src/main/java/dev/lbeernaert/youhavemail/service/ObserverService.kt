@@ -128,7 +128,7 @@ class ObserverService : Service(), Notifier {
     fun setPollInterval(interval: ULong) {
         mService!!.setPollInterval(interval)
         mServiceState.onPollIntervalChanged(interval)
-        registerWorker(this, Duration.ofSeconds(interval.toLong()).toMinutes())
+        registerWorker(this, Duration.ofSeconds(interval.toLong()).toMinutes(), true)
     }
 
     fun setAccountProxy(email: String, proxy: Proxy?) {
@@ -260,7 +260,7 @@ class ObserverService : Service(), Notifier {
         val pollInterval = mService!!.getPollInterval()
         val pollIntervalMin = Duration.ofSeconds(pollInterval.toLong()).toMinutes()
         mServiceState.onPollIntervalChanged(pollInterval)
-        registerWorker(this, pollIntervalMin)
+        registerWorker(this, pollIntervalMin, true)
     }
 
     override fun onDestroy() {
