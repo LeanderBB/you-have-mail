@@ -41,7 +41,7 @@ fun Settings(
                 .fillMaxSize()
         ) {
             var expanded by remember { mutableStateOf(false) }
-            val items = listOf(900UL, 1800UL, 3600UL)
+            val items = listOf(60UL, 150UL, 300UL, 600UL, 900UL, 1800UL, 3600UL)
             var selectedIndex by remember { mutableStateOf(0) }
 
             val onPollIntervalModified: () -> Unit = {
