@@ -5,12 +5,11 @@ import android.app.Notification
 import android.app.NotificationManager
 import android.app.PendingIntent
 import android.app.Service
+import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
 import android.content.SharedPreferences
-import android.net.ConnectivityManager
-import android.net.NetworkCapabilities
-import android.net.NetworkRequest
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
@@ -18,7 +17,7 @@ import android.text.Html
 import android.text.Spanned
 import android.util.Log
 import androidx.core.app.NotificationCompat
-import androidx.core.content.ContextCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dev.lbeernaert.youhavemail.Account
@@ -50,6 +49,8 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.cancel
 import java.io.File
+import java.time.Duration
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 
@@ -71,9 +72,7 @@ class ObserverService : Service(), Notifier {
     private val coroutineScope = CoroutineScope(
         Dispatchers.Default
     )
-
-    // System listeners
-    private val networkListener = NetworkListener(this)
+    private val mReceiver = Receiver(this)
 
     // Notification State
     private var notificationIDCounter: Int = ServiceAccountNotificationsStartID
@@ -129,6 +128,7 @@ class ObserverService : Service(), Notifier {
     fun setPollInterval(interval: ULong) {
         mService!!.setPollInterval(interval)
         mServiceState.onPollIntervalChanged(interval)
+        registerWorker(this, Duration.ofSeconds(interval.toLong()).toMinutes())
     }
 
     fun setAccountProxy(email: String, proxy: Proxy?) {
@@ -165,7 +165,7 @@ class ObserverService : Service(), Notifier {
     fun acquireWakeLock() {
         wakeLock?.let {
             if (!it.isHeld) {
-                it.acquire()
+                it.acquire(TimeUnit.MINUTES.toMillis(5))
             }
         }
     }
@@ -201,6 +201,14 @@ class ObserverService : Service(), Notifier {
 
     override fun onCreate() {
         super.onCreate()
+
+        // we need this lock so our service does not affected by Doze mode
+        wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
+            newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "YouHaveMailService::lock")
+        }
+
+        LocalBroadcastManager.getInstance(this)
+            .registerReceiver(mReceiver, IntentFilter(POLL_INTENT_NAME))
 
         val notificationManager =
             getSystemService(NOTIFICATION_SERVICE) as NotificationManager
@@ -239,7 +247,6 @@ class ObserverService : Service(), Notifier {
         try {
             mService = newService(this, encryptionKey, configPath)
             mBackends.addAll(mService!!.getBackends())
-            registerNetworkListener()
         } catch (e: ServiceException) {
             Log.e(serviceLogTag, "Failed to create service:$e")
             createAndDisplayServiceErrorNotification(
@@ -250,11 +257,15 @@ class ObserverService : Service(), Notifier {
         }
 
         mServiceState.setFrom(mService!!.getObservedAccounts())
-        mServiceState.onPollIntervalChanged(mService!!.getPollInterval())
+        val pollInterval = mService!!.getPollInterval()
+        val pollIntervalMin = Duration.ofSeconds(pollInterval.toLong()).toMinutes()
+        mServiceState.onPollIntervalChanged(pollInterval)
+        registerWorker(this, pollIntervalMin)
     }
 
     override fun onDestroy() {
-        unregisterNetworkListener()
+        LocalBroadcastManager.getInstance(this)
+            .unregisterReceiver(mReceiver)
         coroutineScope.cancel()
         mInLoginAccount?.destroy()
         mBackends.forEach {
@@ -273,18 +284,11 @@ class ObserverService : Service(), Notifier {
         isServiceStarted = true
         setServiceState(this, ServiceState.STARTED)
 
-        // we need this lock so our service does not affected by Doze mode
-        wakeLock = (getSystemService(Context.POWER_SERVICE) as PowerManager).run {
-            newWakeLock(PowerManager.PARTIAL_WAKE_LOCK, "YouHaveMailService::lock").apply {
-                acquire()
-            }
-        }
     }
 
     private fun stopService() {
         Log.d(serviceLogTag, "Stopping foreground service")
         try {
-            releaseWakeLock()
             stopForeground(STOP_FOREGROUND_REMOVE)
             stopSelf()
         } catch (e: java.lang.Exception) {
@@ -293,32 +297,6 @@ class ObserverService : Service(), Notifier {
         isServiceStarted = false
         setServiceState(this, ServiceState.STOPPED)
     }
-
-
-    private fun registerNetworkListener() {
-        val request =
-            NetworkRequest.Builder().addCapability(NetworkCapabilities.NET_CAPABILITY_INTERNET)
-                .addTransportType(NetworkCapabilities.TRANSPORT_WIFI)
-                .addTransportType(NetworkCapabilities.TRANSPORT_CELLULAR)
-                .build()
-
-        val connectivityManager =
-            ContextCompat.getSystemService(
-                this,
-                ConnectivityManager::class.java
-            ) as ConnectivityManager
-        connectivityManager.requestNetwork(request, networkListener)
-    }
-
-    private fun unregisterNetworkListener() {
-        val connectivityManager =
-            ContextCompat.getSystemService(
-                this,
-                ConnectivityManager::class.java
-            ) as ConnectivityManager
-        connectivityManager.unregisterNetworkCallback(networkListener)
-    }
-
 
     private fun createAlertNotification(
         email: String,
@@ -599,7 +577,7 @@ class ObserverService : Service(), Notifier {
         }
     }
 
-    private fun createAndDisplayServiceErrorNotification(
+    fun createAndDisplayServiceErrorNotification(
         text: String,
         exception: ServiceException
     ) {
@@ -611,7 +589,7 @@ class ObserverService : Service(), Notifier {
         }
     }
 
-    private fun createAndDisplayServiceErrorNotification(
+    fun createAndDisplayServiceErrorNotification(
         text: String,
     ) {
         val notification = createServiceErrorNotification(this, text)
@@ -619,6 +597,34 @@ class ObserverService : Service(), Notifier {
             if (this.areNotificationsEnabled()) {
                 notify(ServiceErrorNotificationID, notification)
             }
+        }
+    }
+
+}
+
+class Receiver(private val mObserver: ObserverService) : BroadcastReceiver() {
+    override fun onReceive(context: Context?, intent: Intent?) {
+        if (intent == null) {
+            return
+        }
+        if (intent.action == null) {
+            return
+        }
+        if (intent.action != POLL_INTENT_NAME) {
+            return
+        }
+
+        Log.d(serviceLogTag, "Received poll broadcast")
+        if (mObserver.mService == null) {
+            mObserver.createAndDisplayServiceErrorNotification("Received request to poll, but no service available")
+        }
+        try {
+            mObserver.acquireWakeLock()
+            mObserver.mService!!.poll()
+        } catch (e: ServiceException) {
+            mObserver.createAndDisplayServiceErrorNotification("Failed to poll accounts", e)
+        } finally {
+            mObserver.releaseWakeLock()
         }
     }
 }

@@ -64,7 +64,6 @@ class MainActivity : ComponentActivity(), ServiceConnection {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         actionOnService(Actions.START)
-
         onNewIntent(this.intent)
 
         window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);

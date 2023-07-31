@@ -1,9 +1,8 @@
 //! Glue code which combines all of the You Have Mail Components into on Service.
 
 use crate::{ConfigError, Notifier, NotifierWrapper, Proxy, ServiceError};
-use parking_lot::{Mutex, RwLock};
+use parking_lot::RwLock;
 use std::ops::DerefMut;
-use std::sync::mpsc::{RecvTimeoutError, Sender};
 use std::sync::Arc;
 use std::time::Duration;
 use uniffi::deps::log::{debug, error, info};
@@ -84,7 +83,6 @@ impl Account {
 pub struct Service {
     observer: RwLock<yhm::Observer>,
     backends: Vec<Arc<Backend>>,
-    auto_poller_sender: Mutex<Sender<AutoPollerMessage>>,
 }
 
 impl Drop for Service {
@@ -188,37 +186,17 @@ impl Service {
         Ok(())
     }
 
-    pub fn pause(&self) {
-        if let Err(e) = self
-            .auto_poller_sender
-            .lock()
-            .send(AutoPollerMessage::Pause)
-        {
-            error!("Failed to send quit message: {e}");
-        }
-    }
+    pub fn pause(&self) {}
 
-    pub fn resume(&self) {
-        if let Err(e) = self
-            .auto_poller_sender
-            .lock()
-            .send(AutoPollerMessage::Resume)
-        {
-            error!("Failed to send quit message: {e}");
-        }
-    }
+    pub fn resume(&self) {}
 
-    pub fn quit(&self) {
-        if let Err(e) = self.auto_poller_sender.lock().send(AutoPollerMessage::Quit) {
-            error!("Failed to send quit message: {e}");
-        }
-    }
-}
+    pub fn quit(&self) {}
 
-enum AutoPollerMessage {
-    Pause,
-    Resume,
-    Quit,
+    pub fn poll(&self) -> Result<(), ServiceError> {
+        debug!("Received poll request");
+        self.observer.read().poll()?;
+        Ok(())
+    }
 }
 
 pub fn new_service(
@@ -244,70 +222,9 @@ pub fn new_service(
 
     let observer = builder.load_from_config()?;
 
-    let (sender, receiver) = std::sync::mpsc::channel::<AutoPollerMessage>();
     let service = Arc::new(Service {
         observer: RwLock::new(observer),
         backends,
-        auto_poller_sender: Mutex::new(sender),
-    });
-
-    let s = service.clone();
-
-    std::thread::spawn(move || {
-        debug!("Starting auto-polling thread");
-        let mut paused = true;
-        let mut quit = false;
-
-        fn handle_message(v: AutoPollerMessage) -> (bool, bool) {
-            match v {
-                AutoPollerMessage::Pause => {
-                    debug!("Pausing auto poller thread");
-                    (true, false)
-                }
-                AutoPollerMessage::Resume => {
-                    debug!("Resuming auto poller thread");
-                    (false, false)
-                }
-                AutoPollerMessage::Quit => {
-                    debug!("Quiting auto poller thread");
-                    (true, true)
-                }
-            }
-        }
-
-        while !quit {
-            if paused {
-                match receiver.recv() {
-                    Ok(v) => {
-                        (paused, quit) = handle_message(v);
-                    }
-                    Err(_) => return,
-                }
-            } else {
-                {
-                    if let Err(e) = s.observer.read().poll() {
-                        error!("Failed to poll: {e}");
-                    }
-                }
-
-                let interval = { s.observer.read().get_poll_interval() };
-
-                match receiver.recv_timeout(interval) {
-                    Ok(v) => {
-                        (paused, quit) = handle_message(v);
-                    }
-                    Err(e) => match e {
-                        RecvTimeoutError::Timeout => {
-                            continue;
-                        }
-                        RecvTimeoutError::Disconnected => {
-                            return;
-                        }
-                    },
-                }
-            }
-        }
-        debug!("Auto poller thread finished");
     });
 
     Ok(service)
@@ -348,7 +265,7 @@ pub fn init_log(filepath: String) -> Option<String> {
 
 fn get_backends() -> Vec<Arc<Backend>> {
     [
-        #[cfg(feature = "null_backend")]
+        // #[cfg(feature = "null_backend")]
         {
             yhm::backend::null::new_backend(&[
                 yhm::backend::null::NullTestAccount {

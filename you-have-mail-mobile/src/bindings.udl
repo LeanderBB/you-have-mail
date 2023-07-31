@@ -136,6 +136,9 @@ interface Service {
     [Throws=ServiceError]
     void set_poll_interval(u64 interval);
 
+    [Throws=ServiceError]
+    void poll();
+
     void quit();
 
     void pause();

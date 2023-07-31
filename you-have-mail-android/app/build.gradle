@@ -19,8 +19,8 @@ android {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 29
         targetSdk 33
-        versionCode 26
-        versionName "0.11.1"
+        versionCode 27
+        versionName "0.12.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -63,6 +63,8 @@ android {
 }
 
 dependencies {
+    // WorkManager dependency
+    implementation "androidx.work:work-runtime-ktx:$versions_work"
 
     implementation 'androidx.core:core-ktx:1.10.1'
     implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
