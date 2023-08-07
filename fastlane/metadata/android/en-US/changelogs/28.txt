@@ -1,4 +1,4 @@
 # Features
 
-* Add support for new mail notification in costum folders which have notifications enabled for
+* Add support for new mail notification in custom folders which have notifications enabled for
   Proton Mail accounts.
