@@ -1,5 +1,5 @@
 use proton_api_rs::domain::SecretString;
-use proton_api_rs::log::{error, info, warn};
+use proton_api_rs::log::{error, info, warn, LevelFilter};
 use secrecy::{ExposeSecret, Secret};
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
@@ -74,7 +74,12 @@ impl Notifier for StdOutNotifier {
 }
 
 fn main() {
-    env_logger::init();
+    env_logger::builder()
+        .filter_module("you_have_mail_common", LevelFilter::Debug)
+        .filter_module("proton_api_rs", LevelFilter::Debug)
+        //.filter_module("ureq", LevelFilter::Debug)
+        .filter_level(LevelFilter::Info)
+        .init();
     let should_quit = Arc::new(AtomicBool::new(false));
     let should_quit_copy = should_quit.clone();
     ctrlc::set_handler(move || should_quit_copy.store(true, Ordering::SeqCst))

@@ -8,11 +8,11 @@ use crate::{AccountState, Proxy, ProxyProtocol};
 use anyhow::{anyhow, Error};
 use parking_lot::Mutex;
 use proton_api_rs::domain::{
-    Boolean, EventId, ExposeSecret, HumanVerificationLoginData, HumanVerificationType, LabelID,
-    MessageAction, MessageEvent, MessageId, MoreEvents, UserUid,
+    Boolean, EventAction, EventId, ExposeSecret, HumanVerificationLoginData, HumanVerificationType,
+    LabelEvent, LabelId, LabelType, MessageEvent, MessageId, MoreEvents, UserUid,
 };
 use proton_api_rs::http::Sequence;
-use proton_api_rs::log::{debug, info};
+use proton_api_rs::log::debug;
 use proton_api_rs::{
     captcha_get, http, LoginError, Session, SessionRefreshData, SessionType, TotpSession,
 };
@@ -20,6 +20,7 @@ use secrecy::{Secret, SecretString};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt::Debug;
+use std::ops::Deref;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -41,13 +42,57 @@ pub const PROTON_BACKEND_NAME_OTHER: &str = "Proton Mail V-Other";
 #[derive(Debug)]
 struct TaskState {
     last_event_id: Option<EventId>,
+    active_folder_ids: HashSet<LabelId>,
 }
 
 impl TaskState {
     fn new() -> Arc<Mutex<Self>> {
         Arc::new(Mutex::new(TaskState {
             last_event_id: None,
+            active_folder_ids: HashSet::from([LabelId::inbox()]),
         }))
+    }
+
+    fn handle_label_events(&mut self, events: &[LabelEvent]) {
+        for event in events {
+            match event.action {
+                EventAction::Create => {
+                    if let Some(label) = event.label.as_ref() {
+                        if label.notify == Boolean::True {
+                            debug!("New custom folder added to notification list: {}", label.id);
+                            self.active_folder_ids.insert(label.id.clone());
+                        }
+                    }
+                }
+
+                EventAction::Update | EventAction::UpdateFlags => {
+                    if let Some(label) = event.label.as_ref() {
+                        if label.notify == Boolean::True {
+                            debug!("Folder {} added to notification list", label.id);
+                            self.active_folder_ids.insert(label.id.clone());
+                        } else {
+                            debug!("Folder {} removed from notification list", label.id);
+                            self.active_folder_ids.remove(&label.id);
+                        }
+                    }
+                }
+
+                EventAction::Delete => {
+                    debug!("Folder {} deleted", event.id);
+                    self.active_folder_ids.remove(&event.id);
+                }
+            }
+        }
+    }
+
+    fn should_publish_notification(&self, label_list: &[LabelId]) -> bool {
+        for id in label_list {
+            if self.active_folder_ids.contains(id) {
+                return true;
+            }
+        }
+
+        false
     }
 }
 
@@ -310,22 +355,43 @@ impl CheckTask for ProtonTask {
             notifier,
         };
 
+        // First time this code is run, init state.
         if accessor.last_event_id.is_none() {
             let event_id = self.session.get_latest_event().do_sync(&self.client)?;
             accessor.last_event_id = Some(event_id);
+
+            let folders = self
+                .session
+                .get_labels(LabelType::Folder)
+                .do_sync(&self.client)?;
+            accessor.active_folder_ids.reserve(folders.len());
+            for folder in folders {
+                if folder.notify == Boolean::True {
+                    accessor.active_folder_ids.insert(folder.id);
+                }
+            }
+            debug!(
+                "Account has following list of custom folders: {:?}",
+                accessor.active_folder_ids
+            )
         }
 
         let mut result = EventState::new();
-        if let Some(event_id) = &mut accessor.last_event_id {
+        if let Some(mut event_id) = accessor.last_event_id.clone() {
             let mut has_more = MoreEvents::No;
             loop {
-                let event = self.session.get_event(event_id).do_sync(&self.client)?;
-                if event.event_id != *event_id || has_more == MoreEvents::Yes {
-                    if let Some(message_events) = &event.messages {
-                        result.handle_message_events(message_events);
+                let event = self.session.get_event(&event_id).do_sync(&self.client)?;
+                if event.event_id != event_id || has_more == MoreEvents::Yes {
+                    if let Some(label_events) = &event.labels {
+                        accessor.handle_label_events(label_events)
                     }
 
-                    *event_id = event.event_id;
+                    if let Some(message_events) = &event.messages {
+                        result.handle_message_events(message_events, accessor.deref());
+                    }
+
+                    event_id = event.event_id;
+                    accessor.last_event_id = Some(event_id.clone());
                     has_more = event.more;
                 } else {
                     return Ok(result.into());
@@ -426,12 +492,10 @@ impl EventState {
         }
     }
 
-    fn handle_message_events(&mut self, msg_events: &[MessageEvent]) {
-        let inbox_label = LabelID::inbox();
-
+    fn handle_message_events(&mut self, msg_events: &[MessageEvent], state: &TaskState) {
         for msg_event in msg_events {
             match msg_event.action {
-                MessageAction::Create => {
+                EventAction::Create => {
                     if let Some(message) = &msg_event.message {
                         // If the newly created message is not unread, it must have been read
                         // already.
@@ -440,7 +504,7 @@ impl EventState {
                         }
 
                         // Check if the message has arrived in the inbox.
-                        if message.labels.contains(&inbox_label) {
+                        if state.should_publish_notification(&message.labels) {
                             self.new_emails.push(MsgInfo {
                                 id: message.id.clone(),
                                 subject: message.subject.clone(),
@@ -454,23 +518,16 @@ impl EventState {
                         }
                     }
                 }
-                MessageAction::Update | MessageAction::UpdateFlags => {
+                EventAction::Update | EventAction::UpdateFlags => {
                     if let Some(message) = &msg_event.message {
                         // If message switches to unread state, remove
-                        if message.unread == Boolean::False
-                            || !message.labels.contains(&inbox_label)
-                        {
-                            info!(
-                                "message removed {} {}",
-                                message.unread == Boolean::False,
-                                !message.labels.contains(&inbox_label)
-                            );
+                        if message.unread == Boolean::False {
                             self.unseen.remove(&message.id);
                         }
                     }
                 }
                 // Message Deleted, remove from the list.
-                MessageAction::Delete => {
+                EventAction::Delete => {
                     self.unseen.remove(&msg_event.id);
                 }
             };
