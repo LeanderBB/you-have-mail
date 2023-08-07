@@ -1716,7 +1716,7 @@ dependencies = [
 
 [[package]]
 name = "you-have-mail-mobile"
-version = "0.8.0"
+version = "0.9.0"
 dependencies = [
  "log4rs",
  "parking_lot",
