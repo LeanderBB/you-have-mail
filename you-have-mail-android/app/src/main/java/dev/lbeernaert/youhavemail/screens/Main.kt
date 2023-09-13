@@ -25,10 +25,14 @@ import androidx.compose.material.Text
 import androidx.compose.material.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
@@ -42,13 +46,16 @@ import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.BackgroundTask
 import dev.lbeernaert.youhavemail.service.ServiceAccount
 import dev.lbeernaert.youhavemail.service.ServiceWrapper
+import java.util.Timer
+import java.util.TimerTask
 
 @Composable
 fun Main(
     service: ServiceWrapper,
     navController: NavController,
     requestPermissions: () -> Unit,
-    onSettingsClicked: () -> Unit
+    onSettingsClicked: () -> Unit,
+    onPollClicked: () -> Unit,
 ) {
     if (!service.isReady()) {
         BackgroundTask(text = stringResource(id = R.string.connecting_to_service))
@@ -58,6 +65,7 @@ fun Main(
             navController = navController,
             requestPermissions = requestPermissions,
             onSettingsClicked = onSettingsClicked,
+            onPollClicked = onPollClicked,
         )
     }
 }
@@ -68,19 +76,42 @@ fun AccountList(
     service: ServiceWrapper,
     navController: NavController,
     requestPermissions: () -> Unit,
-    onSettingsClicked: () -> Unit
+    onSettingsClicked: () -> Unit,
+    onPollClicked: () -> Unit,
 ) {
     val accounts by service.getAccountsStateFlow().collectAsState()
+    var pollActive by remember { mutableStateOf(true) }
 
     Scaffold(topBar = {
         TopAppBar(title = { Text(text = stringResource(id = R.string.app_name)) }, actions = {
+            Button(
+                onClick = {
+                    onPollClicked()
+                    pollActive = false
+                    Timer().schedule(
+                        object : TimerTask() {
+                            override fun run() {
+                                pollActive = true
+                            }
+                        }, 15000
+                    )
+                },
+                colors = ButtonDefaults.outlinedButtonColors(),
+                enabled = pollActive,
+            ) {
+                Icon(
+                    Icons.Filled.Refresh,
+                    contentDescription = "Poll accounts",
+                    modifier = Modifier.size(30.dp)
+                )
+            }
             Button(
                 onClick = onSettingsClicked,
                 colors = ButtonDefaults.outlinedButtonColors()
             ) {
                 Icon(
                     Icons.Filled.Settings,
-                    contentDescription = null,
+                    contentDescription = "Settings",
                     modifier = Modifier.size(30.dp)
                 )
             }

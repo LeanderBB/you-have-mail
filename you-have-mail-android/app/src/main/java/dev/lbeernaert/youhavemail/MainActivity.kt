@@ -41,10 +41,12 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import dev.lbeernaert.youhavemail.screens.MainNavController
 import dev.lbeernaert.youhavemail.service.Actions
 import dev.lbeernaert.youhavemail.service.LOG_EXPORT_REQUEST
 import dev.lbeernaert.youhavemail.service.ObserverService
+import dev.lbeernaert.youhavemail.service.POLL_INTENT_NAME
 import dev.lbeernaert.youhavemail.service.ServiceState
 import dev.lbeernaert.youhavemail.service.ServiceWrapper
 import dev.lbeernaert.youhavemail.service.exportLogs
@@ -129,7 +131,21 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                             if (!hasNotificationPermission) {
                                 launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
                             }
-                        })
+                        },
+                        onPollClicked = {
+                            if (!hasNotificationPermission) {
+                                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                            }
+                            try {
+                                Toast.makeText(this, "Poll request sent", Toast.LENGTH_SHORT).show()
+                                val localIntent = Intent(POLL_INTENT_NAME)
+                                LocalBroadcastManager.getInstance(applicationContext)
+                                    .sendBroadcast(localIntent)
+                            } catch (e: Exception) {
+                                Log.e(activityLogTag, "Failed to send poll request: $e")
+                            }
+                        }
+                    )
                 }
             }
         }

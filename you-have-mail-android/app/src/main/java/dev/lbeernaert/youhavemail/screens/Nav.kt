@@ -27,7 +27,8 @@ fun MainNavController(
     context: Activity,
     serviceWrapper: ServiceWrapper,
     appState: AppState,
-    requestPermissions: () -> Unit
+    requestPermissions: () -> Unit,
+    onPollClicked: () -> Unit,
 ) {
     val navController = rememberNavController()
 
@@ -122,9 +123,9 @@ fun MainNavController(
             }, onTotpClicked = onTotpClicked)
         }
         composable(Routes.Main.route) {
-            Main(serviceWrapper, navController, requestPermissions) {
+            Main(serviceWrapper, navController, requestPermissions, onSettingsClicked = {
                 navController.navigate(Routes.Settings.route)
-            }
+            }, onPollClicked)
         }
         composable(Routes.Backend.route) {
             BackendSelection(serviceWrapper = serviceWrapper, navController = navController)

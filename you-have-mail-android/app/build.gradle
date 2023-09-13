@@ -19,8 +19,8 @@ android {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 29
         targetSdk 33
-        versionCode 28
-        versionName "0.13.0"
+        versionCode 29
+        versionName "0.14.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -57,7 +57,7 @@ android {
     defaultConfig {
         ndk {
             //noinspection ChromeOsAbiSupport
-            abiFilters 'arm64-v8a', 'x86_64'
+            abiFilters 'arm64-v8a', 'x86_64', 'armv7a'
         }
     }
 }
@@ -93,7 +93,7 @@ apply plugin: 'org.mozilla.rust-android-gradle.rust-android'
 cargo {
     module = "../../you-have-mail-mobile"
     libname = "youhavemail"
-    targets = ["x86_64", "arm64"]
+    targets = ["x86_64", "arm64", "arm"]
     targetIncludes = ["libyouhavemail.so", "libgo-srp.so"]
     targetDirectory = "/tmp/build-yhm"
     profile = "release"

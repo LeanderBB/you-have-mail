@@ -1,0 +1,4 @@
+# Features
+
+* Add support for 32Bit Arm CPUs
+* Add Refresh button to poll accounts now rather than wait for the next scheduled poll.
