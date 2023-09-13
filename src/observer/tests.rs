@@ -206,7 +206,7 @@ fn test_account_refreshed() {
         observer.poll_foreground().expect("failed to poll");
         observer.config().read(|inner| {
             let cfg_account = inner.get_account("foo").expect("failed to locate account");
-            let ConfigAuthRefresher::Resolved(r) = &cfg_account.auth_refresher  else {
+            let ConfigAuthRefresher::Resolved(r) = &cfg_account.auth_refresher else {
                 panic!("unexpected state");
             };
             let value = r.to_json().expect("failed to serialize");

@@ -88,61 +88,71 @@ impl ObserverBuilder {
         debug!("Loading observer from config");
         let mut observer = self.build_without_poll_interval()?;
 
-        let accounts = observer
-            .config
-            .read(|inner| {
-                debug!("{} accounts in config", inner.len());
-                let mut accounts = Vec::with_capacity(inner.len());
-                for (email, cfg) in inner.get_accounts() {
-                    debug!("Loading account {} ({})", email, cfg.backend);
-                    let Some(backend) = observer.backend_by_name(&cfg.backend) else {
-                        error!("Could not find backend {} for account {email}. Account will not be added.", cfg.backend);
-                        observer.notifier.notify(Notification::Error(format!("Could not find backend {} for {email}, account will not be added", cfg.backend)));
-                        continue;
+        let accounts = observer.config.read(|inner| {
+            debug!("{} accounts in config", inner.len());
+            let mut accounts = Vec::with_capacity(inner.len());
+            for (email, cfg) in inner.get_accounts() {
+                debug!("Loading account {} ({})", email, cfg.backend);
+                let Some(backend) = observer.backend_by_name(&cfg.backend) else {
+                    error!(
+                        "Could not find backend {} for account {email}. Account will not be added.",
+                        cfg.backend
+                    );
+                    observer.notifier.notify(Notification::Error(format!(
+                        "Could not find backend {} for {email}, account will not be added",
+                        cfg.backend
+                    )));
+                    continue;
+                };
+
+                let mut do_account_refresh =
+                    |r: &dyn AuthRefresher, backend| match r.refresh(cfg.proxy.as_ref()) {
+                        Err(e) => {
+                            error!("Failed to refresh {email}: {e}");
+                            observer.notifier.notify(Notification::Error(format!(
+                                "Failed to refresh {email}: {e}"
+                            )));
+                            accounts.push(Account::new(backend, email, cfg.proxy.clone()));
+                        }
+                        Ok(state) => {
+                            accounts.push(Account::with_state(
+                                backend,
+                                email,
+                                state,
+                                cfg.proxy.clone(),
+                            ));
+                        }
                     };
 
-                    let mut do_account_refresh = |r:&dyn AuthRefresher, backend| {
-                        match r.refresh(cfg.proxy.as_ref()) {
+                match &cfg.auth_refresher {
+                    ConfigAuthRefresher::Unresolved(value) => {
+                        debug!("Refreshing account {} ({})", email, cfg.backend);
+                        match backend.auth_refresher_from_config(value.clone()) {
                             Err(e) => {
-                                error!("Failed to refresh {email}: {e}");
-                                observer.notifier.notify(Notification::Error(format!("Failed to refresh {email}: {e}")));
+                                error!("Failed to decode {email}'s refresh data: {e}");
+                                observer.notifier.notify(Notification::Error(format!(
+                                    "Failed to decode {email}'s refresh data: {e}"
+                                )));
                                 accounts.push(Account::new(backend, email, cfg.proxy.clone()));
                             }
-                            Ok(state) => {
-                                accounts.push(Account::with_state(backend, email, state, cfg.proxy.clone()));
+                            Ok(refresher) => {
+                                do_account_refresh(refresher.as_ref(), backend.clone());
                             }
-                        }
-                    };
-
-                    match &cfg.auth_refresher {
-                       ConfigAuthRefresher::Unresolved(value) => {
-                           debug!("Refreshing account {} ({})", email, cfg.backend);
-                           match backend.auth_refresher_from_config(value.clone()) {
-                               Err(e) => {
-                                   error!("Failed to decode {email}'s refresh data: {e}");
-                                   observer.notifier.notify(Notification::Error(format!("Failed to decode {email}'s refresh data: {e}")));
-                                   accounts.push(Account::new(backend, email, cfg.proxy.clone()));
-                               }
-                               Ok(refresher) => {
-                                   do_account_refresh(refresher.as_ref(), backend.clone());
-                               }
-                           }
-                       }
-
-                        ConfigAuthRefresher::Resolved(r) => {
-                            debug!("Refreshing account {} ({})", email, cfg.backend);
-                            do_account_refresh(r.as_ref(), backend.clone());
-                        }
-                        ConfigAuthRefresher::None => {
-                            debug!("Account {} ({}) has no refresh data", email, cfg.backend);
-                            accounts.push(Account::new(backend, email, cfg.proxy.clone()));
-
                         }
                     }
 
+                    ConfigAuthRefresher::Resolved(r) => {
+                        debug!("Refreshing account {} ({})", email, cfg.backend);
+                        do_account_refresh(r.as_ref(), backend.clone());
+                    }
+                    ConfigAuthRefresher::None => {
+                        debug!("Account {} ({}) has no refresh data", email, cfg.backend);
+                        accounts.push(Account::new(backend, email, cfg.proxy.clone()));
+                    }
                 }
-                accounts
-            });
+            }
+            accounts
+        });
 
         if !accounts.is_empty() {
             debug!("Adding loaded accounts to observer");
@@ -234,7 +244,7 @@ impl Observer {
         debug!("Logging out account {}", email);
 
         let Some(account) = self.accounts.get_mut(email) else {
-            return Err(ObserverError::AccountNotFound(email.to_string()))
+            return Err(ObserverError::AccountNotFound(email.to_string()));
         };
 
         account.logout()?;
