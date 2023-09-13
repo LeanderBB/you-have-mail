@@ -57,7 +57,7 @@ android {
     defaultConfig {
         ndk {
             //noinspection ChromeOsAbiSupport
-            abiFilters 'arm64-v8a', 'x86_64', 'armv7a'
+            abiFilters 'arm64-v8a', 'x86_64', 'armeabi-v7a'
         }
     }
 }
