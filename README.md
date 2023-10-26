@@ -33,4 +33,5 @@ Please only download the latest stable releases from:
 
 ## Donations
 
-* Monero: `86CBWfyMFAYM6a7zJUmhj5Xp7hmm8LkVRE9xSHuJ28Lti22KGxGXSNBUGkJBw7PvJC5RWJfEvqkJJjhsaJPT8LYB4kbXc2S`
+If you wish to donate to this project, consider donating to the
+[GrapheneOS](https://grapheneos.org/donate) project instead :).
