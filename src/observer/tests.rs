@@ -199,8 +199,7 @@ fn test_account_refreshed() {
         let account_refresh_data_start = account
             .get_impl()
             .expect("invalid state")
-            .to_refresher()
-            .to_json()
+            .to_config()
             .expect("failed to serialize");
         observer.add_account(account).unwrap();
         observer.poll_foreground().expect("failed to poll");
@@ -209,14 +208,13 @@ fn test_account_refreshed() {
             let ConfigAuthRefresher::Resolved(r) = &cfg_account.auth_refresher else {
                 panic!("unexpected state");
             };
-            let value = r.to_json().expect("failed to serialize");
+            let value = r.clone();
             let account_refresh_data_current = observer
                 .get_account("foo")
                 .expect("Failed to locate account")
                 .get_impl()
                 .expect("invalid state")
-                .to_refresher()
-                .to_json()
+                .to_config()
                 .expect("failed to serialize");
             assert_ne!(account_refresh_data_start, value);
             assert_eq!(account_refresh_data_current, value);

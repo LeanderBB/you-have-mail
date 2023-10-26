@@ -24,7 +24,7 @@ pub enum BackendError {
     #[error("Invalid Human Verification Data Supplied")]
     HVDataInvalid(#[source] anyhow::Error),
     #[error("The user account has been logged out or the token expired")]
-    LoggedOut,
+    LoggedOut(#[source] anyhow::Error),
     #[error("The request or connection timed out: {0}")]
     Timeout(#[source] anyhow::Error),
     #[error("Connection error: {0}")]
@@ -52,6 +52,12 @@ pub struct NewEmailReply {
     pub emails: Vec<EmailInfo>,
 }
 
+impl NewEmailReply {
+    fn empty() -> Self {
+        Self { emails: Vec::new() }
+    }
+}
+
 /// Implementation for the backends.
 #[cfg_attr(test, automock)]
 pub trait Backend: Send + Sync + Debug {
@@ -74,11 +80,12 @@ pub trait Backend: Send + Sync + Debug {
     /// Check proxy settings.
     fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()>;
 
-    /// Load the necessary information to refresh the user's account access credentials.
-    fn auth_refresher_from_config(
+    #[allow(clippy::needless_lifetimes)] // required for automock.
+    fn account_from_config<'a>(
         &self,
+        proxy: Option<&'a Proxy>,
         value: serde_json::Value,
-    ) -> Result<Box<dyn AuthRefresher>, anyhow::Error>;
+    ) -> Result<AccountState, anyhow::Error>;
 }
 
 /// Trait that needs to be implemented for all backend accounts
@@ -94,11 +101,11 @@ pub trait Account: Send + Sync + Debug {
     fn set_proxy<'a>(&mut self, proxy: Option<&'a Proxy>) -> BackendResult<()>;
 
     /// Load the necessary information to refresh the user's account access credentials.
-    fn to_refresher(&self) -> Box<dyn AuthRefresher>;
+    fn to_config(&self) -> Result<serde_json::Value, anyhow::Error>;
 }
 
 pub trait AccountRefreshedNotifier {
-    fn notify_account_refreshed(&mut self, task: &dyn CheckTask);
+    fn notify_account_refreshed(&mut self, email: &str, value: serde_json::Value);
 }
 /// Task that will be run in a different thread
 pub trait CheckTask: Send + Sync + Debug {
@@ -109,7 +116,7 @@ pub trait CheckTask: Send + Sync + Debug {
     /// If the account token was refreshed the second member of the tuple will be true.
     fn check(&self, notifier: &mut dyn AccountRefreshedNotifier) -> BackendResult<NewEmailReply>;
 
-    fn to_refresher(&self) -> Box<dyn AuthRefresher>;
+    fn to_config(&self) -> Result<serde_json::Value, anyhow::Error>;
 }
 
 /// Trait for accounts that require 2FA support
@@ -117,13 +124,4 @@ pub trait CheckTask: Send + Sync + Debug {
 pub trait AwaitTotp: Send + Sync + Debug {
     /// Called when TOTP code will be submitted.
     fn submit_totp(&self, totp: &str) -> Result<Box<dyn Account>, BackendError>;
-}
-
-/// Trait to refresh the accounts' login credentials.
-#[cfg_attr(test, automock)]
-pub trait AuthRefresher: Send + Sync + Debug {
-    #[allow(clippy::needless_lifetimes)] // required for automock.
-    fn refresh<'a>(&self, proxy: Option<&'a Proxy>) -> Result<AccountState, BackendError>;
-
-    fn to_json(&self) -> serde_json::Result<serde_json::Value>;
 }

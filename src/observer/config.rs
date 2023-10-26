@@ -1,4 +1,3 @@
-use crate::backend::AuthRefresher;
 use crate::{decrypt, encrypt, Account, EncryptionKey, Proxy};
 use parking_lot::RwLock;
 use proton_api_rs::log::debug;
@@ -33,8 +32,7 @@ pub type ConfigResult<T> = Result<T, ConfigError>;
 pub struct Config(Arc<RwLock<ConfigInner>>);
 
 pub enum ConfigAuthRefresher {
-    Resolved(Box<dyn AuthRefresher>),
-    Unresolved(serde_json::Value),
+    Resolved(serde_json::Value),
     None,
 }
 
@@ -53,9 +51,9 @@ pub(crate) struct ConfigInner {
 }
 
 impl ConfigInner {
-    pub fn add_or_update_account(&mut self, account: &Account) {
+    pub fn add_or_update_account(&mut self, account: &Account) -> Result<(), anyhow::Error> {
         let refresh_data = if let Some(a) = account.get_impl() {
-            ConfigAuthRefresher::Resolved(a.to_refresher())
+            ConfigAuthRefresher::Resolved(a.to_config()?)
         } else {
             ConfigAuthRefresher::None
         };
@@ -70,6 +68,8 @@ impl ConfigInner {
         );
 
         self.dirty = true;
+
+        Ok(())
     }
 
     pub fn account_removed(&mut self, email: &str) {
@@ -78,7 +78,7 @@ impl ConfigInner {
         }
     }
 
-    pub fn account_refreshed(&mut self, email: &str, value: Box<dyn AuthRefresher>) {
+    pub fn account_refreshed(&mut self, email: &str, value: serde_json::Value) {
         if let Some(account) = self.accounts.get_mut(email) {
             account.auth_refresher = ConfigAuthRefresher::Resolved(value);
             self.dirty = true;
@@ -142,7 +142,7 @@ impl Config {
             accounts: Default::default(),
             dirty: true,
         })));
-        config.write(|_| {})?;
+        config.write(|_| Ok(()))?;
         Ok(config)
     }
 
@@ -177,7 +177,7 @@ impl Config {
                         ConfigAccount {
                             backend: account.backend,
                             auth_refresher: if let Some(v) = account.value {
-                                ConfigAuthRefresher::Unresolved(v)
+                                ConfigAuthRefresher::Resolved(v)
                             } else {
                                 ConfigAuthRefresher::None
                             },
@@ -204,9 +204,12 @@ impl Config {
         (f)(accessor.deref())
     }
 
-    pub(crate) fn write<R>(&self, f: impl FnOnce(&mut ConfigInner) -> R) -> ConfigResult<R> {
+    pub(crate) fn write<R>(
+        &self,
+        f: impl FnOnce(&mut ConfigInner) -> Result<R, anyhow::Error>,
+    ) -> ConfigResult<R> {
         let mut accessor = self.0.write();
-        let r = (f)(accessor.deref_mut());
+        let r = (f)(accessor.deref_mut()).map_err(ConfigError::Unknown)?;
 
         if accessor.dirty {
             debug!("Config is dirty, writing to disk");
@@ -222,11 +225,7 @@ impl Config {
         let mut json_accounts = Vec::with_capacity(config.accounts.len());
         for (k, v) in &config.accounts {
             let refresher_value = match &v.auth_refresher {
-                ConfigAuthRefresher::Resolved(v) => {
-                    let value = v.to_json()?;
-                    Some(value)
-                }
-                ConfigAuthRefresher::Unresolved(v) => Some(v.clone()),
+                ConfigAuthRefresher::Resolved(v) => Some(v.clone()),
                 ConfigAuthRefresher::None => None,
             };
 
@@ -332,9 +331,10 @@ fn test_config_v2_store_and_load() {
 
         config
             .write(|inner| {
-                inner.add_or_update_account(&account1);
-                inner.add_or_update_account(&account2);
+                inner.add_or_update_account(&account1)?;
+                inner.add_or_update_account(&account2)?;
                 inner.set_poll_interval(poll_interval);
+                Ok(())
             })
             .expect("failed to update config");
     }
@@ -354,7 +354,7 @@ fn test_config_v2_store_and_load() {
                     assert_eq!(account.proxy, Some(proxy));
                     assert!(matches!(
                         account.auth_refresher,
-                        ConfigAuthRefresher::Unresolved(_)
+                        ConfigAuthRefresher::Resolved(_)
                     ));
                 }
                 {
@@ -367,6 +367,7 @@ fn test_config_v2_store_and_load() {
 
                 inner.account_logged_out("foo");
                 inner.account_removed("bar");
+                Ok(())
             })
             .expect("failed to update config");
     }

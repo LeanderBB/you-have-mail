@@ -1,4 +1,4 @@
-use crate::backend::{AuthRefresher, Backend};
+use crate::backend::Backend;
 use crate::observer::stateful_notifier::StatefulNotifier;
 use crate::observer::worker::{poll_inplace, TaskList, TaskRunner};
 use crate::Notification::{AccountAdded, AccountLoggedOut, AccountOnline, AccountRemoved};
@@ -105,45 +105,26 @@ impl ObserverBuilder {
                     continue;
                 };
 
-                let mut do_account_refresh =
-                    |r: &dyn AuthRefresher, backend| match r.refresh(cfg.proxy.as_ref()) {
-                        Err(e) => {
-                            error!("Failed to refresh {email}: {e}");
-                            observer.notifier.notify(Notification::Error(format!(
-                                "Failed to refresh {email}: {e}"
-                            )));
-                            accounts.push(Account::new(backend, email, cfg.proxy.clone()));
-                        }
-                        Ok(state) => {
-                            accounts.push(Account::with_state(
-                                backend,
-                                email,
-                                state,
-                                cfg.proxy.clone(),
-                            ));
-                        }
-                    };
-
                 match &cfg.auth_refresher {
-                    ConfigAuthRefresher::Unresolved(value) => {
-                        debug!("Refreshing account {} ({})", email, cfg.backend);
-                        match backend.auth_refresher_from_config(value.clone()) {
-                            Err(e) => {
-                                error!("Failed to decode {email}'s refresh data: {e}");
-                                observer.notifier.notify(Notification::Error(format!(
-                                    "Failed to decode {email}'s refresh data: {e}"
-                                )));
-                                accounts.push(Account::new(backend, email, cfg.proxy.clone()));
+                    ConfigAuthRefresher::Resolved(r) => {
+                        debug!("Loading account from config {} ({})", email, cfg.backend);
+                        match backend.account_from_config(cfg.proxy.as_ref(), r.clone()) {
+                            Ok(account_state) => {
+                                accounts.push(Account::with_state(
+                                    backend,
+                                    email,
+                                    account_state,
+                                    cfg.proxy.clone(),
+                                ));
                             }
-                            Ok(refresher) => {
-                                do_account_refresh(refresher.as_ref(), backend.clone());
+                            Err(e) => {
+                                error!("Failed to restore {email} from config: {e}");
+                                accounts.push(Account::new(backend, email, cfg.proxy.clone()));
+                                observer.notifier.notify(Notification::Error(format!(
+                                    "Failed to restore {email}'s form config: {e}"
+                                )));
                             }
                         }
-                    }
-
-                    ConfigAuthRefresher::Resolved(r) => {
-                        debug!("Refreshing account {} ({})", email, cfg.backend);
-                        do_account_refresh(r.as_ref(), backend.clone());
                     }
                     ConfigAuthRefresher::None => {
                         debug!("Account {} ({}) has no refresh data", email, cfg.backend);
@@ -160,9 +141,10 @@ impl ObserverBuilder {
                 .config
                 .write(|inner| {
                     for account in accounts {
-                        inner.add_or_update_account(&account);
+                        inner.add_or_update_account(&account)?;
                         observer.accounts.insert(account.email().into(), account);
                     }
+                    Ok(())
                 })
                 .map_err(|e| {
                     error!("Failed to update config: {e}");
@@ -251,6 +233,7 @@ impl Observer {
         self.notifier.notify(AccountLoggedOut(account.email()));
         if let Err(e) = self.config.write(|inner| {
             inner.account_logged_out(account.email());
+            Ok(())
         }) {
             error!("Failed to update config after account logout: {e}");
             self.notifier.notify(Notification::Error(format!(
@@ -272,6 +255,7 @@ impl Observer {
                 self.notifier.notify(AccountRemoved(account.email()));
                 if let Err(e) = self.config.write(|inner| {
                     inner.account_removed(account.email());
+                    Ok(())
                 }) {
                     error!("Failed to update config after account removal: {e}");
                     self.notifier.notify(Notification::Error(format!(
@@ -302,8 +286,10 @@ impl Observer {
 
     /// Set poll interval for the observer.
     pub fn set_poll_interval(&mut self, interval: Duration) -> ObserverResult<()> {
-        self.config
-            .write(|inner| inner.set_poll_interval(interval))?;
+        self.config.write(|inner| {
+            inner.set_poll_interval(interval);
+            Ok(())
+        })?;
         Ok(())
     }
 
@@ -356,6 +342,7 @@ impl Observer {
                 .notify(Notification::ProxyApplied(email, proxy));
             self.config.write(move |inner| {
                 inner.account_proxy_changed(email, proxy.cloned());
+                Ok(())
             })?;
         }
 

@@ -1,7 +1,7 @@
 //! Null backend implementation, useful for testing.
 use crate::backend::{
-    Account, AccountRefreshedNotifier, AuthRefresher, AwaitTotp, Backend, BackendError,
-    BackendResult, CheckTask, EmailInfo, NewEmailReply,
+    Account, AccountRefreshedNotifier, AwaitTotp, Backend, BackendError, BackendResult, CheckTask,
+    EmailInfo, NewEmailReply,
 };
 use crate::{AccountState, Proxy};
 use anyhow::{anyhow, Error};
@@ -53,13 +53,6 @@ struct NullAwaitTotp {
     totp: String,
     wait_time: Option<Duration>,
     refresh: bool,
-}
-
-#[doc(hidden)]
-#[derive(Debug)]
-struct NullAuthRefresher {
-    email: String,
-    counter: usize,
 }
 
 const NULL_BACKEND_NAME: &str = "Null Backend";
@@ -117,30 +110,14 @@ impl Backend for NullBacked {
         Ok(())
     }
 
-    fn auth_refresher_from_config(&self, value: Value) -> Result<Box<dyn AuthRefresher>, Error> {
+    fn account_from_config(&self, _: Option<&Proxy>, value: Value) -> Result<AccountState, Error> {
         let cfg = serde_json::from_value::<NullAuthRefresherInfo>(value).map_err(|e| anyhow!(e))?;
-        Ok(Box::new(NullAuthRefresher {
-            email: cfg.email,
-            counter: cfg.counter,
-        }))
-    }
-}
-
-impl AuthRefresher for NullAuthRefresher {
-    fn refresh(&self, _: Option<&Proxy>) -> Result<AccountState, BackendError> {
         Ok(AccountState::LoggedIn(Box::new(NullAccount {
-            email: self.email.clone(),
+            email: cfg.email,
             wait_time: None,
-            counter: Arc::new(AtomicUsize::new(self.counter)),
+            counter: Arc::new(AtomicUsize::new(cfg.counter)),
             refresh: false,
         })))
-    }
-
-    fn to_json(&self) -> serde_json::Result<Value> {
-        serde_json::to_value(NullAuthRefresherInfo {
-            email: self.email.clone(),
-            counter: self.counter,
-        })
     }
 }
 
@@ -184,16 +161,18 @@ impl CheckTask for NullTask {
     fn check(&self, r: &mut dyn AccountRefreshedNotifier) -> BackendResult<NewEmailReply> {
         let val = self.counter.fetch_add(1, Ordering::SeqCst) + 1;
         if self.refresh {
-            r.notify_account_refreshed(self);
+            let cfg = self.to_config().unwrap();
+            r.notify_account_refreshed(self.email(), cfg);
         }
         Ok(NullAccount::create_email_reply(val))
     }
 
-    fn to_refresher(&self) -> Box<dyn AuthRefresher> {
-        Box::new(NullAuthRefresher {
+    fn to_config(&self) -> Result<Value, Error> {
+        serde_json::to_value(NullAuthRefresherInfo {
             email: self.email.clone(),
             counter: self.counter.load(Ordering::SeqCst),
         })
+        .map_err(|e| anyhow!(e))
     }
 }
 
@@ -217,11 +196,12 @@ impl Account for NullAccount {
         Ok(())
     }
 
-    fn to_refresher(&self) -> Box<dyn AuthRefresher> {
-        Box::new(NullAuthRefresher {
+    fn to_config(&self) -> Result<Value, Error> {
+        serde_json::to_value(NullAuthRefresherInfo {
             email: self.email.clone(),
             counter: self.counter.load(Ordering::SeqCst),
         })
+        .map_err(|e| anyhow!(e))
     }
 }
 

@@ -1,4 +1,4 @@
-use crate::backend::{AccountRefreshedNotifier, AuthRefresher, BackendError, CheckTask};
+use crate::backend::{AccountRefreshedNotifier, BackendError, CheckTask};
 use crate::observer::stateful_notifier::StatefulNotifier;
 use crate::observer::{ObserverError, ObserverResult};
 use crate::{AccountError, Config, Notification, Notifier};
@@ -12,24 +12,37 @@ pub type TaskList = Vec<Box<dyn CheckTask>>;
 struct AccountRefreshedCollector<'a> {
     notifier: &'a StatefulNotifier,
     config: &'a Config,
-    accounts: Vec<(String, Box<dyn AuthRefresher>)>,
+    refreshed_accounts: Vec<(String, serde_json::Value)>,
+    logged_out_accounts: Vec<String>,
 }
 
 impl<'a> AccountRefreshedNotifier for AccountRefreshedCollector<'a> {
-    fn notify_account_refreshed(&mut self, task: &dyn CheckTask) {
-        self.accounts
-            .push((task.email().to_string(), task.to_refresher()));
+    fn notify_account_refreshed(&mut self, email: &str, value: serde_json::Value) {
+        if let Some((_, v)) = self.refreshed_accounts.iter_mut().find(|(e, _)| e == email) {
+            *v = value;
+            return;
+        };
+
+        self.refreshed_accounts.push((email.to_string(), value))
     }
 }
 
 impl<'a> Drop for AccountRefreshedCollector<'a> {
     fn drop(&mut self) {
-        if !self.accounts.is_empty() {
+        if !self.refreshed_accounts.is_empty() || !self.logged_out_accounts.is_empty() {
             if let Err(e) = self.config.write(|inner| {
-                let accounts = std::mem::take(&mut self.accounts);
-                for (email, value) in accounts {
-                    inner.account_refreshed(&email, value);
+                {
+                    let accounts = std::mem::take(&mut self.refreshed_accounts);
+                    for (email, value) in accounts {
+                        inner.account_refreshed(&email, value);
+                    }
                 }
+                {
+                    for email in &self.logged_out_accounts {
+                        inner.account_logged_out(email);
+                    }
+                }
+                Ok(())
             }) {
                 error!("Failed to update config: {e}");
                 self.notifier.notify(Notification::ConfigError(e));
@@ -42,7 +55,8 @@ pub fn poll_inplace(tasks: &[Box<dyn CheckTask>], notifier: &StatefulNotifier, c
     let mut account_refreshed_collector = AccountRefreshedCollector {
         notifier,
         config,
-        accounts: Vec::new(),
+        refreshed_accounts: Vec::new(),
+        logged_out_accounts: Vec::new(),
     };
 
     for t in tasks {
@@ -67,7 +81,10 @@ pub fn poll_inplace(tasks: &[Box<dyn CheckTask>], notifier: &StatefulNotifier, c
                     e
                 );
                 match e {
-                    BackendError::LoggedOut => {
+                    BackendError::LoggedOut(_) => {
+                        account_refreshed_collector
+                            .logged_out_accounts
+                            .push(t.email().to_string());
                         notifier.notify(Notification::AccountLoggedOut(t.email()));
                     }
                     BackendError::Timeout(_) | BackendError::Connection(_) => {

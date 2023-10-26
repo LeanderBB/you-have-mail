@@ -1,4 +1,4 @@
-use crate::backend::{AuthRefresher, CheckTask};
+use crate::backend::CheckTask;
 use crate::Proxy;
 use proton_api_rs::log::error;
 use secrecy::SecretString;
@@ -44,7 +44,7 @@ pub enum AccountError {
 impl AccountError {
     pub fn is_logged_out(&self) -> bool {
         if let AccountError::Backend(e) = self {
-            return matches!(e, crate::backend::BackendError::LoggedOut);
+            return matches!(e, crate::backend::BackendError::LoggedOut(_));
         }
         false
     }
@@ -154,16 +154,6 @@ impl Account {
             }
             _ => Err(AccountError::InvalidState),
         }
-    }
-
-    /// Refresh the authentication token for this account.
-    pub fn refresh(&mut self, refresher: Box<dyn AuthRefresher>) -> AccountResult<()> {
-        if !self.is_logged_out() {
-            return Err(AccountError::InvalidState);
-        }
-
-        self.state = refresher.refresh(self.proxy.as_ref())?;
-        Ok(())
     }
 
     /// Apply proxy configuration to this account
