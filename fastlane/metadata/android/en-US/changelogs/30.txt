@@ -1,0 +1,4 @@
+# Fixes
+
+* If a session refresh request can't complete due to network error, do not treat the account as
+  logged out.

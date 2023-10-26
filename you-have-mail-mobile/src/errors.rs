@@ -58,7 +58,7 @@ impl From<yhm::backend::BackendError> for ServiceError {
     fn from(value: yhm::backend::BackendError) -> Self {
         use yhm::backend::BackendError;
         match value {
-            BackendError::LoggedOut => ServiceError::LoggedOut,
+            BackendError::LoggedOut(_) => ServiceError::LoggedOut,
             BackendError::Timeout(e) => ServiceError::RequestError {
                 category: RequestErrorCategory::Connection,
                 msg: e.to_string(),
