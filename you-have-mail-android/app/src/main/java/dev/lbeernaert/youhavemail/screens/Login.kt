@@ -15,7 +15,9 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
+import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.autofill.AutofillType
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
@@ -25,8 +27,11 @@ import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
 import dev.lbeernaert.youhavemail.components.PasswordField
+import dev.lbeernaert.youhavemail.ui.AutoFillRequestHandler
+import dev.lbeernaert.youhavemail.ui.autofill
 
 
+@OptIn(ExperimentalComposeUiApi::class)
 @Composable
 fun Login(
     backendName: String,
@@ -34,7 +39,7 @@ fun Login(
     onBackClicked: () -> Unit,
     onLoginClicked: suspend (email: String, password: String) -> Unit
 ) {
-    var email = rememberSaveable(stateSaver = TextFieldValue.Saver) {
+    val email = rememberSaveable(stateSaver = TextFieldValue.Saver) {
         mutableStateOf(
             TextFieldValue(accountEmail)
         )
@@ -53,6 +58,10 @@ fun Login(
                 onLoginClicked(email.value.text, password.value.text)
             }
         }
+        val autoFillHandler = AutoFillRequestHandler(
+            autofillTypes = listOf(AutofillType.EmailAddress),
+            onFill = { email.value = TextFieldValue(it) }
+        )
 
         Column(
             modifier = Modifier
@@ -68,7 +77,8 @@ fun Login(
             Spacer(modifier = Modifier.height(20.dp))
 
             TextField(
-                modifier = Modifier.fillMaxWidth(),
+                modifier = Modifier.fillMaxWidth()
+                    .autofill(handler = autoFillHandler),
                 label = { Text(text = "Email") },
                 singleLine = true,
                 value = email.value,
