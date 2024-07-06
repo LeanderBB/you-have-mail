@@ -1,0 +1,54 @@
+[package]
+name = "proton-api"
+authors = ["Leander Beernaert <lbb-dev@pm.me>"]
+version = "0.14.0"
+edition = "2021"
+license = "AGPL-3.0-only"
+description = "Unofficial implemention of proton REST API in rust"
+keywords = ["proton", "rest", "api"]
+categories = ["api-bindings"]
+
+[dependencies]
+go-srp = {path = "../go-srp", version = "0.1.6"}
+thiserror = "1"
+serde = {version ="1", features=["derive"]}
+serde_repr = "0.1"
+serde_json = "1"
+base64 = "0.21"
+secrecy = "0.8"
+anyhow = "1.0"
+bytes = "1.4"
+log = "0.4"
+parking_lot = "0.12"
+ureq = {version="2.6", optional=true, features=["socks-proxy", "socks"]}
+
+
+[features]
+default = []
+http-ureq = ["dep:ureq"]
+http-reqwest = ["dep:reqwest"]
+async-traits =[]
+
+[dependencies.reqwest]
+version = "0.11"
+default-features = false
+features = ["json", "deflate", "stream", "cookies", "multipart", "rustls","rustls-tls", "socks"]
+optional = true
+
+[dev-dependencies]
+env_logger = "0.10"
+tokio = {version ="1", features = ["full"]}
+go-gpa-server = {path= "../go-gpa-server"}
+
+[[example]]
+name = "user_id"
+required-features = ["http-reqwest"]
+
+[[example]]
+name = "user_id_sync"
+required-features = ["http-ureq"]
+
+[[test]]
+name = "session"
+required-features = ["http-ureq", "http-reqwest"]
+

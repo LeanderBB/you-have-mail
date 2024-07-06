@@ -5,7 +5,7 @@ use crate::backend::{
 };
 use crate::{AccountState, Proxy};
 use anyhow::{anyhow, Error};
-use proton_api_rs::domain::SecretString;
+use proton_api::domain::SecretString;
 use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;

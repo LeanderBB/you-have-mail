@@ -1,0 +1,16 @@
+[package]
+name = "go-gpa-server"
+version = "0.1.0"
+edition = "2021"
+authors = ["Leander Beernaert <lbb-dev@pm.me>"]
+license = "AGPL-3.0-only"
+description = "API test server from https://github.com/ProtonMail/go-proton-api"
+keywords = ["api"]
+categories = ["api-bindings"]
+publish = false
+
+[dependencies]
+base64 = "0.21"
+
+[build-dependencies]
+bindgen = "0.64"

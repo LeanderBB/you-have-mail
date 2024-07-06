@@ -1,5 +1,5 @@
-use proton_api_rs::domain::SecretString;
-use proton_api_rs::log::{error, info, warn, LevelFilter};
+use proton_api::domain::SecretString;
+use proton_api::log::{error, info, warn, LevelFilter};
 use secrecy::{ExposeSecret, Secret};
 use std::io::{BufRead, Write};
 use std::path::PathBuf;

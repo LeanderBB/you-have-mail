@@ -1,0 +1,50 @@
+[package]
+name = "you-have-mail-common"
+version = "0.11.0"
+edition = "2021"
+authors = ["Leander Beernaert <lbb-dev@pm.me>"]
+license = "AGPL-3.0-only"
+categories = ["email"]
+readme = "README.md"
+repository= "https://github.com/LeanderBB/you-have-mail-common"
+
+[features]
+default = ["proton-backend"]
+proton-backend = ["dep:proton-api"]
+
+
+[dependencies]
+thiserror = "1"
+anyhow = "1"
+chacha20poly1305 = "0.10"
+serde_json = "1"
+serde = {version="1", features=["derive"]}
+secrecy = "0.8"
+crossbeam-channel = "0.5"
+parking_lot = "0.12"
+base64 = "0.21"
+
+[dependencies.log4rs]
+version = "1.2"
+default-features = false
+features = ["console_appender", "file_appender", "rolling_file_appender", "fixed_window_roller", "size_trigger", "compound_policy"]
+
+[dependencies.proton-api]
+path = "../proton/api"
+optional = true
+features = ["http-ureq"]
+
+[dev-dependencies]
+mockall = "0.11"
+dirs = "5.0.0"
+keyring = "2"
+temp-dir = "0.1"
+ctrlc = "3"
+env_logger = "0.10"
+
+[[example]]
+name = "cli"
+
+[package.metadata.docs.rs]
+all-features = true
+rustdoc-args = ["--cfg", "docsrc"]

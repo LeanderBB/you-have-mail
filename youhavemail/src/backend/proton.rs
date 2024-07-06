@@ -7,13 +7,13 @@ use crate::backend::{
 use crate::{AccountState, Proxy, ProxyProtocol};
 use anyhow::anyhow;
 use parking_lot::Mutex;
-use proton_api_rs::domain::{
+use proton_api::domain::{
     Boolean, EventAction, EventId, ExposeSecret, HumanVerificationLoginData, HumanVerificationType,
     LabelEvent, LabelId, LabelType, MessageEvent, MessageId, MoreEvents, UserUid,
 };
-use proton_api_rs::http::Sequence;
-use proton_api_rs::log::{debug, error};
-use proton_api_rs::{
+use proton_api::http::Sequence;
+use proton_api::log::{debug, error};
+use proton_api::{
     captcha_get, http, LoginError, Session, SessionRefreshData, SessionType, TotpSession,
 };
 use secrecy::{Secret, SecretString};
@@ -260,7 +260,7 @@ impl Backend for ProtonBackend {
 
     fn check_proxy(&self, proxy: &Proxy) -> BackendResult<()> {
         let client = new_client(Some(proxy))?;
-        proton_api_rs::ping().do_sync(&client).map_err(|e| e.into())
+        proton_api::ping().do_sync(&client).map_err(|e| e.into())
     }
 
     fn account_from_config(

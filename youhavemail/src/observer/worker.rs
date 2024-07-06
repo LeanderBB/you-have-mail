@@ -4,7 +4,7 @@ use crate::observer::{ObserverError, ObserverResult};
 use crate::{AccountError, Config, Notification, Notifier};
 use anyhow::anyhow;
 use crossbeam_channel::{Receiver, SendError, Sender};
-use proton_api_rs::log::{debug, error};
+use proton_api::log::{debug, error};
 use std::sync::Arc;
 
 pub type TaskList = Vec<Box<dyn CheckTask>>;

@@ -1,6 +1,6 @@
 use crate::backend::CheckTask;
 use crate::Proxy;
-use proton_api_rs::log::error;
+use proton_api::log::error;
 use secrecy::SecretString;
 use std::sync::Arc;
 use thiserror::Error;

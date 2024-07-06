@@ -6,7 +6,7 @@ use crate::{
     Account, AccountError, Config, ConfigAuthRefresher, ConfigError, Notification, Notifier, Proxy,
 };
 use anyhow::anyhow;
-use proton_api_rs::log::{debug, error, trace};
+use proton_api::log::{debug, error, trace};
 use std::collections::btree_map::Entry;
 use std::collections::BTreeMap;
 use std::sync::Arc;

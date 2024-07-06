@@ -1,6 +1,6 @@
 use crate::{decrypt, encrypt, Account, EncryptionKey, Proxy};
 use parking_lot::RwLock;
-use proton_api_rs::log::debug;
+use proton_api::log::debug;
 use secrecy::Secret;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
