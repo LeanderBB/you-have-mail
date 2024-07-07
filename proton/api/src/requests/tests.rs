@@ -1,13 +1,13 @@
-use crate::http;
-use crate::http::RequestData;
+use http::Method;
 
+#[derive(Copy, Clone)]
 pub struct Ping;
 
-impl http::RequestDesc for Ping {
-    type Output = ();
+impl http::Request for Ping {
     type Response = http::NoResponse;
+    const METHOD: Method = Method::Get;
 
-    fn build(&self) -> RequestData {
-        RequestData::new(http::Method::Get, "tests/ping")
+    fn url(&self) -> String {
+        "tests/ping".to_owned()
     }
 }

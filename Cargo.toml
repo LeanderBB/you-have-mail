@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "youhavemail",
+    #"youhavemail",
     "proton/api",
     "proton/go-gpa-server",
     "proton/go-srp",
@@ -9,10 +9,16 @@ members = [
 ]
 
 [workspace.dependencies]
-ureq = {version="2.9", features=["socks-proxy"]}
-secrecy = "0.8"
-thiserror = "1"
-serde = { version = "1", features = ["derive"]}
-serde_json = "1"
-url="2.5"
-anyhow = "1"
+ureq = {version="2.9.7", features=["socks-proxy"]}
+secrecy = { version="0.8.0", features = ["serde"] }
+thiserror = "1.0.61"
+serde = { version = "1.0.204", features = ["derive"]}
+serde_repr = "0.1.19"
+serde_json = "1.0.120"
+url="2.5.2"
+anyhow = "1.0.86"
+tracing = "0.1.40"
+base64 = "0.22.1"
+parking_lot = "0.12.3"
+tracing-subscriber = "0.3.18"
+tracing-log = "0.2.0"

@@ -1,13 +1,16 @@
 use crate::domain::{HumanVerification, HumanVerificationType};
 use anyhow::anyhow;
+use http::ureq::Response;
+use http::ExtSafeResponse;
 use serde::Deserialize;
 use thiserror::Error;
+use tracing::error;
 
 const HUMAN_VERIFICATION_REQUESTED: u32 = 9001;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct APIErrorDesc {
+struct APIErrorDesc {
     pub code: u32,
     pub error: Option<String>,
     pub details: Option<serde_json::Value>,
@@ -37,10 +40,15 @@ pub enum GetHumanVerificationError {
 }
 
 impl APIError {
+    /// Check whether this error is a request to perform HV.
     pub fn is_human_verification_request(&self) -> bool {
         self.api_code == HUMAN_VERIFICATION_REQUESTED
     }
 
+    /// Attempt to decode the HV verification details.
+    ///
+    /// # Errors
+    /// Returns error if we failed to extract the HV details.
     pub fn try_get_human_verification_details(
         &self,
     ) -> Result<HumanVerification, GetHumanVerificationError> {
@@ -98,28 +106,30 @@ impl std::fmt::Display for APIError {
 }
 
 impl APIError {
+    /// Create a new instance based of status code and response body.
+    ///
+    /// Note that if we fail to parse the response json only the http status code is returned.
+    pub fn with_status_and_response(status: u16, response: Response) -> Self {
+        match serde_json::from_reader::<_, APIErrorDesc>(response.into_safe_reader()) {
+            Ok(desc) => Self {
+                http_code: status,
+                api_code: desc.code,
+                message: desc.error,
+                details: desc.details,
+            },
+            Err(e) => {
+                error!("Failed to decode API error string: {e}");
+                Self::new(status)
+            }
+        }
+    }
+    /// Create a new instance with an `http_status` code.
     pub fn new(http_status: u16) -> Self {
         Self {
             http_code: http_status,
             api_code: 0,
             message: None,
             details: None,
-        }
-    }
-
-    pub fn with_status_and_body(http_status: u16, body: &[u8]) -> Self {
-        if body.is_empty() {
-            return Self::new(http_status);
-        }
-
-        match serde_json::from_slice::<APIErrorDesc>(body) {
-            Ok(e) => Self {
-                http_code: http_status,
-                api_code: e.code,
-                message: e.error,
-                details: e.details,
-            },
-            Err(_) => Self::new(http_status),
         }
     }
 }

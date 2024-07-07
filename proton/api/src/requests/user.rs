@@ -1,6 +1,5 @@
 use crate::domain::User;
-use crate::http;
-use crate::http::{JsonResponse, RequestData};
+use http::Method;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
@@ -9,13 +8,14 @@ pub struct UserInfoResponse {
     pub user: User,
 }
 
+#[derive(Copy, Clone)]
 pub struct UserInfoRequest {}
 
-impl http::RequestDesc for UserInfoRequest {
-    type Output = UserInfoResponse;
-    type Response = JsonResponse<Self::Output>;
+impl http::Request for UserInfoRequest {
+    type Response = http::JsonResponse<UserInfoResponse>;
+    const METHOD: Method = Method::Get;
 
-    fn build(&self) -> RequestData {
-        RequestData::new(http::Method::Get, "core/v4/users")
+    fn url(&self) -> String {
+        "core/v4/users".to_owned()
     }
 }

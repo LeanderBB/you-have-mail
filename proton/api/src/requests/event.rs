@@ -1,5 +1,4 @@
-use crate::http;
-use crate::http::RequestData;
+use http::{Method, RequestBuilder};
 use serde::Deserialize;
 
 #[doc(hidden)]
@@ -9,14 +8,19 @@ pub struct LatestEventResponse {
     pub event_id: crate::domain::EventId,
 }
 
+#[derive(Copy, Clone)]
 pub struct GetLatestEventRequest;
 
-impl http::RequestDesc for GetLatestEventRequest {
-    type Output = LatestEventResponse;
-    type Response = http::JsonResponse<Self::Output>;
+impl http::Request for GetLatestEventRequest {
+    type Response = http::JsonResponse<LatestEventResponse>;
+    const METHOD: Method = Method::Get;
 
-    fn build(&self) -> RequestData {
-        RequestData::new(http::Method::Get, "core/v4/events/latest")
+    fn url(&self) -> String {
+        "core/v4/events/latest".to_owned()
+    }
+
+    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+        Ok(builder)
     }
 }
 
@@ -30,14 +34,14 @@ impl<'a> GetEventRequest<'a> {
     }
 }
 
-impl<'a> http::RequestDesc for GetEventRequest<'a> {
-    type Output = crate::domain::Event;
-    type Response = http::JsonResponse<Self::Output>;
+impl<'a> http::Request for GetEventRequest<'a> {
+    type Response = http::JsonResponse<crate::domain::Event>;
+    const METHOD: Method = Method::Get;
 
-    fn build(&self) -> RequestData {
-        RequestData::new(
-            http::Method::Get,
-            format!("core/v4/events/{}", self.event_id),
-        )
+    fn url(&self) -> String {
+        format!("core/v4/events/{}", self.event_id)
+    }
+    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+        Ok(builder)
     }
 }

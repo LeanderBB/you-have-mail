@@ -9,11 +9,13 @@ use std::io;
 use std::io::Read;
 use std::marker::PhantomData;
 use std::time::Duration;
-use ureq::ErrorKind;
+pub use ureq;
+use ureq::{ErrorKind, Response};
 use url::Url;
 
 /// Errors that may arrise during an http request.
 #[derive(Debug, thiserror::Error)]
+#[allow(clippy::large_enum_variant)]
 pub enum Error {
     /// HTTP client error.
     #[error("Client Error: {0}")]
@@ -51,7 +53,7 @@ impl Error {
     }
 }
 
-type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = std::result::Result<T, Error>;
 
 /// How to process the response.
 pub trait FromResponse {
@@ -85,6 +87,19 @@ impl<T: DeserializeOwned> FromResponse for JsonResponse<T> {
     }
 }
 
+/// This response handler converts the response body from the sever into a string.
+pub struct StringResponse {}
+
+impl FromResponse for StringResponse {
+    type Output = String;
+
+    fn from_response(response: Response) -> Result<Self::Output> {
+        let mut result = String::new();
+        response.into_safe_reader().read_to_string(&mut result)?;
+        Ok(result)
+    }
+}
+
 /// HTTP method for the request.
 #[derive(Debug, Copy, Clone, Eq, PartialEq)]
 pub enum Method {
@@ -99,7 +114,9 @@ pub trait Request {
 
     const METHOD: Method;
     fn url(&self) -> String;
-    fn build(&self, builder: &mut RequestBuilder) -> Result<()>;
+    fn build(&self, builder: RequestBuilder) -> Result<RequestBuilder> {
+        Ok(builder)
+    }
 }
 
 pub struct RequestBuilder {
@@ -114,28 +131,38 @@ impl RequestBuilder {
             body: None,
         }
     }
+    /// Set a header with `key` and `value`.
     pub fn header(mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         self.request = self.request.set(key.as_ref(), value.as_ref());
         self
     }
 
+    /// Set bearer authentication `token`.
     pub fn bearer_token(self, token: impl AsRef<str>) -> Self {
         self.header("authorization", format!("Bearer {}", token.as_ref()))
     }
 
+    /// Set the body as a collection of bytes.
     pub fn bytes(mut self, bytes: Vec<u8>) -> Self {
         self.body = Some(bytes);
         self
     }
 
+    /// Set the body as a serialized json object.
     pub fn json(self, value: impl Serialize) -> Self {
         let bytes = serde_json::to_vec(&value).expect("Failed to serialize json");
         self.json_bytes(bytes)
     }
 
-    pub fn json_bytes(mut self, bytes: Vec<u8>) -> Self {
+    fn json_bytes(mut self, bytes: Vec<u8>) -> Self {
         self.body = Some(bytes.into());
         self.header("Content-Type", "application/json")
+    }
+
+    /// Set a query parameter with `key` and `value`.
+    pub fn query(mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Self {
+        self.request = self.request.query(key.as_ref(), value.as_ref());
+        self
     }
 }
 
@@ -190,7 +217,7 @@ impl Proxy {
 }
 
 /// Http client builder.
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct ClientBuilder {
     base_url: Url,
     request_timeout: Option<Duration>,
@@ -327,7 +354,7 @@ impl Client {
             Method::Get => self.agent.get(url.as_str()),
             Method::Put => self.agent.put(url.as_str()),
             Method::Post => self.agent.post(url.as_str()),
-            Method::Delete => self.agent.post(url.as_str()),
+            Method::Delete => self.agent.delete(url.as_str()),
             Method::Patch => self.agent.patch(url.as_str()),
         };
 
@@ -337,7 +364,7 @@ impl Client {
             builder = builder.header(key, value);
         }
 
-        request.build(&mut builder)?;
+        let builder = request.build(builder)?;
 
         let ureq_response = if let Some(body) = builder.body {
             builder.request.send_bytes(body.as_ref())?

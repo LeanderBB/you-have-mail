@@ -1,8 +1,8 @@
 use crate::domain::{Label, LabelType};
-use crate::http;
-use crate::http::RequestData;
+use http::{Method, RequestBuilder};
 use serde::Deserialize;
 
+#[derive(Copy, Clone)]
 pub struct GetLabelsRequest {
     label_type: LabelType,
 }
@@ -20,14 +20,15 @@ impl GetLabelsRequest {
     }
 }
 
-impl http::RequestDesc for GetLabelsRequest {
-    type Output = GetLabelsResponse;
-    type Response = http::JsonResponse<Self::Output>;
+impl http::Request for GetLabelsRequest {
+    type Response = http::JsonResponse<GetLabelsResponse>;
+    const METHOD: Method = Method::Get;
 
-    fn build(&self) -> RequestData {
-        RequestData::new(
-            http::Method::Get,
-            format!("core/v4/labels?Type={}", self.label_type as u8),
-        )
+    fn url(&self) -> String {
+        "core/v4/labels".to_owned()
+    }
+
+    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+        Ok(builder.query("Type", &(self.label_type as u8).to_string()))
     }
 }

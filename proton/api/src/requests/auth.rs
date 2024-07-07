@@ -1,7 +1,6 @@
-use crate::domain::{HumanVerificationLoginData, SecretString, UserUid};
-use crate::http;
-use crate::http::{RequestData, X_PM_HUMAN_VERIFICATION_TOKEN, X_PM_HUMAN_VERIFICATION_TOKEN_TYPE};
-use secrecy::Secret;
+use crate::auth::{AuthToken, RefreshToken};
+use crate::domain::{HumanVerificationLoginData, UserUid};
+use http::{Method, RequestBuilder};
 use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
 use std::borrow::Cow;
@@ -13,12 +12,16 @@ pub struct AuthInfoRequest<'a> {
     pub username: &'a str,
 }
 
-impl<'a> http::RequestDesc for AuthInfoRequest<'a> {
-    type Output = AuthInfoResponse;
-    type Response = http::JsonResponse<Self::Output>;
+impl<'a> http::Request for AuthInfoRequest<'a> {
+    type Response = http::JsonResponse<AuthInfoResponse>;
+    const METHOD: Method = Method::Post;
 
-    fn build(&self) -> RequestData {
-        RequestData::new(http::Method::Post, "auth/v4/info").json(self)
+    fn url(&self) -> String {
+        "auth/v4/info".to_owned()
+    }
+
+    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+        Ok(builder.json(self))
     }
 }
 
@@ -47,35 +50,39 @@ pub struct AuthRequest<'a> {
     pub human_verification: &'a Option<HumanVerificationLoginData>,
 }
 
-impl<'a> http::RequestDesc for AuthRequest<'a> {
-    type Output = AuthResponse;
-    type Response = http::JsonResponse<Self::Output>;
+impl<'a> http::Request for AuthRequest<'a> {
+    type Response = http::JsonResponse<AuthResponse>;
+    const METHOD: Method = Method::Post;
 
-    fn build(&self) -> RequestData {
-        let mut request = RequestData::new(http::Method::Post, "auth/v4").json(self);
+    fn url(&self) -> String {
+        "auth/v4".to_owned()
+    }
+
+    fn build(&self, mut builder: RequestBuilder) -> http::Result<RequestBuilder> {
+        builder = builder.json(self);
 
         if let Some(hv) = &self.human_verification {
             // repeat submission with x-pm-human-verification-token and x-pm-human-verification-token-type
-            request = request
+            builder = builder
                 .header(X_PM_HUMAN_VERIFICATION_TOKEN, &hv.token)
-                .header(X_PM_HUMAN_VERIFICATION_TOKEN_TYPE, hv.hv_type.as_str())
+                .header(X_PM_HUMAN_VERIFICATION_TOKEN_TYPE, hv.hv_type.as_str());
         }
 
-        request
+        Ok(builder)
     }
 }
 
 #[doc(hidden)]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct AuthResponse {
     #[serde(rename = "UserID")]
     pub user_id: String,
     #[serde(rename = "UID")]
-    pub uid: String,
+    pub uid: UserUid,
     pub token_type: Option<String>,
-    pub access_token: String,
-    pub refresh_token: String,
+    pub access_token: AuthToken,
+    pub refresh_token: RefreshToken,
     pub server_proof: String,
     pub scope: String,
     #[serde(rename = "2FA")]
@@ -171,41 +178,19 @@ impl<'a> TOTPRequest<'a> {
     }
 }
 
-impl<'a> http::RequestDesc for TOTPRequest<'a> {
-    type Output = ();
+impl<'a> http::Request for TOTPRequest<'a> {
     type Response = http::NoResponse;
+    const METHOD: Method = Method::Post;
 
-    fn build(&self) -> RequestData {
-        RequestData::new(http::Method::Post, "auth/v4/2fa").json(TFAAuth {
+    fn url(&self) -> String {
+        "auth/v4/2fa".to_owned()
+    }
+
+    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+        Ok(builder.json(TFAAuth {
             two_factor_code: self.code,
             fido2: FIDO2Auth::empty(),
-        })
-    }
-}
-
-#[doc(hidden)]
-#[derive(Debug, Clone)]
-pub struct UserAuth {
-    pub uid: Secret<UserUid>,
-    pub access_token: SecretString,
-    pub refresh_token: SecretString,
-}
-
-impl UserAuth {
-    pub fn from_auth_response(auth: AuthResponse) -> Self {
-        Self {
-            uid: Secret::new(UserUid(auth.uid)),
-            access_token: SecretString::new(auth.access_token),
-            refresh_token: SecretString::new(auth.refresh_token),
-        }
-    }
-
-    pub fn from_auth_refresh_response(auth: AuthRefreshResponse) -> Self {
-        Self {
-            uid: Secret::new(UserUid(auth.uid)),
-            access_token: SecretString::new(auth.access_token),
-            refresh_token: SecretString::new(auth.refresh_token),
-        }
+        }))
     }
 }
 
@@ -223,14 +208,14 @@ pub struct AuthRefresh<'a> {
 }
 
 #[doc(hidden)]
-#[derive(Deserialize, Debug)]
+#[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
 pub struct AuthRefreshResponse {
     #[serde(rename = "UID")]
-    pub uid: String,
+    pub uid: UserUid,
     pub token_type: Option<String>,
-    pub access_token: String,
-    pub refresh_token: String,
+    pub access_token: AuthToken,
+    pub refresh_token: RefreshToken,
     pub scope: String,
 }
 
@@ -245,29 +230,38 @@ impl<'a> AuthRefreshRequest<'a> {
     }
 }
 
-impl<'a> http::RequestDesc for AuthRefreshRequest<'a> {
-    type Output = AuthRefreshResponse;
-    type Response = http::JsonResponse<Self::Output>;
+impl<'a> http::Request for AuthRefreshRequest<'a> {
+    type Response = http::JsonResponse<AuthRefreshResponse>;
+    const METHOD: Method = Method::Post;
 
-    fn build(&self) -> RequestData {
-        RequestData::new(http::Method::Post, "auth/v4/refresh").json(AuthRefresh {
+    fn url(&self) -> String {
+        "auth/v4/refresh".to_owned()
+    }
+
+    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+        Ok(builder.json(AuthRefresh {
             uid: &self.uid.0,
             refresh_token: self.token,
             grant_type: "refresh_token",
             response_type: "token",
             redirect_uri: "https://protonmail.ch/",
-        })
+        }))
     }
 }
 
+#[derive(Copy, Clone)]
 pub struct LogoutRequest {}
 
-impl http::RequestDesc for LogoutRequest {
-    type Output = ();
+impl http::Request for LogoutRequest {
     type Response = http::NoResponse;
+    const METHOD: Method = Method::Delete;
 
-    fn build(&self) -> RequestData {
-        RequestData::new(http::Method::Delete, "auth/v4")
+    fn url(&self) -> String {
+        "auth/v4".to_owned()
+    }
+
+    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+        Ok(builder)
     }
 }
 
@@ -282,17 +276,22 @@ impl<'a> CaptchaRequest<'a> {
     }
 }
 
-impl<'a> http::RequestDesc for CaptchaRequest<'a> {
-    type Output = String;
+impl<'a> http::Request for CaptchaRequest<'a> {
     type Response = http::StringResponse;
+    const METHOD: Method = Method::Get;
 
-    fn build(&self) -> RequestData {
-        let url = if self.force_web {
-            format!("core/v4/captcha?ForceWebMessaging=1&Token={}", self.token)
-        } else {
-            format!("core/v4/captcha?Token={}", self.token)
-        };
+    fn url(&self) -> String {
+        "core/v4/captcha".to_owned()
+    }
 
-        RequestData::new(http::Method::Get, url)
+    fn build(&self, mut builder: RequestBuilder) -> http::Result<RequestBuilder> {
+        if self.force_web {
+            builder = builder.query("ForceWebMessaging", "1");
+        }
+
+        Ok(builder.query("Token", self.token))
     }
 }
+
+const X_PM_HUMAN_VERIFICATION_TOKEN: &str = "X-Pm-Human-Verification-Token";
+const X_PM_HUMAN_VERIFICATION_TOKEN_TYPE: &str = "X-Pm-Human-Verification-Token-Type";

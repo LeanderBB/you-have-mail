@@ -1,5 +1,6 @@
 //! Domain Types.
 
+pub mod errors;
 mod event;
 mod human_verification;
 mod labels;

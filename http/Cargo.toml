@@ -6,13 +6,14 @@ edition = "2021"
 license = "AGPL-3.0-only"
 
 [dependencies]
-ureq.workspace=true
-secrecy.workspace=true
-thiserror.workspace=true
-serde.workspace=true
-serde_json.workspace=true
-url.workspace=true
+ureq.workspace = true
+secrecy.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
 anyhow = "1"
+tracing.workspace = true
 
 [lints.clippy]
-pedantic="deny"
+pedantic = "deny"
