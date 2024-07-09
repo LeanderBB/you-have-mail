@@ -1,13 +1,12 @@
-use crate::domain::{Boolean, Label, LabelId};
 use serde::Deserialize;
 use serde_repr::Deserialize_repr;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
 /// Id for an API Event.
-pub struct EventId(pub String);
+pub struct Id(pub String);
 
-impl Display for EventId {
+impl Display for Id {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
@@ -24,15 +23,15 @@ pub enum MoreEvents {
 #[serde(rename_all = "PascalCase")]
 pub struct Event {
     #[serde(rename = "EventID")]
-    pub event_id: EventId,
+    pub event_id: Id,
     pub more: MoreEvents,
-    pub messages: Option<Vec<MessageEvent>>,
-    pub labels: Option<Vec<LabelEvent>>,
+    pub messages: Option<Vec<Message>>,
+    pub labels: Option<Vec<Label>>,
 }
 
 #[derive(Debug, Deserialize_repr, Eq, PartialEq, Copy, Clone)]
 #[repr(u8)]
-pub enum EventAction {
+pub enum Action {
     Delete = 0,
     Create = 1,
     Update = 2,
@@ -52,33 +51,19 @@ impl Display for MessageId {
 /// Event data related to a Message event.
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct MessageEvent {
-    #[serde(rename = "ID")]
-    pub id: MessageId,
-    pub action: EventAction,
-    pub message: Option<Message>,
-}
-
-/// Represents an email message.
-#[derive(Debug, Deserialize)]
-#[serde(rename_all = "PascalCase")]
 pub struct Message {
     #[serde(rename = "ID")]
     pub id: MessageId,
-    #[serde(rename = "LabelIDs")]
-    pub labels: Vec<LabelId>,
-    pub subject: String,
-    pub sender_address: String,
-    pub sender_name: Option<String>,
-    pub unread: Boolean,
+    pub action: Action,
+    pub message: Option<crate::domain::message::Message>,
 }
 
 /// Event data related to a Label event
 #[derive(Debug, Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct LabelEvent {
+pub struct Label {
     #[serde(rename = "ID")]
-    pub id: LabelId,
-    pub action: EventAction,
-    pub label: Option<Label>,
+    pub id: Id,
+    pub action: Action,
+    pub label: Option<crate::domain::label::Label>,
 }

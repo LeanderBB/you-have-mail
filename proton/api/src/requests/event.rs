@@ -5,7 +5,7 @@ use serde::Deserialize;
 #[derive(Deserialize)]
 pub struct LatestEventResponse {
     #[serde(rename = "EventID")]
-    pub event_id: crate::domain::EventId,
+    pub event_id: crate::domain::event::Id,
 }
 
 #[derive(Copy, Clone)]
@@ -25,17 +25,18 @@ impl http::Request for GetLatestEventRequest {
 }
 
 pub struct GetEventRequest<'a> {
-    event_id: &'a crate::domain::EventId,
+    event_id: &'a crate::domain::event::Id,
 }
 
 impl<'a> GetEventRequest<'a> {
-    pub fn new(id: &'a crate::domain::EventId) -> Self {
+    #[must_use]
+    pub fn new(id: &'a crate::domain::event::Id) -> Self {
         Self { event_id: id }
     }
 }
 
 impl<'a> http::Request for GetEventRequest<'a> {
-    type Response = http::JsonResponse<crate::domain::Event>;
+    type Response = http::JsonResponse<crate::domain::event::Event>;
     const METHOD: Method = Method::Get;
 
     fn url(&self) -> String {

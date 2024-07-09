@@ -1,18 +1,18 @@
-use crate::domain::User;
+use crate::domain::user::User;
 use http::Method;
 use serde::Deserialize;
 
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct UserInfoResponse {
+pub struct GetUserInfoResponse {
     pub user: User,
 }
 
 #[derive(Copy, Clone)]
-pub struct UserInfoRequest {}
+pub struct GetUserInfoRequest {}
 
-impl http::Request for UserInfoRequest {
-    type Response = http::JsonResponse<UserInfoResponse>;
+impl http::Request for GetUserInfoRequest {
+    type Response = http::JsonResponse<GetUserInfoResponse>;
     const METHOD: Method = Method::Get;
 
     fn url(&self) -> String {

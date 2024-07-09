@@ -7,7 +7,7 @@ use serde::Deserialize;
 
 /// Human Verification Type return by API.
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Hash, Deserialize)]
-pub enum HumanVerificationType {
+pub enum VerificationType {
     /// User needs to solve a Captcha, use [`crate::captcha_get`] to retrieve the token, solve in a web
     /// browser/view and retrieve the token posted via an `HVCaptchaMessage`.
     Captcha,
@@ -19,17 +19,18 @@ pub enum HumanVerificationType {
     Sms,
 }
 
-impl HumanVerificationType {
+impl VerificationType {
+    #[must_use]
     pub fn as_str(&self) -> &str {
         match self {
-            HumanVerificationType::Captcha => "captcha",
-            HumanVerificationType::Email => "email",
-            HumanVerificationType::Sms => "sms",
+            VerificationType::Captcha => "captcha",
+            VerificationType::Email => "email",
+            VerificationType::Sms => "sms",
         }
     }
 }
 
-impl std::fmt::Display for HumanVerificationType {
+impl std::fmt::Display for VerificationType {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.as_str())
     }
@@ -37,9 +38,9 @@ impl std::fmt::Display for HumanVerificationType {
 
 /// Human Verification data required for Login.
 #[derive(Debug, Clone)]
-pub struct HumanVerificationLoginData {
+pub struct LoginData {
     /// Type of human verification where the code originated from.
-    pub hv_type: HumanVerificationType,
+    pub hv_type: VerificationType,
     /// Result of the human verification request.
     pub token: String,
 }
@@ -48,7 +49,7 @@ pub struct HumanVerificationLoginData {
 #[derive(Debug)]
 pub struct HumanVerification {
     /// Types of supported verification.
-    pub methods: Vec<HumanVerificationType>,
+    pub methods: Vec<VerificationType>,
     /// Token for the verification request.
     pub token: String,
 }
@@ -56,34 +57,48 @@ pub struct HumanVerification {
 /// When solving HTML Captcha, the webpage will post a JSON message, use this type to decode the
 /// message.
 #[derive(Debug, Deserialize)]
-pub struct HVCaptchaMessage<'a> {
+pub struct CaptchaMessage<'a> {
     #[serde(rename = "type")]
     message_type: &'a str,
     height: Option<usize>,
     token: Option<&'a str>,
 }
 
-impl<'a> HVCaptchaMessage<'a> {
+impl<'a> CaptchaMessage<'a> {
     const CAPTCHA_MESSAGE_HEIGHT: &'static str = "pm_height";
     const CAPTCHA_MESSAGE_TOKEN: &'static str = "pm_captcha";
     const CAPTCHA_MESSAGE_EXPIRED: &'static str = "pm_captcha_expired";
 
+    /// Deserialize the captcha message.
+    ///
+    /// # Errors
+    /// Returns error if the deserialization failed.
     pub fn new(message: &'a str) -> Result<Self, serde_json::Error> {
-        serde_json::from_str::<HVCaptchaMessage<'a>>(message)
+        serde_json::from_str::<CaptchaMessage<'a>>(message)
     }
 
+    /// Whether this message is a token message type.
+    #[must_use]
     pub fn is_token(&self) -> bool {
         self.message_type == Self::CAPTCHA_MESSAGE_TOKEN && self.token.is_some()
     }
 
+    /// Whether this message is a height message type.
+    #[must_use]
     pub fn is_height(&self) -> bool {
         self.message_type == Self::CAPTCHA_MESSAGE_HEIGHT && self.height.is_some()
     }
 
+    /// Whether the captcha has expired.
+    #[must_use]
     pub fn is_captcha_expired(&self) -> bool {
         self.message_type == Self::CAPTCHA_MESSAGE_EXPIRED
     }
 
+    /// Retrieve the token.
+    ///
+    /// Returns `None` if the message is not of type token.
+    #[must_use]
     pub fn get_token(&self) -> Option<&str> {
         if !self.is_token() {
             return None;
@@ -92,6 +107,10 @@ impl<'a> HVCaptchaMessage<'a> {
         self.token
     }
 
+    /// Retrieve the height of the captcha.
+    ///
+    /// Returns `None` if the message is not of type height.
+    #[must_use]
     pub fn get_height(&self) -> Option<usize> {
         if !self.is_height() {
             return None;

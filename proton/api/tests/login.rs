@@ -2,7 +2,7 @@ mod utils;
 use crate::utils::{
     create_session_and_server, login, new_session, DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD,
 };
-use proton_api::login::{Error, LoginSequence};
+use proton_api::login::{Error, Sequence};
 use secrecy::ExposeSecret;
 
 #[test]
@@ -67,7 +67,7 @@ fn session_login_invalid_user() {
     let (client, _server) = create_session_and_server();
     let session = new_session(client);
 
-    let mut sequence = LoginSequence::new(session);
+    let mut sequence = Sequence::new(session);
 
     let err = sequence
         .login("bar", DEFAULT_USER_PASSWORD, None)

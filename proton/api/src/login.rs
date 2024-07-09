@@ -1,10 +1,10 @@
 use crate::auth::{Auth, StoreError};
 use crate::domain::errors::APIError;
-use crate::domain::{HumanVerification, HumanVerificationLoginData, TwoFactorAuth};
-use crate::requests::{AuthInfoRequest, AuthRequest, TFAStatus, TOTPRequest};
+use crate::domain::human_verification::{HumanVerification, LoginData};
+use crate::domain::TwoFactorAuth;
+use crate::requests::{PostAuthInfoRequest, PostAuthRequest, PostTOTPRequest, TFAStatus};
 use crate::session::Session;
 use go_srp::SRPAuth;
-use http::ureq;
 use std::sync::Arc;
 use tracing::error;
 
@@ -33,7 +33,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 impl From<http::Error> for Error {
     fn from(value: http::Error) -> Self {
         match value {
-            http::Error::Client(ureq::Error::Status(code, response)) => {
+            http::Error::Http(code, response) => {
                 let api_err = APIError::with_status_and_response(code, response);
                 if let Ok(hv) = api_err.try_get_human_verification_details() {
                     Self::HumanVerificationRequired(hv)
@@ -51,13 +51,14 @@ impl From<http::Error> for Error {
 /// The accounts start of with the usual email and password exchange.
 ///
 /// If enabled, the next step is 2FA.
-pub struct LoginSequence {
+pub struct Sequence {
     session: Arc<Session>,
     state: State,
 }
 
-impl LoginSequence {
+impl Sequence {
     /// Create a new instance with a given `session`.
+    #[must_use]
     pub fn new(session: Arc<Session>) -> Self {
         Self {
             session,
@@ -66,16 +67,19 @@ impl LoginSequence {
     }
 
     /// Whether the account is waiting on totp code.
+    #[must_use]
     pub fn is_awaiting_totp(&self) -> bool {
         matches!(self.state, State::AwaitingTotp)
     }
 
     /// Whether the account is logged out.
+    #[must_use]
     pub fn is_logged_out(&self) -> bool {
         matches!(self.state, State::LoggedOut)
     }
 
     /// Check whether the login process has completed.
+    #[must_use]
     pub fn is_logged_in(&self) -> bool {
         matches!(self.state, State::LoggedIn)
     }
@@ -94,7 +98,7 @@ impl LoginSequence {
         &mut self,
         email: &str,
         password: &str,
-        human_verification_login_data: Option<HumanVerificationLoginData>,
+        human_verification_login_data: Option<&LoginData>,
     ) -> Result<()> {
         if !matches!(self.state, State::LoggedOut) {
             return Err(Error::InvalidState);
@@ -102,7 +106,7 @@ impl LoginSequence {
 
         let auth_info_response = self
             .session
-            .execute(AuthInfoRequest { username: email })
+            .execute(PostAuthInfoRequest { username: email })
             .map_err(|e| {
                 error!("Failed to get auth info: {e}");
                 e
@@ -120,12 +124,12 @@ impl LoginSequence {
 
         let auth_response = self
             .session
-            .execute(AuthRequest {
+            .execute(PostAuthRequest {
                 username: email,
                 client_ephemeral: &srp_auth.client_ephemeral,
                 client_proof: &srp_auth.client_proof,
                 srp_session: &auth_info_response.srp_session,
-                human_verification: &human_verification_login_data,
+                human_verification: human_verification_login_data,
             })
             .map_err(|e| {
                 error!("Failed to get auth response: {e}");
@@ -177,7 +181,7 @@ impl LoginSequence {
             return Err(Error::InvalidState);
         };
         self.session
-            .execute_with_auth(TOTPRequest::new(totp))
+            .execute_with_auth(PostTOTPRequest::new(totp))
             .map_err(|e| {
                 error!("Failed to submit totp code: {e}");
                 e
@@ -212,6 +216,7 @@ impl LoginSequence {
     }
 
     /// Get the underlying session.
+    #[must_use]
     pub fn session(&self) -> &Session {
         self.session.as_ref()
     }

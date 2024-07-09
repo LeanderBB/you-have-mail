@@ -1,5 +1,5 @@
-use crate::auth::{AuthToken, RefreshToken};
-use crate::domain::{HumanVerificationLoginData, UserUid};
+use crate::auth::{RefreshToken, Token, Uid};
+use crate::domain::human_verification::LoginData;
 use http::{Method, RequestBuilder};
 use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
@@ -8,12 +8,12 @@ use std::borrow::Cow;
 #[doc(hidden)]
 #[derive(Serialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct AuthInfoRequest<'a> {
+pub struct PostAuthInfoRequest<'a> {
     pub username: &'a str,
 }
 
-impl<'a> http::Request for AuthInfoRequest<'a> {
-    type Response = http::JsonResponse<AuthInfoResponse>;
+impl<'a> http::Request for PostAuthInfoRequest<'a> {
+    type Response = http::JsonResponse<PostAuthInfoResponse>;
     const METHOD: Method = Method::Post;
 
     fn url(&self) -> String {
@@ -28,7 +28,7 @@ impl<'a> http::Request for AuthInfoRequest<'a> {
 #[doc(hidden)]
 #[derive(Deserialize, Debug)]
 #[serde(rename_all = "PascalCase")]
-pub struct AuthInfoResponse {
+pub struct PostAuthInfoResponse {
     pub version: i64,
     pub modulus: String,
     pub server_ephemeral: String,
@@ -40,18 +40,18 @@ pub struct AuthInfoResponse {
 #[doc(hidden)]
 #[derive(Serialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct AuthRequest<'a> {
+pub struct PostAuthRequest<'a> {
     pub username: &'a str,
     pub client_ephemeral: &'a str,
     pub client_proof: &'a str,
     #[serde(rename = "SRPSession")]
     pub srp_session: &'a str,
     #[serde(skip)]
-    pub human_verification: &'a Option<HumanVerificationLoginData>,
+    pub human_verification: Option<&'a LoginData>,
 }
 
-impl<'a> http::Request for AuthRequest<'a> {
-    type Response = http::JsonResponse<AuthResponse>;
+impl<'a> http::Request for PostAuthRequest<'a> {
+    type Response = http::JsonResponse<PostAuthResponse>;
     const METHOD: Method = Method::Post;
 
     fn url(&self) -> String {
@@ -75,13 +75,13 @@ impl<'a> http::Request for AuthRequest<'a> {
 #[doc(hidden)]
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct AuthResponse {
+pub struct PostAuthResponse {
     #[serde(rename = "UserID")]
     pub user_id: String,
     #[serde(rename = "UID")]
-    pub uid: UserUid,
+    pub uid: Uid,
     pub token_type: Option<String>,
-    pub access_token: AuthToken,
+    pub access_token: Token,
     pub refresh_token: RefreshToken,
     pub server_proof: String,
     pub scope: String,
@@ -138,16 +138,16 @@ pub struct FIDO2Info {
 #[doc(hidden)]
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "PascalCase")]
-pub struct TFAAuth<'a> {
+pub struct TFAAuthData<'a> {
     pub two_factor_code: &'a str,
     #[serde(rename = "FIDO2")]
-    pub fido2: FIDO2Auth<'a>,
+    pub fido2: FIDO2AuthData<'a>,
 }
 
 #[doc(hidden)]
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "PascalCase")]
-pub struct FIDO2Auth<'a> {
+pub struct FIDO2AuthData<'a> {
     pub authentication_options: serde_json::Value,
     pub client_data: &'a str,
     pub authentication_data: &'a str,
@@ -156,9 +156,10 @@ pub struct FIDO2Auth<'a> {
     pub credential_id: &'a [i32],
 }
 
-impl<'a> FIDO2Auth<'a> {
+impl<'a> FIDO2AuthData<'a> {
+    #[must_use]
     pub fn empty() -> Self {
-        FIDO2Auth {
+        FIDO2AuthData {
             authentication_options: serde_json::Value::Null,
             client_data: "",
             authentication_data: "",
@@ -168,17 +169,18 @@ impl<'a> FIDO2Auth<'a> {
     }
 }
 
-pub struct TOTPRequest<'a> {
+pub struct PostTOTPRequest<'a> {
     code: &'a str,
 }
 
-impl<'a> TOTPRequest<'a> {
+impl<'a> PostTOTPRequest<'a> {
+    #[must_use]
     pub fn new(code: &'a str) -> Self {
         Self { code }
     }
 }
 
-impl<'a> http::Request for TOTPRequest<'a> {
+impl<'a> http::Request for PostTOTPRequest<'a> {
     type Response = http::NoResponse;
     const METHOD: Method = Method::Post;
 
@@ -187,9 +189,9 @@ impl<'a> http::Request for TOTPRequest<'a> {
     }
 
     fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
-        Ok(builder.json(TFAAuth {
+        Ok(builder.json(TFAAuthData {
             two_factor_code: self.code,
-            fido2: FIDO2Auth::empty(),
+            fido2: FIDO2AuthData::empty(),
         }))
     }
 }
@@ -197,7 +199,7 @@ impl<'a> http::Request for TOTPRequest<'a> {
 #[doc(hidden)]
 #[derive(Serialize, Debug)]
 #[serde(rename_all = "PascalCase")]
-pub struct AuthRefresh<'a> {
+pub struct PostAuthRefresh<'a> {
     #[serde(rename = "UID")]
     pub uid: &'a str,
     pub refresh_token: &'a str,
@@ -210,28 +212,29 @@ pub struct AuthRefresh<'a> {
 #[doc(hidden)]
 #[derive(Deserialize)]
 #[serde(rename_all = "PascalCase")]
-pub struct AuthRefreshResponse {
+pub struct PostAuthRefreshResponse {
     #[serde(rename = "UID")]
-    pub uid: UserUid,
+    pub uid: Uid,
     pub token_type: Option<String>,
-    pub access_token: AuthToken,
+    pub access_token: Token,
     pub refresh_token: RefreshToken,
     pub scope: String,
 }
 
-pub struct AuthRefreshRequest<'a> {
-    uid: &'a UserUid,
+pub struct PostAuthRefreshRequest<'a> {
+    uid: &'a Uid,
     token: &'a str,
 }
 
-impl<'a> AuthRefreshRequest<'a> {
-    pub fn new(uid: &'a UserUid, token: &'a str) -> Self {
+impl<'a> PostAuthRefreshRequest<'a> {
+    #[must_use]
+    pub fn new(uid: &'a Uid, token: &'a str) -> Self {
         Self { uid, token }
     }
 }
 
-impl<'a> http::Request for AuthRefreshRequest<'a> {
-    type Response = http::JsonResponse<AuthRefreshResponse>;
+impl<'a> http::Request for PostAuthRefreshRequest<'a> {
+    type Response = http::JsonResponse<PostAuthRefreshResponse>;
     const METHOD: Method = Method::Post;
 
     fn url(&self) -> String {
@@ -239,7 +242,7 @@ impl<'a> http::Request for AuthRefreshRequest<'a> {
     }
 
     fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
-        Ok(builder.json(AuthRefresh {
+        Ok(builder.json(PostAuthRefresh {
             uid: &self.uid.0,
             refresh_token: self.token,
             grant_type: "refresh_token",
@@ -265,18 +268,19 @@ impl http::Request for LogoutRequest {
     }
 }
 
-pub struct CaptchaRequest<'a> {
+pub struct GetCaptchaRequest<'a> {
     token: &'a str,
     force_web: bool,
 }
 
-impl<'a> CaptchaRequest<'a> {
+impl<'a> GetCaptchaRequest<'a> {
+    #[must_use]
     pub fn new(token: &'a str, force_web: bool) -> Self {
         Self { token, force_web }
     }
 }
 
-impl<'a> http::Request for CaptchaRequest<'a> {
+impl<'a> http::Request for GetCaptchaRequest<'a> {
     type Response = http::StringResponse;
     const METHOD: Method = Method::Get;
 

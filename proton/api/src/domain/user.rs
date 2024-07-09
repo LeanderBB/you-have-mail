@@ -2,49 +2,17 @@ use serde::{Deserialize, Deserializer};
 use serde_repr::Deserialize_repr;
 use std::fmt::{Display, Formatter};
 
-/// Represents an API User UID.
-#[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
-pub struct UserUid(pub(crate) String);
-
-impl Display for UserUid {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
-impl secrecy::Zeroize for UserUid {
-    fn zeroize(&mut self) {
-        self.0.zeroize()
-    }
-}
-
-impl secrecy::CloneableSecret for UserUid {}
-
-impl secrecy::DebugSecret for UserUid {}
-
-impl UserUid {
-    pub fn as_str(&self) -> &str {
-        &self.0
-    }
-}
-
-impl<T: Into<String>> From<T> for UserUid {
-    fn from(value: T) -> Self {
-        Self(value.into())
-    }
-}
-
 /// Represents an API User ID.
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
-pub struct UserId(pub(crate) String);
+pub struct Id(pub(crate) String);
 
-impl AsRef<str> for UserId {
+impl AsRef<str> for Id {
     fn as_ref(&self) -> &str {
         &self.0
     }
 }
 
-impl Display for UserId {
+impl Display for Id {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
         self.0.fmt(f)
     }
@@ -65,7 +33,7 @@ impl Display for KeyId {
 #[serde(rename_all = "PascalCase")]
 pub struct User {
     #[serde(rename = "ID")]
-    pub id: UserId,
+    pub id: Id,
     pub name: String,
     pub display_name: String,
     pub email: String,

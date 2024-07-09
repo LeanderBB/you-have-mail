@@ -1,15 +1,11 @@
 //! Domain Types.
 
 pub mod errors;
-mod event;
-mod human_verification;
-mod labels;
-mod user;
-
-pub use event::*;
-pub use human_verification::*;
-pub use labels::*;
-pub use user::*;
+pub mod event;
+pub mod human_verification;
+pub mod label;
+pub mod message;
+pub mod user;
 
 use serde_repr::Deserialize_repr;
 use std::fmt::{Display, Formatter};

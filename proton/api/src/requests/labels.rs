@@ -1,10 +1,10 @@
-use crate::domain::{Label, LabelType};
+use crate::domain::label::{Label, Type};
 use http::{Method, RequestBuilder};
 use serde::Deserialize;
 
 #[derive(Copy, Clone)]
 pub struct GetLabelsRequest {
-    label_type: LabelType,
+    label_type: Type,
 }
 
 #[doc(hidden)]
@@ -15,7 +15,8 @@ pub struct GetLabelsResponse {
 }
 
 impl GetLabelsRequest {
-    pub fn new(label_type: LabelType) -> Self {
+    #[must_use]
+    pub fn new(label_type: Type) -> Self {
         Self { label_type }
     }
 }
@@ -29,6 +30,6 @@ impl http::Request for GetLabelsRequest {
     }
 
     fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
-        Ok(builder.query("Type", &(self.label_type as u8).to_string()))
+        Ok(builder.query("Type", (self.label_type as u8).to_string()))
     }
 }

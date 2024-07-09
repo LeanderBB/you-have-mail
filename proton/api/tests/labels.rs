@@ -1,6 +1,6 @@
 mod utils;
 use crate::utils::login;
-use proton_api::domain::LabelType;
+use proton_api::domain::label::Type as LabelType;
 use proton_api::requests::GetLabelsRequest;
 use utils::{create_session_and_server, DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD};
 

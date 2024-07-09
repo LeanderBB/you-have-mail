@@ -1,3 +1,4 @@
+#![allow(clippy::result_large_err)]
 //! Convenience HTTP request handlers that use ureq underneath in order to ensure safe usage
 //! when reading the body and reducing boilerplate.
 
@@ -15,11 +16,13 @@ use url::Url;
 
 /// Errors that may arrise during an http request.
 #[derive(Debug, thiserror::Error)]
-#[allow(clippy::large_enum_variant)]
 pub enum Error {
-    /// HTTP client error.
-    #[error("Client Error: {0}")]
-    Client(#[from] ureq::Error),
+    /// HTTP status error.
+    #[error("Http: {0}")]
+    Http(u16, Response),
+    /// HTTP Transport error.
+    #[error("Transport: {0}")]
+    Transport(ureq::Transport),
     /// Json serialization or deserialization error.
     #[error("Json Serialization: {0}")]
     Json(#[from] serde_json::Error),
@@ -34,14 +37,23 @@ pub enum Error {
     Unexpected(anyhow::Error),
 }
 
+impl From<ureq::Error> for Error {
+    fn from(value: ureq::Error) -> Self {
+        match value {
+            ureq::Error::Status(code, response) => Self::Http(code, response),
+            ureq::Error::Transport(t) => Self::Transport(t),
+        }
+    }
+}
+
 impl Error {
     /// Whether the current error is a connection error that may indicate there are issues
     /// connecting to the server.
+    #[must_use]
     pub fn is_connection_error(&self) -> bool {
-        let Self::Client(ureq::Error::Transport(err)) = self else {
+        let Self::Transport(err) = self else {
             return false;
         };
-
         matches!(
             err.kind(),
             ErrorKind::Dns
@@ -62,6 +74,9 @@ pub trait FromResponse {
     /// Process the response from the server.
     ///
     /// This function will only be called if the server did not return an error status.
+    ///
+    /// # Errors
+    /// Should return error if the operation failed.
     fn from_response(response: ureq::Response) -> Result<Self::Output>;
 }
 
@@ -109,11 +124,24 @@ pub enum Method {
     Post,
     Put,
 }
+
+/// Defines an Http Request.
 pub trait Request {
+    /// How the response should be handled.
     type Response: FromResponse;
 
+    /// Http Method.
     const METHOD: Method;
+
+    /// The relative url of the request without query components.
     fn url(&self) -> String;
+
+    /// Build the request.
+    ///
+    /// Query parameters and body should be set here.
+    ///
+    /// # Errors
+    /// Returns error if building the operation failed.
     fn build(&self, builder: RequestBuilder) -> Result<RequestBuilder> {
         Ok(builder)
     }
@@ -132,34 +160,43 @@ impl RequestBuilder {
         }
     }
     /// Set a header with `key` and `value`.
+    #[must_use]
     pub fn header(mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         self.request = self.request.set(key.as_ref(), value.as_ref());
         self
     }
 
     /// Set bearer authentication `token`.
+    #[must_use]
     pub fn bearer_token(self, token: impl AsRef<str>) -> Self {
         self.header("authorization", format!("Bearer {}", token.as_ref()))
     }
 
     /// Set the body as a collection of bytes.
+    #[must_use]
     pub fn bytes(mut self, bytes: Vec<u8>) -> Self {
         self.body = Some(bytes);
         self
     }
 
     /// Set the body as a serialized json object.
+    ///
+    /// # Panics
+    /// Will panic if the type can not be serialized to json.
+    #[must_use]
     pub fn json(self, value: impl Serialize) -> Self {
         let bytes = serde_json::to_vec(&value).expect("Failed to serialize json");
         self.json_bytes(bytes)
     }
 
+    #[must_use]
     fn json_bytes(mut self, bytes: Vec<u8>) -> Self {
-        self.body = Some(bytes.into());
+        self.body = Some(bytes);
         self.header("Content-Type", "application/json")
     }
 
     /// Set a query parameter with `key` and `value`.
+    #[must_use]
     pub fn query(mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Self {
         self.request = self.request.query(key.as_ref(), value.as_ref());
         self
@@ -196,6 +233,9 @@ pub struct Proxy {
 
 impl Proxy {
     /// Convert the proxy configuration into a usable url.
+    ///
+    /// # Errors
+    /// Returns error if the generated url is not valid.
     pub fn to_url(&self) -> Result<Url> {
         let protocol = match self.protocol {
             ProxyProtocol::Https => "https",
@@ -244,42 +284,49 @@ impl ClientBuilder {
     }
 
     /// Set the user agent to be submitted with every request.
+    #[must_use]
     pub fn user_agent(mut self, agent: &str) -> Self {
         self.user_agent = agent.to_string();
         self
     }
 
     /// Set the full request timeout. By default there is no timeout.
+    #[must_use]
     pub fn request_timeout(mut self, duration: Duration) -> Self {
         self.request_timeout = Some(duration);
         self
     }
 
     /// Set the connection timeout. By default there is no timeout.
+    #[must_use]
     pub fn connect_timeout(mut self, duration: Duration) -> Self {
         self.connect_timeout = Some(duration);
         self
     }
 
     /// Specify proxy URL for the builder.
+    #[must_use]
     pub fn with_proxy(mut self, proxy: Proxy) -> Self {
         self.proxy_url = Some(proxy);
         self
     }
 
     /// Allow http request
+    #[must_use]
     pub fn allow_http(mut self) -> Self {
         self.allow_http = true;
         self
     }
 
     /// Enable request debugging.
+    #[must_use]
     pub fn debug(mut self) -> Self {
         self.debug = true;
         self
     }
 
     /// Set a header with `key` and `value`.
+    #[must_use]
     pub fn header(mut self, key: impl Into<String>, value: impl Into<String>) -> Self {
         self.default_headers.insert(key.into(), value.into());
         self
@@ -297,7 +344,7 @@ impl ClientBuilder {
         }
 
         if let Some(d) = self.connect_timeout {
-            builder = builder.timeout_connect(d)
+            builder = builder.timeout_connect(d);
         }
 
         if let Some(proxy) = self.proxy_url {
@@ -306,7 +353,7 @@ impl ClientBuilder {
         }
 
         if !self.allow_http {
-            builder = builder.https_only(true)
+            builder = builder.https_only(true);
         }
 
         let agent = builder
@@ -334,6 +381,7 @@ pub struct Client {
 
 impl Client {
     /// Create a new builder with the given `base_url`.
+    #[must_use]
     pub fn builder(base_url: Url) -> ClientBuilder {
         ClientBuilder::new(base_url)
     }

@@ -1,7 +1,7 @@
 use proton_api::auth::{new_thread_safe_store, InMemoryStore};
 use proton_api::domain::SecretString;
-use proton_api::login::LoginSequence;
-use proton_api::requests::{LogoutRequest, Ping, UserInfoRequest};
+use proton_api::login::Sequence;
+use proton_api::requests::{GetUserInfoRequest, LogoutRequest, Ping};
 use proton_api::session::{Session, DEFAULT_HOST_URL};
 use secrecy::ExposeSecret;
 use std::io::{BufRead, Write};
@@ -28,7 +28,7 @@ fn main() {
 
     session.execute(Ping {}).unwrap();
 
-    let mut login_sequence = LoginSequence::new(session.clone());
+    let mut login_sequence = Sequence::new(session.clone());
 
     login_sequence
         .login(&user_email, user_password.expose_secret().as_str(), None)
@@ -67,7 +67,7 @@ fn main() {
         }
     }
 
-    let user = session.execute_with_auth(UserInfoRequest {}).unwrap();
+    let user = session.execute_with_auth(GetUserInfoRequest {}).unwrap();
     println!("User ID is {}", user.user.id);
 
     session.execute_with_auth(LogoutRequest {}).unwrap()

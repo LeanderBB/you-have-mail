@@ -1,6 +1,6 @@
 use crate::auth::{Auth, ThreadSafeStore};
-use crate::domain::User;
-use crate::requests::{AuthRefreshRequest, LogoutRequest, UserInfoRequest};
+use crate::domain::user::User;
+use crate::requests::{GetUserInfoRequest, LogoutRequest, PostAuthRefreshRequest};
 use http::{Client, FromResponse, Method, Request, RequestBuilder};
 use secrecy::ExposeSecret;
 use tracing::{error, warn};
@@ -48,7 +48,7 @@ impl<'s, T: Request> Request for ProtonAuthRequest<'s, T> {
             http::Error::Unexpected(anyhow::anyhow!("Failed to read authentication data: {e}"))
         })? {
             builder = builder.bearer_token(auth.auth_token.0.expose_secret());
-            builder = builder.header(X_PM_UID_HEADER, auth.uid.as_str());
+            builder = builder.header(X_PM_UID_HEADER, auth.uid.as_ref());
         } else {
             warn!("Authenticated requested without authentication data");
         }
@@ -64,6 +64,7 @@ impl Session {
     }
 
     /// Get the sessions authentication store.
+    #[must_use]
     pub fn auth_store(&self) -> &ThreadSafeStore {
         &self.auth_store
     }
@@ -73,7 +74,7 @@ impl Session {
     /// # Errors
     /// Returns error if the request failed.
     pub fn user_info(&self) -> http::Result<User> {
-        Ok(self.execute_with_auth(UserInfoRequest {})?.user)
+        Ok(self.execute_with_auth(GetUserInfoRequest {})?.user)
     }
 
     /// Logout the session.
@@ -85,6 +86,9 @@ impl Session {
     }
 
     /// Execute a non-authenticate request with this client.
+    ///
+    /// # Errors
+    /// Returns error if the request failed.
     pub fn execute<T: Request>(
         &self,
         request: T,
@@ -93,7 +97,7 @@ impl Session {
 
         match self.client.execute(&request) {
             Ok(v) => Ok(v),
-            Err(e) => self.handle_error(request, e),
+            Err(e) => self.handle_error(&request, e),
         }
     }
 
@@ -115,17 +119,17 @@ impl Session {
 
         match self.client.execute(&request) {
             Ok(v) => Ok(v),
-            Err(e) => self.handle_error(request, e),
+            Err(e) => self.handle_error(&request, e),
         }
     }
 
     /// Check if this was a session expired error and attempt to auto refresh.
     fn handle_error<T: Request>(
         &self,
-        request: T,
+        request: &T,
         error: http::Error,
     ) -> http::Result<<T::Response as FromResponse>::Output> {
-        let http::Error::Client(http::ureq::Error::Status(401, _)) = &error else {
+        let http::Error::Http(401, _) = &error else {
             return Err(error);
         };
 
@@ -137,7 +141,7 @@ impl Session {
             return Err(error);
         };
 
-        let response = match self.execute(AuthRefreshRequest::new(
+        let response = match self.execute(PostAuthRefreshRequest::new(
             &auth.uid,
             auth.refresh_token.0.expose_secret(),
         )) {
@@ -163,7 +167,7 @@ impl Session {
         drop(guard);
 
         // Execute the request again.
-        self.client.execute(&request)
+        self.client.execute(request)
     }
 }
 

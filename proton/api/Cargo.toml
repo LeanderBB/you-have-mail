@@ -31,5 +31,5 @@ tracing-subscriber.workspace = true
 name = "user_id"
 
 [lints.clippy]
-pendantic = "deny"
+pedantic = "deny"
 

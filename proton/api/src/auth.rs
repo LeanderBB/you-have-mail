@@ -1,19 +1,21 @@
-use crate::domain::{SecretString, UserUid};
+use crate::domain::SecretString;
 use parking_lot::RwLock;
 use serde::{Deserialize, Deserializer};
+use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
 /// Authentication token for access to protected API endpoints.
 #[derive(Clone)]
-pub struct AuthToken(pub SecretString);
+pub struct Token(pub SecretString);
 
-impl AuthToken {
+impl Token {
+    #[must_use]
     pub fn new(token: SecretString) -> Self {
         Self(token)
     }
 }
 
-impl<'de> Deserialize<'de> for AuthToken {
+impl<'de> Deserialize<'de> for Token {
     fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
     where
         D: Deserializer<'de>,
@@ -27,6 +29,7 @@ impl<'de> Deserialize<'de> for AuthToken {
 pub struct RefreshToken(pub SecretString);
 
 impl RefreshToken {
+    #[must_use]
     pub fn new(token: SecretString) -> Self {
         Self(token)
     }
@@ -41,13 +44,45 @@ impl<'de> Deserialize<'de> for RefreshToken {
     }
 }
 
+/// Represents a session id.
+#[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
+pub struct Uid(pub(crate) String);
+
+impl Display for Uid {
+    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl secrecy::Zeroize for Uid {
+    fn zeroize(&mut self) {
+        self.0.zeroize();
+    }
+}
+
+impl secrecy::CloneableSecret for Uid {}
+
+impl secrecy::DebugSecret for Uid {}
+
+impl AsRef<str> for Uid {
+    fn as_ref(&self) -> &str {
+        &self.0
+    }
+}
+
+impl<T: Into<String>> From<T> for Uid {
+    fn from(value: T) -> Self {
+        Self(value.into())
+    }
+}
+
 /// Authentication data for a [`crate::Session`]
 #[derive(Clone)]
 pub struct Auth {
     /// Id of the session.
-    pub uid: UserUid,
+    pub uid: Uid,
     /// Authentication token.
-    pub auth_token: AuthToken,
+    pub auth_token: Token,
     /// Refresh token.
     pub refresh_token: RefreshToken,
 }
@@ -95,6 +130,7 @@ pub struct InMemoryStore {
 
 impl InMemoryStore {
     /// Create a new instance with existing authentication data.
+    #[must_use]
     pub fn with(auth: Auth) -> Self {
         Self { data: Some(auth) }
     }

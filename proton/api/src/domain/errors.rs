@@ -1,4 +1,4 @@
-use crate::domain::{HumanVerification, HumanVerificationType};
+use crate::domain::human_verification::{HumanVerification, VerificationType};
 use anyhow::anyhow;
 use http::ureq::Response;
 use http::ExtSafeResponse;
@@ -41,6 +41,7 @@ pub enum GetHumanVerificationError {
 
 impl APIError {
     /// Check whether this error is a request to perform HV.
+    #[must_use]
     pub fn is_human_verification_request(&self) -> bool {
         self.api_code == HUMAN_VERIFICATION_REQUESTED
     }
@@ -76,9 +77,9 @@ impl APIError {
 
         for t in &hv.human_verification_methods {
             let hv_type = match t.as_ref() {
-                "captcha" => HumanVerificationType::Captcha,
-                "email" => HumanVerificationType::Email,
-                "sms" => HumanVerificationType::Email,
+                "captcha" => VerificationType::Captcha,
+                "email" => VerificationType::Email,
+                "sms" => VerificationType::Sms,
                 _ => {
                     return Err(GetHumanVerificationError::UnknownVerificationType(
                         t.clone(),
@@ -124,6 +125,7 @@ impl APIError {
         }
     }
     /// Create a new instance with an `http_status` code.
+    #[must_use]
     pub fn new(http_status: u16) -> Self {
         Self {
             http_code: http_status,
