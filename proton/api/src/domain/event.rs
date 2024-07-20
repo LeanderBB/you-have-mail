@@ -1,8 +1,8 @@
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
 use std::fmt::{Display, Formatter};
 
-#[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Hash, Clone)]
 /// Id for an API Event.
 pub struct Id(pub String);
 
@@ -63,7 +63,7 @@ pub struct Message {
 #[serde(rename_all = "PascalCase")]
 pub struct Label {
     #[serde(rename = "ID")]
-    pub id: Id,
+    pub id: crate::domain::label::Id,
     pub action: Action,
     pub label: Option<crate::domain::label::Label>,
 }

@@ -5,24 +5,22 @@ edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
 categories = ["email"]
-readme = "README.md"
-repository= "https://github.com/LeanderBB/you-have-mail-common"
-
-[features]
-default = ["proton-backend"]
-proton-backend = ["dep:proton-api"]
-
+repository = "https://github.com/LeanderBB/you-have-mail-common"
 
 [dependencies]
-thiserror = "1"
-anyhow = "1"
-chacha20poly1305 = "0.10"
-serde_json = "1"
-serde = {version="1", features=["derive"]}
-secrecy = "0.8"
+thiserror.workspace = true
+anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+secrecy.workspace = true
+parking_lot.workspace = true
+base64.workspace = true
+tracing.workspace = true
+rusqlite.workspace = true
+rusqlite-from-row.workspace = true
 crossbeam-channel = "0.5"
-parking_lot = "0.12"
-base64 = "0.21"
+chacha20poly1305 = "0.10"
+http = { path = "../http" }
 
 [dependencies.log4rs]
 version = "1.2"
@@ -31,19 +29,17 @@ features = ["console_appender", "file_appender", "rolling_file_appender", "fixed
 
 [dependencies.proton-api]
 path = "../proton/api"
-optional = true
-features = ["http-ureq"]
 
 [dev-dependencies]
-mockall = "0.11"
+mockall = "0.12.1"
 dirs = "5.0.0"
-keyring = "2"
+keyring = { version = "3.0.3", features = ["linux-native"] }
 temp-dir = "0.1"
 ctrlc = "3"
-env_logger = "0.10"
+tracing-subscriber.workspace = true
 
-[[example]]
-name = "cli"
+#[[example]]
+#name = "cli"
 
 [package.metadata.docs.rs]
 all-features = true

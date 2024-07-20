@@ -1,13 +1,12 @@
 use proton_api::auth::{new_thread_safe_store, InMemoryStore};
+use proton_api::client::ProtonExtension;
 use proton_api::domain::SecretString;
 use proton_api::login::Sequence;
-use proton_api::requests::{GetUserInfoRequest, LogoutRequest, Ping};
-use proton_api::session::{Session, DEFAULT_HOST_URL};
+use proton_api::requests::{GetUserInfoRequest, Ping};
+use proton_api::session::Session;
 use secrecy::ExposeSecret;
 use std::io::{BufRead, Write};
-use std::sync::Arc;
 use tracing::metadata::LevelFilter;
-use url;
 
 fn main() {
     tracing_subscriber::FmtSubscriber::builder()
@@ -17,14 +16,9 @@ fn main() {
     let user_email = std::env::var("USER_EMAIL").unwrap();
     let user_password = SecretString::new(std::env::var("USER_PASSWORD").unwrap());
 
-    let base_url = url::Url::parse(DEFAULT_HOST_URL).unwrap();
+    let client = http::Client::proton_client().debug().build().unwrap();
 
-    let client = http::Client::builder(base_url).debug().build().unwrap();
-
-    let session = Arc::new(Session::new(
-        client,
-        new_thread_safe_store(InMemoryStore::default()),
-    ));
+    let session = Session::new(client, new_thread_safe_store(InMemoryStore::default()));
 
     session.execute(Ping {}).unwrap();
 
@@ -70,5 +64,5 @@ fn main() {
     let user = session.execute_with_auth(GetUserInfoRequest {}).unwrap();
     println!("User ID is {}", user.user.id);
 
-    session.execute_with_auth(LogoutRequest {}).unwrap()
+    session.logout().unwrap();
 }

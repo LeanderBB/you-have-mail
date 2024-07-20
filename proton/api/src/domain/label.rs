@@ -1,11 +1,11 @@
 use crate::domain::Boolean;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
 use std::fmt::{Display, Formatter};
 
 /// Labels API ID. Note that label IDs are used interchangeably between what we would consider
 /// mail labels and mailboxes.
-#[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
+#[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Hash, Clone)]
 pub struct Id(pub String);
 
 impl Display for Id {

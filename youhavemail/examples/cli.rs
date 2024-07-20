@@ -1,32 +1,15 @@
 use proton_api::domain::SecretString;
-use proton_api::log::{error, info, warn, LevelFilter};
 use secrecy::{ExposeSecret, Secret};
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::Arc;
 use std::time::Duration;
-use you_have_mail_common::backend::Backend;
-use you_have_mail_common::{
-    Account, Config, ConfigResult, EncryptionKey, Notification, Notifier, ObserverBuilder,
-};
-
-#[cfg(feature = "proton-backend")]
-fn new_backed() -> Arc<dyn Backend> {
-    return you_have_mail_common::backend::proton::new_backend();
-}
-
-#[cfg(not(feature = "proton-backend"))]
-fn new_backed() -> Arc<dyn Backend> {
-    use you_have_mail_common::backend::null::NullTestAccount;
-    return you_have_mail_common::backend::null::new_backend(&[NullTestAccount {
-        email: "foo".to_string(),
-        password: "bar".to_string(),
-        totp: None,
-        proxy: None,
-    }]);
-}
-
+use tracing::info;
+use you_have_mail_common::encryption::Key;
+use you_have_mail_common::state::State;
+use you_have_mail_common::yhm::Yhm;
+/*
 struct StdOutNotifier {}
 
 impl Notifier for StdOutNotifier {
@@ -73,12 +56,13 @@ impl Notifier for StdOutNotifier {
     }
 }
 
+ */
+
 fn main() {
-    env_logger::builder()
-        .filter_module("you_have_mail_common", LevelFilter::Debug)
-        .filter_module("proton_api_rs", LevelFilter::Debug)
-        //.filter_module("ureq", LevelFilter::Debug)
-        .filter_level(LevelFilter::Info)
+    let filter = tracing_subscriber::EnvFilter::builder()
+        .parse_lossy("info,you_have_mail_common=debug,proton_api=debug");
+    tracing_subscriber::FmtSubscriber::builder()
+        .with_env_filter(filter)
         .init();
     let should_quit = Arc::new(AtomicBool::new(false));
     let should_quit_copy = should_quit.clone();
@@ -86,35 +70,36 @@ fn main() {
         .expect("Failed to install ctrl+c handler");
 
     let encryption_key = get_or_create_encryption_key();
-    let backend = new_backed();
-    let notifier = Arc::new(StdOutNotifier {});
+    let db_path = get_db_file_path();
+    let state = State::new(db_path, encryption_key).expect("Failed to create state");
+    let yhm = Yhm::new(state);
 
-    info!("Loading config");
-    let config = load_config(encryption_key).expect("Failed to load config");
+    /*
+       info!("Building observer");
+       let mut observer = ObserverBuilder::new(notifier, config)
+           .with_backend(backend.clone())
+           .load_from_config()
+           .expect("Failed to initialize observer from config");
 
-    info!("Building observer");
-    let mut observer = ObserverBuilder::new(notifier, config)
-        .with_backend(backend.clone())
-        .load_from_config()
-        .expect("Failed to initialize observer from config");
+       observer
+           .set_poll_interval(Duration::from_secs(5))
+           .expect("Failed to update poll interval");
 
-    observer
-        .set_poll_interval(Duration::from_secs(5))
-        .expect("Failed to update poll interval");
+    */
 
-    if observer.len() == 0 {
+    if yhm.account_count().unwrap() == 0 {
         info!("No previous accounts logging in with ENV{{YHM_EMAIL}} and ENV{{YHM_PASSWORD}}");
         let email = std::env::var("YHM_EMAIL").expect("Failed to resolve env YHM_EMAIL");
         let password = SecretString::new(
             std::env::var("YHM_PASSWORD").expect("Failed to resolve env YHM_PASSWORD"),
         );
 
-        let mut account = Account::new(backend, &email, None);
-        account
-            .login(&password, None)
-            .expect("Failed to login into account");
+        let mut sequence = you_have_mail_common::backend::proton::new_login_sequence(None).unwrap();
 
-        if account.is_awaiting_totp() {
+        sequence
+            .login(&email, password.expose_secret().as_str(), None)
+            .expect("Failed to login into account");
+        if sequence.is_awaiting_totp() {
             let mut stdout = std::io::stdout();
             let mut line_reader = std::io::BufReader::new(std::io::stdin());
             stdout.write_all("Please Input TOTP:".as_bytes()).unwrap();
@@ -124,19 +109,20 @@ fn main() {
                 .read_line(&mut line)
                 .expect("Failed to read line");
             let totp = line.trim_end_matches('\n');
-            account.submit_totp(totp).expect("Failed to submit totp");
+            sequence.submit_totp(totp).expect("Failed to submit totp");
         }
 
-        observer
-            .add_account(account)
-            .expect("Failed to add account");
+        yhm.add(sequence).expect("Failed to add account");
     }
 
     info!("Starting observer loop - Ctrl+C to Quit");
 
     loop {
-        observer.poll().expect("Failed to poll");
-        std::thread::sleep(observer.get_poll_interval());
+        let result = yhm.poll().expect("Failed to poll");
+        if !result.is_empty() {
+            println!("{result:?}")
+        }
+        std::thread::sleep(Duration::from_secs(5));
         if should_quit.load(Ordering::SeqCst) {
             break;
         }
@@ -145,12 +131,7 @@ fn main() {
     info!("Goodbye");
 }
 
-fn load_config(encryption_key: Secret<EncryptionKey>) -> ConfigResult<Config> {
-    let config_path = get_config_file_path();
-    Config::create_or_load(encryption_key, config_path)
-}
-
-fn get_or_create_encryption_key() -> Secret<EncryptionKey> {
+fn get_or_create_encryption_key() -> Secret<Key> {
     let entry = keyring::Entry::new("you-have-mail-common", "secret-key-b64").unwrap();
     match entry.get_password() {
         Err(e) => {
@@ -158,21 +139,24 @@ fn get_or_create_encryption_key() -> Secret<EncryptionKey> {
                 panic!("failed to load encryption key: {e}")
             }
 
-            let key = EncryptionKey::new();
+            info!("No entry available, generating new key");
+
+            let key = Key::new();
             entry
                 .set_password(&key.expose_secret().to_base64())
                 .unwrap();
             return key;
         }
         Ok(s) => {
-            let key = EncryptionKey::with_base64(s).expect("Failed to decode key");
+            info!("Using existing key");
+            let key = Key::with_base64(s).expect("Failed to decode key");
             Secret::new(key)
         }
     }
 }
 
-const CONFIG_FILE_NAME: &str = "you-have-mail-common-cli.conf";
-
-fn get_config_file_path() -> PathBuf {
-    dirs::config_dir().unwrap().join(CONFIG_FILE_NAME)
+fn get_db_file_path() -> PathBuf {
+    let path = dirs::config_dir().unwrap().join("you-have-mail-common-cli");
+    std::fs::create_dir_all(&path).expect("failed to create db dir");
+    path.join("sqlite.db")
 }

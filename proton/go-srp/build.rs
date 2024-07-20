@@ -55,10 +55,7 @@ fn target_path_for_go_lib(platform: Platform) -> (PathBuf, PathBuf) {
     match platform {
         Platform::Desktop => {
             let lib_dir = PathBuf::from(env::var("OUT_DIR").unwrap());
-            (
-                lib_dir.clone(),
-                lib_dir.join(format!("lib{GO_LIB_NAME}.so")),
-            )
+            (lib_dir.clone(), lib_dir.join(format!("lib{GO_LIB_NAME}.a")))
         }
         Platform::Android(_) => {
             let lib_dir = if let Ok(env_path) = env::var("GO_SRP_ANDROID_OUT_DIR") {
@@ -66,10 +63,7 @@ fn target_path_for_go_lib(platform: Platform) -> (PathBuf, PathBuf) {
             } else {
                 PathBuf::from(env::var("OUT_DIR").unwrap()).join("../../../")
             };
-            (
-                lib_dir.clone(),
-                lib_dir.join(format!("lib{GO_LIB_NAME}.so")),
-            )
+            (lib_dir.clone(), lib_dir.join(format!("lib{GO_LIB_NAME}.a")))
         }
     }
 }
@@ -109,12 +103,12 @@ fn build_go_lib(lib_path: &Path, platform: Platform) {
 
     match platform {
         Platform::Desktop => {
-            command.arg("-buildmode=c-shared");
+            command.arg("-buildmode=c-archive");
             command.arg("lib.go");
             println!("cargo:rerun-if-changed=go/lib.go");
         }
         Platform::Android(_) => {
-            command.arg("-buildmode=c-shared");
+            command.arg("-buildmode=c-archive");
             command.arg("lib.go");
             println!("cargo:rerun-if-changed=go/lib.go");
         }

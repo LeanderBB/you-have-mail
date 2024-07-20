@@ -1,7 +1,10 @@
 //! Collection of Traits expected to be implemented by the respective application targets.
+/*
 
 use crate::backend::EmailInfo;
-use crate::{AccountError, ConfigError, Proxy};
+use crate::{AccountError, ConfigError};
+use http::Proxy;
+
 #[cfg(test)]
 use mockall::automock;
 
@@ -49,3 +52,4 @@ pub struct NullNotifier {}
 impl Notifier for NullNotifier {
     fn notify(&self, _: Notification) {}
 }
+*/

@@ -9,7 +9,7 @@ pub const DEFAULT_USER_EMAIL: &str = "foo@bar.com";
 pub const DEFAULT_USER_PASSWORD: &str = "12345";
 
 /// Create new test server and client.
-pub fn create_session_and_server() -> (Client, Server) {
+pub fn create_session_and_server() -> (Arc<Client>, Server) {
     let server = Server::new().expect("failed to create test server");
     let url = server.url().expect("Failed to get server url");
 
@@ -22,22 +22,19 @@ pub fn create_session_and_server() -> (Client, Server) {
 }
 
 /// Perform login with `email` and `password`.
-pub fn login(client: Client, email: &str, password: &str) -> Arc<Session> {
+pub fn login(client: Arc<Client>, email: &str, password: &str) -> Session {
     let session = new_session(client);
     let mut sequence = Sequence::new(session);
     sequence
         .login(email, password, None)
         .expect("failed to login");
     match sequence.finish() {
-        Ok(session) => session,
+        Ok((_, session)) => session,
         Err(_) => panic!("Not logged in"),
     }
 }
 
 /// Create a new session over `client`.
-pub fn new_session(client: Client) -> Arc<Session> {
-    Arc::new(Session::new(
-        client,
-        new_thread_safe_store(InMemoryStore::default()),
-    ))
+pub fn new_session(client: Arc<Client>) -> Session {
+    Session::new(client, new_thread_safe_store(InMemoryStore::default()))
 }

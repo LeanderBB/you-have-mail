@@ -1,6 +1,8 @@
 use crate::domain::SecretString;
 use parking_lot::RwLock;
-use serde::{Deserialize, Deserializer};
+use secrecy::ExposeSecret;
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
 use std::sync::Arc;
 
@@ -77,7 +79,7 @@ impl<T: Into<String>> From<T> for Uid {
 }
 
 /// Authentication data for a [`crate::Session`]
-#[derive(Clone)]
+#[derive(Clone, Deserialize)]
 pub struct Auth {
     /// Id of the session.
     pub uid: Uid,
@@ -85,6 +87,19 @@ pub struct Auth {
     pub auth_token: Token,
     /// Refresh token.
     pub refresh_token: RefreshToken,
+}
+
+impl Serialize for Auth {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("Auth", 3)?;
+        state.serialize_field("uid", self.uid.as_ref())?;
+        state.serialize_field("auth_token", self.auth_token.0.expose_secret())?;
+        state.serialize_field("refresh_token", self.refresh_token.0.expose_secret())?;
+        state.end()
+    }
 }
 
 /// The operation on the store failed.

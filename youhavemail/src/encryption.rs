@@ -2,22 +2,30 @@
 use anyhow::anyhow;
 use base64::Engine;
 use chacha20poly1305::aead::{Aead, OsRng};
-use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key, KeyInit, Nonce};
-use secrecy::{ExposeSecret, Secret};
+use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key as CryptoKey, KeyInit, Nonce};
+use secrecy::{Secret, Zeroize};
 
-#[derive(Copy, Clone, Eq, PartialEq)]
+#[derive(Clone, Eq, PartialEq)]
 /// Encryption Key for use with [`encrypt`] and [`decrypt`].
-pub struct EncryptionKey(Key);
+pub struct Key(CryptoKey);
 
-impl secrecy::Zeroize for EncryptionKey {
+impl Zeroize for Key {
     fn zeroize(&mut self) {
         self.0.zeroize()
     }
 }
 
-impl secrecy::CloneableSecret for EncryptionKey {}
+impl secrecy::CloneableSecret for Key {}
 
-impl EncryptionKey {
+impl secrecy::zeroize::ZeroizeOnDrop for Key {}
+
+impl Drop for Key {
+    fn drop(&mut self) {
+        self.zeroize();
+    }
+}
+
+impl Key {
     pub fn new() -> Secret<Self> {
         let mut rng = OsRng {};
         Secret::new(Self(ChaCha20Poly1305::generate_key(&mut rng)))
@@ -45,7 +53,7 @@ impl EncryptionKey {
     }
 }
 
-impl AsRef<[u8]> for EncryptionKey {
+impl AsRef<[u8]> for Key {
     fn as_ref(&self) -> &[u8] {
         self.0.as_slice()
     }
@@ -53,13 +61,13 @@ impl AsRef<[u8]> for EncryptionKey {
 
 const ENCRYPTION_KEY_BYTES_LEN: usize = 32;
 
-impl From<[u8; ENCRYPTION_KEY_BYTES_LEN]> for EncryptionKey {
+impl From<[u8; ENCRYPTION_KEY_BYTES_LEN]> for Key {
     fn from(value: [u8; ENCRYPTION_KEY_BYTES_LEN]) -> Self {
-        Self(Key::from(value))
+        Self(CryptoKey::from(value))
     }
 }
 
-impl TryFrom<&[u8]> for EncryptionKey {
+impl TryFrom<&[u8]> for Key {
     type Error = ();
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() != ENCRYPTION_KEY_BYTES_LEN {
@@ -72,38 +80,51 @@ impl TryFrom<&[u8]> for EncryptionKey {
     }
 }
 
-pub fn encrypt(key: &Secret<EncryptionKey>, bytes: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    if bytes.is_empty() {
-        return Err(anyhow!("Empty data"));
+impl Key {
+    /// Encrypt the given `bytes`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the encryption failed.
+    pub fn encrypt(&self, bytes: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+        if bytes.is_empty() {
+            return Err(anyhow!("Empty data"));
+        }
+        let mut rng = OsRng {};
+        let nonce = ChaCha20Poly1305::generate_nonce(&mut rng);
+        let cipher = ChaCha20Poly1305::new(&self.0);
+        let mut encrypted = cipher.encrypt(&nonce, bytes).map_err(|e| anyhow!(e))?;
+        encrypted.extend_from_slice(nonce.as_slice());
+        Ok(encrypted)
     }
-    let mut rng = OsRng {};
-    let nonce = ChaCha20Poly1305::generate_nonce(&mut rng);
-    let cipher = ChaCha20Poly1305::new(&key.expose_secret().0);
-    let mut encrypted = cipher.encrypt(&nonce, bytes).map_err(|e| anyhow!(e))?;
-    encrypted.extend_from_slice(nonce.as_slice());
-    Ok(encrypted)
-}
 
-pub fn decrypt(key: &Secret<EncryptionKey>, bytes: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
-    const NONCE_LEN: usize = 12;
-    if bytes.len() < NONCE_LEN {
-        return Err(anyhow!("Data is not large enough"));
+    /// Decrypt the given `bytes`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the decryption failed.
+    pub fn decrypt(&self, bytes: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+        const NONCE_LEN: usize = 12;
+        if bytes.len() < NONCE_LEN {
+            return Err(anyhow!("Data is not large enough"));
+        }
+        let data_len = bytes.len() - NONCE_LEN;
+        let nonce = Nonce::from_slice(&bytes[data_len..]);
+        debug_assert_eq!(nonce.len(), NONCE_LEN);
+        let cipher = ChaCha20Poly1305::new(&self.0);
+        let decrypted = cipher
+            .decrypt(nonce, &bytes[0..data_len])
+            .map_err(|e| anyhow!(e))?;
+        Ok(decrypted)
     }
-    let data_len = bytes.len() - NONCE_LEN;
-    let nonce = Nonce::from_slice(&bytes[data_len..]);
-    debug_assert_eq!(nonce.len(), NONCE_LEN);
-    let cipher = ChaCha20Poly1305::new(&key.expose_secret().0);
-    let decrypted = cipher
-        .decrypt(nonce, &bytes[0..data_len])
-        .map_err(|e| anyhow!(e))?;
-    Ok(decrypted)
 }
 
 #[test]
 fn test_encrypt_decrypt() {
+    use secrecy::ExposeSecret;
     let value = b"Hello World!!";
-    let key = EncryptionKey::new();
-    let encrypted = encrypt(&key, value).unwrap();
-    let decrypted = decrypt(&key, &encrypted).unwrap();
+    let key = Key::new();
+    let encrypted = key.expose_secret().encrypt(value).unwrap();
+    let decrypted = key.expose_secret().decrypt(&encrypted).unwrap();
     assert_eq!(decrypted.as_slice(), value);
 }

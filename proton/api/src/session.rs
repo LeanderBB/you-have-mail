@@ -1,15 +1,18 @@
 use crate::auth::{Auth, ThreadSafeStore};
 use crate::domain::user::User;
 use crate::requests::{GetUserInfoRequest, LogoutRequest, PostAuthRefreshRequest};
+use anyhow::anyhow;
 use http::{Client, FromResponse, Method, Request, RequestBuilder};
 use secrecy::ExposeSecret;
+use std::sync::Arc;
 use tracing::{error, warn};
 
 /// Authenticated Session from which one can access data/functionality restricted to authenticated
 /// users.
+#[derive(Clone)]
 pub struct Session {
     auth_store: ThreadSafeStore,
-    client: Client,
+    client: Arc<Client>,
 }
 
 struct ProtonRequest<T: Request> {
@@ -59,8 +62,14 @@ impl<'s, T: Request> Request for ProtonAuthRequest<'s, T> {
 
 impl Session {
     /// Create a new instance with a given `client` and `auth_store`.
-    pub fn new(client: Client, auth_store: ThreadSafeStore) -> Self {
+    pub fn new(client: Arc<Client>, auth_store: ThreadSafeStore) -> Self {
         Self { auth_store, client }
+    }
+
+    /// Get http client.
+    #[must_use]
+    pub fn client(&self) -> &Arc<Client> {
+        &self.client
     }
 
     /// Get the sessions authentication store.
@@ -82,7 +91,10 @@ impl Session {
     /// # Errors
     /// Returns error if the request failed.
     pub fn logout(&self) -> http::Result<()> {
-        self.execute_with_auth(LogoutRequest {})
+        self.execute_with_auth(LogoutRequest {})?;
+        self.auth_store.write().delete().map_err(|e| {
+            http::Error::Unexpected(anyhow!("Failed to delete authentication data: {e}"))
+        })
     }
 
     /// Execute a non-authenticate request with this client.
@@ -172,6 +184,6 @@ impl Session {
 }
 
 const DEFAULT_APP_VERSION: &str = "Other";
-pub const DEFAULT_HOST_URL: &str = "https://mail.proton.me/api/";
+pub(crate) const DEFAULT_HOST_URL: &str = "https://mail.proton.me/api/";
 const X_PM_APP_VERSION_HEADER: &str = "X-Pm-Appversion";
 const X_PM_UID_HEADER: &str = "X-Pm-Uid";

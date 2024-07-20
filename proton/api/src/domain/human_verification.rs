@@ -37,12 +37,23 @@ impl std::fmt::Display for VerificationType {
 }
 
 /// Human Verification data required for Login.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct LoginData {
     /// Type of human verification where the code originated from.
     pub hv_type: VerificationType,
     /// Result of the human verification request.
     pub token: String,
+}
+
+impl LoginData {
+    /// Create HV login data from webview `data`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the data does not match the expected format.
+    pub fn from_webview_string(data: &str) -> serde_json::Result<Self> {
+        serde_json::from_str(data)
+    }
 }
 
 /// Information for the Human Verification request.

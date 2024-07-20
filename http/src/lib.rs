@@ -4,14 +4,17 @@
 
 use secrecy::{ExposeSecret, SecretString};
 use serde::de::DeserializeOwned;
-use serde::Serialize;
+use serde::ser::SerializeStruct;
+use serde::{Deserialize, Serialize, Serializer};
 use std::collections::HashMap;
 use std::io;
 use std::io::Read;
 use std::marker::PhantomData;
+use std::sync::Arc;
 use std::time::Duration;
 pub use ureq;
 use ureq::{ErrorKind, Response};
+pub use url;
 use url::Url;
 
 /// Errors that may arrise during an http request.
@@ -203,14 +206,14 @@ impl RequestBuilder {
     }
 }
 
-#[derive(Debug, Copy, Clone, Eq, PartialEq)]
+#[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ProxyProtocol {
     Https,
     Socks5,
 }
 
 /// Proxy authentication information.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Deserialize)]
 pub struct ProxyAuth {
     /// Username.
     pub username: String,
@@ -218,8 +221,29 @@ pub struct ProxyAuth {
     pub password: SecretString,
 }
 
+impl PartialEq for ProxyAuth {
+    fn eq(&self, other: &Self) -> bool {
+        self.username == other.username
+            && self.password.expose_secret() == other.password.expose_secret()
+    }
+}
+
+impl Eq for ProxyAuth {}
+
+impl Serialize for ProxyAuth {
+    fn serialize<S>(&self, serializer: S) -> std::result::Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut state = serializer.serialize_struct("ProxyAuth", 2)?;
+        state.serialize_field("username", self.username.as_str())?;
+        state.serialize_field("password", self.password.expose_secret().as_str())?;
+        state.end()
+    }
+}
+
 /// HTTP proxy configuration.
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Proxy {
     /// Protocol of the proxy.
     pub protocol: ProxyProtocol,
@@ -263,7 +287,7 @@ pub struct ClientBuilder {
     request_timeout: Option<Duration>,
     connect_timeout: Option<Duration>,
     user_agent: String,
-    proxy_url: Option<Proxy>,
+    proxy: Option<Proxy>,
     debug: bool,
     allow_http: bool,
     default_headers: HashMap<String, String>,
@@ -276,7 +300,7 @@ impl ClientBuilder {
             base_url,
             request_timeout: None,
             connect_timeout: None,
-            proxy_url: None,
+            proxy: None,
             debug: false,
             allow_http: false,
             default_headers: HashMap::new(),
@@ -307,7 +331,7 @@ impl ClientBuilder {
     /// Specify proxy URL for the builder.
     #[must_use]
     pub fn with_proxy(mut self, proxy: Proxy) -> Self {
-        self.proxy_url = Some(proxy);
+        self.proxy = Some(proxy);
         self
     }
 
@@ -336,7 +360,7 @@ impl ClientBuilder {
     ///
     /// # Errors
     /// Returns error if the construction failed.
-    pub fn build(self) -> Result<Client> {
+    pub fn build(self) -> Result<Arc<Client>> {
         let mut builder = ureq::AgentBuilder::new();
 
         if let Some(d) = self.request_timeout {
@@ -347,7 +371,7 @@ impl ClientBuilder {
             builder = builder.timeout_connect(d);
         }
 
-        if let Some(proxy) = self.proxy_url {
+        if let Some(proxy) = &self.proxy {
             let proxy = ureq::Proxy::new(proxy.to_url()?.as_str())?;
             builder = builder.proxy(proxy);
         }
@@ -362,11 +386,12 @@ impl ClientBuilder {
             .max_idle_connections_per_host(0)
             .build();
 
-        Ok(Client {
+        Ok(Arc::new(Client {
             agent,
             base_url: self.base_url,
             default_headers: self.default_headers,
-        })
+            proxy: self.proxy,
+        }))
     }
 }
 
@@ -377,6 +402,7 @@ pub struct Client {
     agent: ureq::Agent,
     base_url: Url,
     default_headers: HashMap<String, String>,
+    proxy: Option<Proxy>,
 }
 
 impl Client {
@@ -384,6 +410,18 @@ impl Client {
     #[must_use]
     pub fn builder(base_url: Url) -> ClientBuilder {
         ClientBuilder::new(base_url)
+    }
+
+    /// The base url in use by the client.
+    #[must_use]
+    pub fn base_url(&self) -> &Url {
+        &self.base_url
+    }
+
+    /// The proxy configuration in use by the client
+    #[must_use]
+    pub fn proxy(&self) -> Option<&Proxy> {
+        self.proxy.as_ref()
     }
 
     /// Execute the request and return the result.
@@ -485,4 +523,22 @@ fn proxy_config_generates_valid_url() {
     assert_eq!(url.port().unwrap(), port);
     assert_eq!(url.password().unwrap(), "bar");
     assert_eq!(url.username(), "Foo");
+}
+
+#[test]
+fn proxy_serialize_deserialize() {
+    let host = "foo.bar.com";
+    let proxy = Proxy {
+        protocol: ProxyProtocol::Socks5,
+        auth: Some(ProxyAuth {
+            username: "Foo".to_string(),
+            password: SecretString::new("bar".to_string()),
+        }),
+        host: host.to_owned(),
+        port: 1024,
+    };
+
+    let serialized = serde_json::to_vec(&proxy).unwrap();
+    let derserialized = serde_json::from_slice::<Proxy>(&serialized).unwrap();
+    assert_eq!(proxy, derserialized);
 }

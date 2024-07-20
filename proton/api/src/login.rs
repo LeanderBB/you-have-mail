@@ -1,12 +1,12 @@
 use crate::auth::{Auth, StoreError};
 use crate::domain::errors::APIError;
-use crate::domain::human_verification::{HumanVerification, LoginData};
+use crate::domain::human_verification::{HumanVerification, LoginData, VerificationType};
+use crate::domain::user::User;
 use crate::domain::TwoFactorAuth;
 use crate::requests::{PostAuthInfoRequest, PostAuthRequest, PostTOTPRequest, TFAStatus};
 use crate::session::Session;
 use go_srp::SRPAuth;
-use std::sync::Arc;
-use tracing::error;
+use tracing::{error, Level};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -24,6 +24,8 @@ pub enum Error {
     Unsupported2FA(TwoFactorAuth),
     #[error("Human Verification Required'")]
     HumanVerificationRequired(HumanVerification),
+    #[error("Unsupported Human Verification:{0}")]
+    HumanVerificationTypeNotSupported(VerificationType),
     #[error("Auth Store:{0}")]
     AuthStore(#[from] StoreError),
 }
@@ -52,14 +54,14 @@ impl From<http::Error> for Error {
 ///
 /// If enabled, the next step is 2FA.
 pub struct Sequence {
-    session: Arc<Session>,
+    session: Session,
     state: State,
 }
 
 impl Sequence {
     /// Create a new instance with a given `session`.
     #[must_use]
-    pub fn new(session: Arc<Session>) -> Self {
+    pub fn new(session: Session) -> Self {
         Self {
             session,
             state: State::LoggedOut,
@@ -94,6 +96,7 @@ impl Sequence {
     /// or HV validation was requested.
     ///
     /// [`Error::InvalidState`] is returned if the sequence is not in a logged out state.
+    #[tracing::instrument(level=Level::DEBUG,skip(self, password, human_verification_login_data))]
     pub fn login(
         &mut self,
         email: &str,
@@ -103,6 +106,12 @@ impl Sequence {
         if !matches!(self.state, State::LoggedOut) {
             return Err(Error::InvalidState);
         };
+
+        if let Some(hv) = human_verification_login_data {
+            if hv.hv_type != VerificationType::Captcha {
+                return Err(Error::HumanVerificationTypeNotSupported(hv.hv_type));
+            }
+        }
 
         let auth_info_response = self
             .session
@@ -176,6 +185,7 @@ impl Sequence {
     /// Returns error if the request failed.
     ///
     /// [`Error::InvalidState`] is returned if the sequence is not in a logged out state.
+    #[tracing::instrument(level=Level::DEBUG,skip(self, totp))]
     pub fn submit_totp(&mut self, totp: &str) -> Result<()> {
         if !matches!(self.state, State::AwaitingTotp) {
             return Err(Error::InvalidState);
@@ -207,18 +217,24 @@ impl Sequence {
     ///
     /// # Errors
     /// If the state is not logged in, the sequence will be returned as error.
-    pub fn finish(self) -> std::result::Result<Arc<Session>, Self> {
+    #[tracing::instrument(level=Level::DEBUG,skip(self))]
+    pub fn finish(&self) -> Result<(User, Session)> {
         if !matches!(self.state, State::LoggedIn) {
-            return Err(self);
+            return Err(Error::InvalidState);
         }
 
-        Ok(self.session)
+        let user = self.session.user_info().map_err(|e| {
+            error!("Failed to fetch user info: {e}");
+            e
+        })?;
+
+        Ok((user, self.session.clone()))
     }
 
     /// Get the underlying session.
     #[must_use]
     pub fn session(&self) -> &Session {
-        self.session.as_ref()
+        &self.session
     }
 }
 

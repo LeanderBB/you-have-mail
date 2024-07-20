@@ -253,7 +253,7 @@ impl<'a> http::Request for PostAuthRefreshRequest<'a> {
 }
 
 #[derive(Copy, Clone)]
-pub struct LogoutRequest {}
+pub(crate) struct LogoutRequest {}
 
 impl http::Request for LogoutRequest {
     type Response = http::NoResponse;
