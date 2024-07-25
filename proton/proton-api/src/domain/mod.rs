@@ -32,6 +32,7 @@ impl Display for TwoFactorAuth {
 }
 
 #[derive(Debug, Deserialize_repr, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "mocks", derive(serde_repr::Serialize_repr))]
 #[repr(u8)]
 pub enum Boolean {
     False = 0,

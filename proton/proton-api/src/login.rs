@@ -56,6 +56,7 @@ impl From<http::Error> for Error {
 pub struct Sequence {
     session: Session,
     state: State,
+    skip_server_proof: bool,
 }
 
 impl Sequence {
@@ -65,6 +66,22 @@ impl Sequence {
         Self {
             session,
             state: State::LoggedOut,
+            skip_server_proof: false,
+        }
+    }
+
+    /// Create a new instance with a given `session` without checking for server proof.
+    ///
+    /// # Remarks
+    ///
+    /// This is very dangerous when used against live servers. For testing only.
+    #[cfg(feature = "mocks")]
+    #[must_use]
+    pub fn without_server_proof_check(session: Session) -> Self {
+        Self {
+            session,
+            state: State::LoggedOut,
+            skip_server_proof: true,
         }
     }
 
@@ -145,7 +162,7 @@ impl Sequence {
                 e
             })?;
 
-        if srp_auth.expected_server_proof != auth_response.server_proof {
+        if !self.skip_server_proof && srp_auth.expected_server_proof != auth_response.server_proof {
             return Err(Error::SRPServerProof(
                 "Server Proof does not match".to_string(),
             ));

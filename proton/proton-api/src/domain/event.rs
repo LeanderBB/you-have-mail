@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
+#[cfg(feature = "mocks")]
+use serde_repr::Serialize_repr;
 use std::fmt::{Display, Formatter};
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq, Hash, Clone)]
@@ -13,14 +15,16 @@ impl Display for Id {
 }
 
 #[derive(Debug, Deserialize_repr, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "mocks", derive(Serialize_repr))]
 #[repr(u8)]
 pub enum MoreEvents {
     No = 0,
     Yes = 1,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Clone)]
 #[serde(rename_all = "PascalCase")]
+#[cfg_attr(feature = "mocks", derive(Serialize))]
 pub struct Event {
     #[serde(rename = "EventID")]
     pub event_id: Id,
@@ -30,6 +34,7 @@ pub struct Event {
 }
 
 #[derive(Debug, Deserialize_repr, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "mocks", derive(Serialize_repr))]
 #[repr(u8)]
 pub enum Action {
     Delete = 0,
@@ -40,6 +45,7 @@ pub enum Action {
 
 /// Message API ID.
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
+#[cfg_attr(feature = "mocks", derive(Serialize))]
 pub struct MessageId(String);
 
 impl Display for MessageId {
@@ -49,7 +55,8 @@ impl Display for MessageId {
 }
 
 /// Event data related to a Message event.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Clone)]
+#[cfg_attr(feature = "mocks", derive(Serialize))]
 #[serde(rename_all = "PascalCase")]
 pub struct Message {
     #[serde(rename = "ID")]
@@ -59,7 +66,8 @@ pub struct Message {
 }
 
 /// Event data related to a Label event
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Clone)]
+#[cfg_attr(feature = "mocks", derive(Serialize))]
 #[serde(rename_all = "PascalCase")]
 pub struct Label {
     #[serde(rename = "ID")]

@@ -15,6 +15,7 @@ impl Display for Id {
 }
 
 #[derive(Debug, Deserialize_repr, Eq, PartialEq, Copy, Clone)]
+#[cfg_attr(feature = "mocks", derive(serde_repr::Serialize_repr))]
 #[repr(u8)]
 pub enum Type {
     Label = 1,
@@ -23,7 +24,8 @@ pub enum Type {
     System = 4,
 }
 
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Clone)]
+#[cfg_attr(feature = "mocks", derive(Serialize))]
 #[serde(rename_all = "PascalCase")]
 pub struct Label {
     #[serde(rename = "ID")]

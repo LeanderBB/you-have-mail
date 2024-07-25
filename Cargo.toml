@@ -1,11 +1,10 @@
 [workspace]
 resolver = "2"
 members = [
-    "youhavemail",
-    "proton/api",
-    "proton/go-gpa-server",
-    "proton/go-srp",
     "http",
+    "youhavemail",
+    "proton/proton-api",
+    "proton/go-srp",
 ]
 
 [workspace.dependencies]
@@ -24,3 +23,4 @@ tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing-log = "0.2.0"
 rusqlite = { version = "0.31.0", features = ["chrono", "bundled"] }
 rusqlite-from-row = "0.2.4"
+mockito = "1.4.0"

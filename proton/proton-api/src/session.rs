@@ -183,7 +183,7 @@ impl Session {
     }
 }
 
-const DEFAULT_APP_VERSION: &str = "Other";
+pub(crate) const DEFAULT_APP_VERSION: &str = "Other";
 pub(crate) const DEFAULT_HOST_URL: &str = "https://mail.proton.me/api/";
-const X_PM_APP_VERSION_HEADER: &str = "X-Pm-Appversion";
-const X_PM_UID_HEADER: &str = "X-Pm-Uid";
+pub(crate) const X_PM_APP_VERSION_HEADER: &str = "X-Pm-Appversion";
+pub(crate) const X_PM_UID_HEADER: &str = "X-Pm-Uid";

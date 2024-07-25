@@ -9,6 +9,7 @@ pub struct GetLabelsRequest {
 
 #[doc(hidden)]
 #[derive(Deserialize)]
+#[cfg_attr(feature = "mocks", derive(serde::Serialize))]
 pub struct GetLabelsResponse {
     #[serde(rename = "Labels")]
     pub labels: Vec<Label>,

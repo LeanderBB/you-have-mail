@@ -3,7 +3,8 @@ use serde::Deserialize;
 
 #[doc(hidden)]
 #[derive(Deserialize)]
-pub struct LatestEventResponse {
+#[cfg_attr(feature = "mocks", derive(serde::Serialize))]
+pub struct GetLatestEventResponse {
     #[serde(rename = "EventID")]
     pub event_id: crate::domain::event::Id,
 }
@@ -12,7 +13,7 @@ pub struct LatestEventResponse {
 pub struct GetLatestEventRequest;
 
 impl http::Request for GetLatestEventRequest {
-    type Response = http::JsonResponse<LatestEventResponse>;
+    type Response = http::JsonResponse<GetLatestEventResponse>;
     const METHOD: Method = Method::Get;
 
     fn url(&self) -> String {

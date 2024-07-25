@@ -4,7 +4,8 @@ use crate::domain::Boolean;
 use serde::Deserialize;
 
 /// Represents an email message.
-#[derive(Debug, Deserialize)]
+#[derive(Debug, Deserialize, Eq, PartialEq, Clone)]
+#[cfg_attr(feature = "mocks", derive(serde::Serialize))]
 #[serde(rename_all = "PascalCase")]
 pub struct Message {
     #[serde(rename = "ID")]

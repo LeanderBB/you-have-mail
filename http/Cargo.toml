@@ -12,8 +12,8 @@ thiserror.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 url.workspace = true
-anyhow = "1"
 tracing.workspace = true
+anyhow.workspace = true
 
 [lints.clippy]
 pedantic = "deny"

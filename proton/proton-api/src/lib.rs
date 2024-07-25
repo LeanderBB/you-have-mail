@@ -5,3 +5,6 @@ pub mod domain;
 pub mod login;
 pub mod requests;
 pub mod session;
+
+#[cfg(feature = "mocks")]
+pub mod mocks;
