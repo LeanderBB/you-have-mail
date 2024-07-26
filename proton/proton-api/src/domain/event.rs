@@ -43,24 +43,13 @@ pub enum Action {
     UpdateFlags = 3,
 }
 
-/// Message API ID.
-#[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
-#[cfg_attr(feature = "mocks", derive(Serialize))]
-pub struct MessageId(String);
-
-impl Display for MessageId {
-    fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {
-        self.0.fmt(f)
-    }
-}
-
 /// Event data related to a Message event.
 #[derive(Debug, Deserialize, Eq, PartialEq, Clone)]
 #[cfg_attr(feature = "mocks", derive(Serialize))]
 #[serde(rename_all = "PascalCase")]
 pub struct Message {
     #[serde(rename = "ID")]
-    pub id: MessageId,
+    pub id: crate::domain::message::Id,
     pub action: Action,
     pub message: Option<crate::domain::message::Message>,
 }

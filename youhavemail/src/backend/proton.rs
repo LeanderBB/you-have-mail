@@ -6,9 +6,9 @@ use crate::state::{Account, IntoAccount, State};
 use http::{Client, Proxy};
 use proton_api::auth::{new_thread_safe_store, Auth as ProtonAuth, InMemoryStore, StoreError};
 use proton_api::client::ProtonExtension;
-use proton_api::domain::event::{MessageId, MoreEvents};
+use proton_api::domain::event::MoreEvents;
 use proton_api::domain::label::Type;
-use proton_api::domain::{event, label, Boolean};
+use proton_api::domain::{event, label, message, Boolean};
 use proton_api::login::Sequence;
 use proton_api::requests::{GetEventRequest, GetLabelsRequest, GetLatestEventRequest};
 use proton_api::session::Session;
@@ -243,7 +243,7 @@ fn new_client(proxy: Option<Proxy>) -> http::Result<Arc<Client>> {
 }
 
 struct MsgInfo {
-    id: MessageId,
+    id: message::Id,
     sender: String,
     subject: String,
 }
@@ -309,7 +309,7 @@ impl TaskState {
 /// a notification if no other client has opened the message.
 struct EventState {
     new_emails: Vec<MsgInfo>,
-    unseen: HashSet<MessageId>,
+    unseen: HashSet<message::Id>,
 }
 
 impl EventState {

@@ -14,6 +14,7 @@ impl Display for Id {
     }
 }
 
+/// Type of the label.
 #[derive(Debug, Deserialize_repr, Eq, PartialEq, Copy, Clone)]
 #[cfg_attr(feature = "mocks", derive(serde_repr::Serialize_repr))]
 #[repr(u8)]
@@ -24,6 +25,7 @@ pub enum Type {
     System = 4,
 }
 
+/// Represents a location where you can find your messages.
 #[derive(Debug, Deserialize, Eq, PartialEq, Clone)]
 #[cfg_attr(feature = "mocks", derive(Serialize))]
 #[serde(rename_all = "PascalCase")]
