@@ -6,7 +6,7 @@ use std::fmt::{Display, Formatter};
 /// Message API ID.
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
 #[cfg_attr(feature = "mocks", derive(serde::Serialize))]
-pub struct Id(String);
+pub struct Id(pub String);
 
 impl Display for Id {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

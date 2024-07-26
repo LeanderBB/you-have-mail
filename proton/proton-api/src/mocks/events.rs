@@ -16,8 +16,8 @@ pub fn get_latest_event_id(server: &mut Server, event_id: event::Id) -> Mock {
 }
 
 /// Mock get event by `event_id`.
-pub fn get_event(server: &mut Server, event: &event::Event) -> Mock {
-    let url = GetEventRequest::new(&event.event_id).url();
+pub fn get_event(server: &mut Server, event_id: &event::Id, event: &event::Event) -> Mock {
+    let url = GetEventRequest::new(event_id).url();
     let url = format!("/{url}");
     server
         .mock("GET", url.as_str())

@@ -1,8 +1,8 @@
 mod utils;
 use crate::utils::{new_mock_session_and_server, perform_login};
 use proton_api::domain::label::{Id, Label, Type as LabelType, Type};
+use proton_api::mocks::{DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD};
 use proton_api::requests::GetLabelsRequest;
-use utils::{DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD};
 
 #[test]
 fn session_label_fetch() {

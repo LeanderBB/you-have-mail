@@ -171,6 +171,12 @@ pub trait IntoAccount {
     fn into_account(self, encryption_key: &Key) -> Result<Account, Error>;
 }
 
+impl IntoAccount for Account {
+    fn into_account(self, _: &Key) -> Result<Account, Error> {
+        Ok(self)
+    }
+}
+
 /// Contains all state serialized in the database.
 pub struct State {
     pool: Arc<Pool>,

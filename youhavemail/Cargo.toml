@@ -22,24 +22,21 @@ crossbeam-channel = "0.5"
 chacha20poly1305 = "0.10"
 http = { path = "../http" }
 
-[dependencies.log4rs]
-version = "1.2"
-default-features = false
-features = ["console_appender", "file_appender", "rolling_file_appender", "fixed_window_roller", "size_trigger", "compound_policy"]
-
 [dependencies.proton-api]
 path = "../proton/proton-api"
 
+[dev-dependencies.proton-api]
+path = "../proton/proton-api"
+features = ["mocks"]
+
 [dev-dependencies]
-mockall = "0.12.1"
 dirs = "5.0.0"
 keyring = { version = "3.0.3", features = ["linux-native"] }
 temp-dir = "0.1"
 ctrlc = "3"
 tracing-subscriber.workspace = true
+tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 
-#[[example]]
-#name = "cli"
 
 [package.metadata.docs.rs]
 all-features = true

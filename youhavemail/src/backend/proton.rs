@@ -21,12 +21,12 @@ use std::time::Duration;
 use tracing::{debug, error, warn, Level};
 
 /// Create a proton mail backend.
-pub fn new_backend(db: Arc<State>) -> Arc<dyn Backend> {
-    Arc::new(ProtonBackend { db })
+pub fn new_backend(db: Arc<State>, base_url: Option<http::url::Url>) -> Arc<dyn Backend> {
+    Arc::new(ProtonBackend { db, base_url })
 }
 
 pub fn new_login_sequence(proxy: Option<Proxy>) -> http::Result<Sequence> {
-    let client = new_client(proxy)?;
+    let client = new_client(proxy, None)?;
     let store = new_thread_safe_store(InMemoryStore::default());
     let session = Session::new(client, store);
 
@@ -35,10 +35,10 @@ pub fn new_login_sequence(proxy: Option<Proxy>) -> http::Result<Sequence> {
 
 struct ProtonBackend {
     db: Arc<State>,
+    base_url: Option<http::url::Url>,
 }
 
 pub const PROTON_BACKEND_NAME: &str = "Proton Mail";
-pub const PROTON_BACKEND_NAME_OTHER: &str = "Proton Mail V-Other";
 
 impl Backend for ProtonBackend {
     fn name(&self) -> &str {
@@ -46,11 +46,11 @@ impl Backend for ProtonBackend {
     }
 
     fn description(&self) -> &str {
-        "For Proton accounts (mail.proton.com)"
+        "For Proton Mail accounts (proton.me)"
     }
 
     fn create_client(&self, proxy: Option<Proxy>) -> BackendResult<Arc<Client>> {
-        Ok(new_client(proxy)?)
+        Ok(new_client(proxy, self.base_url.as_ref())?)
     }
 
     fn new_poller(&self, client: Arc<Client>, account: &Account) -> BackendResult<Box<dyn Poller>> {
@@ -191,6 +191,12 @@ impl Poller for ProtonPoller {
                         self.state.last_event_id = Some(event_id.clone());
                         has_more = event.more;
                     } else {
+                        self.db
+                            .update_account_state(&self.email, &self.state)
+                            .map_err(|e| {
+                                error!("Failed to update state after check: {e}");
+                                e
+                            })?;
                         return Ok(result.into());
                     }
                 }
@@ -230,8 +236,15 @@ impl Poller for ProtonPoller {
 }
 
 /// Create a new client configured for proton.
-fn new_client(proxy: Option<Proxy>) -> http::Result<Arc<Client>> {
-    let mut builder = Client::proton_client();
+fn new_client(
+    proxy: Option<Proxy>,
+    base_url: Option<&http::url::Url>,
+) -> http::Result<Arc<Client>> {
+    let mut builder = if let Some(base_url) = base_url {
+        Client::builder(base_url.clone()).allow_http()
+    } else {
+        Client::proton_client()
+    };
     if let Some(p) = proxy {
         builder = builder.with_proxy(p)
     }
@@ -249,15 +262,22 @@ struct MsgInfo {
 }
 
 #[derive(Debug, Serialize, Deserialize)]
-struct TaskState {
-    last_event_id: Option<event::Id>,
-    active_folder_ids: HashSet<label::Id>,
+pub struct TaskState {
+    pub last_event_id: Option<event::Id>,
+    pub active_folder_ids: HashSet<label::Id>,
 }
 
 impl TaskState {
-    fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             last_event_id: None,
+            active_folder_ids: HashSet::from([label::Id::inbox()]),
+        }
+    }
+
+    pub fn with_event_id(id: event::Id) -> Self {
+        Self {
+            last_event_id: Some(id),
             active_folder_ids: HashSet::from([label::Id::inbox()]),
         }
     }

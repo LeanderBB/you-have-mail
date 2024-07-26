@@ -4,8 +4,6 @@
 use crate::state;
 use crate::state::Account;
 use http::{Client, Proxy};
-#[cfg(test)]
-use mockall::automock;
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -38,7 +36,6 @@ pub struct NewEmail {
 }
 
 /// Implementation for the backends.
-#[cfg_attr(test, automock)]
 pub trait Backend: Send + Sync {
     /// Return the backend's name.
     fn name(&self) -> &str;
@@ -62,7 +59,6 @@ pub trait Backend: Send + Sync {
 }
 
 /// Trait that needs to be implemented for all backend accounts
-#[cfg_attr(test, automock)]
 pub trait Poller {
     /// Check if there are new emails on the account.
     ///

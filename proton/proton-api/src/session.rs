@@ -1,4 +1,4 @@
-use crate::auth::{Auth, ThreadSafeStore};
+use crate::auth::{new_thread_safe_store, Auth, InMemoryStore, ThreadSafeStore};
 use crate::domain::user::User;
 use crate::requests::{GetUserInfoRequest, LogoutRequest, PostAuthRefreshRequest};
 use anyhow::anyhow;
@@ -64,6 +64,14 @@ impl Session {
     /// Create a new instance with a given `client` and `auth_store`.
     pub fn new(client: Arc<Client>, auth_store: ThreadSafeStore) -> Self {
         Self { auth_store, client }
+    }
+
+    /// Create a new instance with a given `client` and an [`crate::auth::InMemoryStore`].
+    pub fn with_in_memory_auth_store(client: Arc<Client>) -> Self {
+        Self {
+            auth_store: new_thread_safe_store(InMemoryStore::default()),
+            client,
+        }
     }
 
     /// Get http client.

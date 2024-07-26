@@ -1,6 +1,4 @@
-use crate::utils::{
-    new_mock_session_and_server, perform_login, DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD,
-};
+use crate::utils::{new_mock_session_and_server, perform_login};
 use proton_api::domain::event;
 use proton_api::domain::event::MoreEvents;
 use proton_api::requests::GetEventRequest;
@@ -11,7 +9,12 @@ fn get_events() {
     // Check get events API call.
     let (client, mut server) = new_mock_session_and_server();
     let _mocks = proton_api::mocks::auth::login_flow(&mut server, false);
-    let (_, session) = perform_login(client, DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD, false);
+    let (_, session) = perform_login(
+        client,
+        proton_api::mocks::DEFAULT_USER_EMAIL,
+        proton_api::mocks::DEFAULT_USER_PASSWORD,
+        false,
+    );
 
     let id = event::Id("foo".to_owned());
     let event = event::Event {
@@ -21,7 +24,7 @@ fn get_events() {
         labels: None,
     };
 
-    let _get_event_mock = proton_api::mocks::events::get_event(&mut server, &event);
+    let _get_event_mock = proton_api::mocks::events::get_event(&mut server, &id, &event);
     let remote_event = session
         .execute_with_auth(GetEventRequest::new(&id))
         .unwrap();

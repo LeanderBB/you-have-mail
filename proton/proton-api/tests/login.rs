@@ -1,11 +1,10 @@
 mod utils;
 
-use crate::utils::{
-    new_mock_session_and_server, perform_login, DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD,
-};
+use crate::utils::{new_mock_session_and_server, perform_login};
 use mockito::{Mock, Server};
 use proton_api::domain::event;
 use proton_api::mocks::auth::MatchExtension;
+use proton_api::mocks::{DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD};
 use proton_api::requests::{GetLatestEventRequest, GetLatestEventResponse};
 use secrecy::ExposeSecret;
 

@@ -36,10 +36,24 @@ pub struct PollOutput {
     pub result: crate::backend::Result<Vec<NewEmail>>,
 }
 impl Yhm {
-    /// Create new instance with the given `state`.
+    /// Create new instance with the given `state` and a default list of backends.
     pub fn new(state: Arc<State>) -> Self {
-        let backends = vec![crate::backend::proton::new_backend(Arc::clone(&state))];
-        Self { state, backends }
+        let state_cloned = Arc::clone(&state);
+        Self::with_backends(
+            state,
+            [crate::backend::proton::new_backend(state_cloned, None)],
+        )
+    }
+
+    /// Create new instance with the given `state` and custom list of `backends`.
+    pub fn with_backends(
+        state: Arc<State>,
+        backends: impl IntoIterator<Item = Arc<dyn Backend>>,
+    ) -> Self {
+        Self {
+            state,
+            backends: Vec::from_iter(backends),
+        }
     }
 
     /// Poll all active accounts and check for new emails.
@@ -82,6 +96,11 @@ impl Yhm {
     /// Get the current active backend.
     pub fn backends(&self) -> &[Arc<dyn Backend>] {
         &self.backends
+    }
+
+    /// Get a backend by `name`
+    pub fn backend_with_name(&self, name: &str) -> Option<&Arc<dyn Backend>> {
+        self.backends.iter().find(|b| b.name() == name)
     }
 
     /// Returns the number of registered accounts

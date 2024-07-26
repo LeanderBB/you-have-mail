@@ -48,7 +48,7 @@ impl<'de> Deserialize<'de> for RefreshToken {
 
 /// Represents a session id.
 #[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
-pub struct Uid(pub(crate) String);
+pub struct Uid(pub String);
 
 impl Display for Uid {
     fn fmt(&self, f: &mut Formatter<'_>) -> std::fmt::Result {

@@ -6,9 +6,6 @@ use proton_api::mocks::auth::TFA_CODE;
 use proton_api::session::Session;
 use std::sync::Arc;
 
-pub const DEFAULT_USER_EMAIL: &str = "foo@bar.com";
-pub const DEFAULT_USER_PASSWORD: &str = "12345";
-
 /// Perform login with `email` and `password`.
 ///
 /// Set `tfa` to true to trigger Two Factor Auth.
@@ -40,12 +37,8 @@ pub fn new_session(client: Arc<Client>) -> Session {
 
 /// Create a new client and mock server.
 pub fn new_mock_session_and_server() -> (Arc<Client>, mockito::Server) {
-    let server = proton_api::mocks::new();
-    let mut url = server.url();
-    if !url.ends_with('/') {
-        url.push('/');
-    }
-    let url = url::Url::parse(&url).unwrap();
+    let server = proton_api::mocks::new_server();
+    let url = url::Url::parse(&proton_api::mocks::server_url(&server)).unwrap();
     let client = Client::builder(url)
         .allow_http()
         .build()

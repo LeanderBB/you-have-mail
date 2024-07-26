@@ -36,7 +36,11 @@ impl Config {
     pub fn to_v2_accounts(&self, encryption_key: &Key) -> Result<Vec<crate::state::Account>> {
         let mut result = Vec::with_capacity(self.accounts.len());
         for account in &self.accounts {
-            let mut v2 = crate::state::Account::new(account.email.clone(), account.backend.clone());
+            let mut v2 = crate::state::Account::new(
+                account.email.clone(),
+                // there were no other accounts in v1.
+                crate::backend::proton::PROTON_BACKEND_NAME.to_owned(),
+            );
             let proxy = account.proxy.clone().map(|v| http::Proxy {
                 protocol: match v.protocol {
                     ProxyProtocol::Https => http::ProxyProtocol::Https,
@@ -150,7 +154,10 @@ fn test_config_v1_into_v2() {
         .unwrap();
 
     assert_eq!(accounts_v2[0].email(), config_loaded.accounts[0].email);
-    assert_eq!(accounts_v2[0].backend(), config_loaded.accounts[0].backend);
+    assert_eq!(
+        accounts_v2[0].backend(),
+        crate::backend::proton::PROTON_BACKEND_NAME
+    );
     assert!(accounts_v2[0].is_logged_out());
     assert!(accounts_v2[0]
         .proxy(encryption_key.expose_secret())
@@ -158,7 +165,10 @@ fn test_config_v1_into_v2() {
         .is_some());
 
     assert_eq!(accounts_v2[1].email(), config_loaded.accounts[1].email);
-    assert_eq!(accounts_v2[1].backend(), config_loaded.accounts[1].backend);
+    assert_eq!(
+        accounts_v2[1].backend(),
+        crate::backend::proton::PROTON_BACKEND_NAME
+    );
     assert!(accounts_v2[1].is_logged_out());
     assert!(accounts_v2[1]
         .proxy(encryption_key.expose_secret())
