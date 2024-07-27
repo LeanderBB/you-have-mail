@@ -10,4 +10,6 @@ pub mod yhm;
 pub use secrecy;
 
 pub mod events;
+
+pub use http;
 mod v1;
