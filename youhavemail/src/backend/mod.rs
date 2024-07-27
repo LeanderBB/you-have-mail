@@ -7,6 +7,7 @@ use http::{Client, Proxy};
 use std::fmt::Debug;
 use std::sync::Arc;
 
+pub mod dummy;
 pub mod proton;
 
 /// Expected backend errors.
