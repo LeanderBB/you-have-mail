@@ -9,31 +9,31 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
+import androidx.compose.material.Divider
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.runtime.Composable
-import androidx.compose.runtime.collectAsState
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
-import dev.lbeernaert.youhavemail.ObserverAccountStatus
+import dev.lbeernaert.youhavemail.Account
 import dev.lbeernaert.youhavemail.R
+import dev.lbeernaert.youhavemail.app.accountStatusString
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
-import dev.lbeernaert.youhavemail.service.ServiceAccount
 
 
 @Composable
 fun AccountInfo(
-    account: ServiceAccount,
+    account: Account,
     onBackClicked: () -> Unit,
     onLogout: suspend () -> Unit,
     onLogin: () -> Unit,
     onDelete: suspend () -> Unit,
     onProxyClicked: () -> Unit,
 ) {
-    val accountState = account.state.collectAsState()
 
     AsyncScreen(
         title = stringResource(id = R.string.account_title),
@@ -44,7 +44,6 @@ fun AccountInfo(
         val onLogoutImpl: () -> Unit = {
             runTask(logOutBackgroundLabel) {
                 onLogout()
-                //accountState.value = ObserverAccountStatus.LOGGED_OUT
             }
         }
 
@@ -63,39 +62,57 @@ fun AccountInfo(
             verticalArrangement = Arrangement.Top,
             horizontalAlignment = Alignment.CenterHorizontally,
         ) {
-
             Text(
-                text = account.email,
+                text = "Email",
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.h4,
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.h5,
+            )
+
+            Text(
+                text = account.email(),
+                modifier = Modifier.fillMaxWidth(),
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
             Text(
-                text = "Backend: ${account.backend}",
+                text = "Backend",
+                modifier = Modifier.fillMaxWidth(),
+                fontWeight = FontWeight.Bold,
+                style = MaterialTheme.typography.h5,
+            )
+
+            Text(
+                text = account.backend(),
                 modifier = Modifier.fillMaxWidth()
             )
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            val statusString = when (accountState.value) {
-                ObserverAccountStatus.OFFLINE -> stringResource(id = R.string.status_offline)
-                ObserverAccountStatus.LOGGED_OUT -> stringResource(id = R.string.status_logged_out)
-                ObserverAccountStatus.ONLINE -> stringResource(id = R.string.status_online)
-            }
             Text(
-                text = stringResource(id = R.string.status, statusString),
+                text = stringResource(id = R.string.status_no_colon),
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.fillMaxWidth(),
+                style = MaterialTheme.typography.h5,
+            )
+
+            Text(
+                text = accountStatusString(account),
                 modifier = Modifier.fillMaxWidth()
             )
 
-            Spacer(modifier = Modifier.height(40.dp))
+            Spacer(modifier = Modifier.height(20.dp))
+
+            Divider()
+
+            Spacer(modifier = Modifier.height(20.dp))
 
             ActionButton(text = stringResource(id = R.string.proxy_settings), onProxyClicked)
 
             Spacer(modifier = Modifier.height(40.dp))
 
-            if (accountState.value == ObserverAccountStatus.LOGGED_OUT) {
+            if (account.isLoggedOut()) {
                 ActionButton(
                     text = stringResource(id = R.string.login),
                     onClick = onLogin

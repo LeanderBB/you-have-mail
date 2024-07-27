@@ -1,6 +1,8 @@
 [bindings.kotlin]
 package_name = "dev.lbeernaert.youhavemail"
 cdylib_name = "youhavemail"
+android_cleaner = true
+android = true
 
 [bindings.python]
 cdylib_name = "youhavemail"

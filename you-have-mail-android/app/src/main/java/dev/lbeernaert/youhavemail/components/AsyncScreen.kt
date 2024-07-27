@@ -2,15 +2,19 @@ package dev.lbeernaert.youhavemail.components
 
 import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material.*
+import androidx.compose.material.Icon
+import androidx.compose.material.IconButton
+import androidx.compose.material.Scaffold
+import androidx.compose.material.SnackbarDuration
+import androidx.compose.material.Text
+import androidx.compose.material.TopAppBar
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.ArrowBack
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
+import androidx.compose.material.rememberScaffoldState
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.rememberCoroutineScope
-import dev.lbeernaert.youhavemail.ServiceException
-import dev.lbeernaert.youhavemail.serviceExceptionToErrorStr
 import kotlinx.coroutines.launch
 
 const val asyncScreenLogTag = "async"
@@ -46,7 +50,7 @@ fun AsyncScreen(
                     navigationIcon = {
                         IconButton(onClick = onBackClicked) {
                             Icon(
-                                imageVector = Icons.Filled.ArrowBack,
+                                imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                                 contentDescription = "Back"
                             )
                         }
@@ -59,12 +63,12 @@ fun AsyncScreen(
                     openDialog.value = true
                     try {
                         run()
-                    } catch (err: ServiceException) {
+                    } catch (e: Exception) {
                         openDialog.value = false
-                        Log.e(asyncScreenLogTag, err.toString())
+                        Log.e(asyncScreenLogTag, e.toString())
                         coroutineScope.launch {
                             scaffoldState.snackbarHostState.showSnackbar(
-                                message = serviceExceptionToErrorStr(err, null),
+                                message = e.message.orEmpty(),
                                 duration = SnackbarDuration.Short,
                             )
                         }

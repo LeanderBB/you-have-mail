@@ -1,19 +1,15 @@
 package dev.lbeernaert.youhavemail
 
 import android.Manifest
-import android.content.ComponentName
+import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
-import android.content.ServiceConnection
 import android.content.pm.PackageManager
 import android.net.Uri
 import android.os.Build
 import android.os.Bundle
-import android.os.IBinder
 import android.provider.Settings
 import android.util.Log
-import android.view.WindowManager
-import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.compose.setContent
@@ -41,34 +37,60 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
+import dev.lbeernaert.youhavemail.app.LOG_EXPORT_REQUEST
+import dev.lbeernaert.youhavemail.app.NotificationActionClicked
+import dev.lbeernaert.youhavemail.app.NotificationIntentAppNameKey
+import dev.lbeernaert.youhavemail.app.NotificationIntentBackendKey
+import dev.lbeernaert.youhavemail.app.NotificationIntentEmailKey
+import dev.lbeernaert.youhavemail.app.State
+import dev.lbeernaert.youhavemail.app.createAndDisplayServiceErrorNotification
+import dev.lbeernaert.youhavemail.app.createNotificationChannels
+import dev.lbeernaert.youhavemail.app.createServiceErrorNotification
+import dev.lbeernaert.youhavemail.app.exportLogs
+import dev.lbeernaert.youhavemail.app.getLogPath
+import dev.lbeernaert.youhavemail.app.oneshotWorker
 import dev.lbeernaert.youhavemail.screens.MainNavController
-import dev.lbeernaert.youhavemail.service.Actions
-import dev.lbeernaert.youhavemail.service.LOG_EXPORT_REQUEST
-import dev.lbeernaert.youhavemail.service.ObserverService
-import dev.lbeernaert.youhavemail.service.POLL_INTENT_NAME
-import dev.lbeernaert.youhavemail.service.ServiceState
-import dev.lbeernaert.youhavemail.service.ServiceWrapper
-import dev.lbeernaert.youhavemail.service.exportLogs
-import dev.lbeernaert.youhavemail.service.getServiceState
-import dev.lbeernaert.youhavemail.service.serviceLogTag
 import dev.lbeernaert.youhavemail.ui.theme.YouHaveMailTheme
 
 
 const val activityLogTag = "activity"
 
-class MainActivity : ComponentActivity(), ServiceConnection {
-    private var mBound: Boolean = false
-    private var mServiceState = ServiceWrapper()
-    private var mAppState = AppState()
+class MainActivity : ComponentActivity() {
+    private var mState: State? = null
 
 
     override fun onCreate(savedInstanceState: Bundle?) {
+        Log.i("BOOT", "OnCreate")
         super.onCreate(savedInstanceState)
-        actionOnService(Actions.START)
         onNewIntent(this.intent)
 
-        window.setSoftInputMode(WindowManager.LayoutParams.SOFT_INPUT_ADJUST_RESIZE);
+        val notificationManager =
+            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+
+        createNotificationChannels(notificationManager)
+
+        val log_init = initLog(getLogPath(this).path);
+        if (log_init != null) {
+            createServiceErrorNotification(this, "Failed to init log: ${log_init}")
+        }
+
+
+        if (mState == null) {
+            try {
+                mState = State(this)
+            } catch (e: YhmException) {
+                yhmLogError("Failed to create state: $e")
+                try {
+                    createAndDisplayServiceErrorNotification(this, "state init failed", e)
+                } catch (e: Exception) {
+                    Log.e(activityLogTag, "Failed to create exception");
+                }
+            }
+        }
+
+        if (mState != null) {
+            mState!!.migrateAccounts(this)
+        }
 
         setContent {
             YouHaveMailTheme {
@@ -123,89 +145,33 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                         }
                     }
 
-
-                    MainNavController(serviceWrapper = mServiceState,
-                        context = this,
-                        appState = mAppState,
-                        requestPermissions = {
-                            if (!hasNotificationPermission) {
-                                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                    if (mState == null) {
+                        TODO("display text saying service failed to initiliaze")
+                    } else {
+                        MainNavController(
+                            context = this,
+                            state = mState!!,
+                            requestPermissions = {
+                                if (!hasNotificationPermission) {
+                                    launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                            },
+                            onPollClicked = {
+                                if (!hasNotificationPermission) {
+                                    launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
+                                }
+                                oneshotWorker(this)
                             }
-                        },
-                        onPollClicked = {
-                            if (!hasNotificationPermission) {
-                                launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
-                            }
-                            try {
-                                Toast.makeText(this, "Poll request sent", Toast.LENGTH_SHORT).show()
-                                val localIntent = Intent(POLL_INTENT_NAME)
-                                LocalBroadcastManager.getInstance(applicationContext)
-                                    .sendBroadcast(localIntent)
-                            } catch (e: Exception) {
-                                Log.e(activityLogTag, "Failed to send poll request: $e")
-                            }
-                        }
-                    )
+                        )
+                    }
                 }
             }
         }
     }
 
-    override fun onStart() {
-        super.onStart()
 
-        // Bind to Service
-        Intent(this, ObserverService::class.java).also { intent ->
-            bindService(intent, this, Context.BIND_AUTO_CREATE)
-        }
-    }
-
-    override fun onStop() {
-        super.onStop()
-        unbindService(this)
-        mBound = false
-    }
-
-    private fun actionOnService(action: Actions) {
-        if (getServiceState(this) == ServiceState.STOPPED && action == Actions.STOP) return
-        Intent(this, ObserverService::class.java).also {
-            it.action = action.name
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-                Log.i(activityLogTag, "App Starting the service in >= 26 Mode")
-                startForegroundService(it)
-                return
-            }
-            Log.i(activityLogTag, "App Starting the service in <= 26 Mode")
-            startService(it)
-        }
-
-    }
-
-    override fun onServiceConnected(name: ComponentName?, service: IBinder?) {
-        // We've bound to LocalService, cast the IBinder and get LocalService instance
-        Log.i(activityLogTag, "App Bound to service")
-        val binder = service as ObserverService.LocalBinder
-
-        try {
-            mServiceState.setService(binder.getService())
-            mBound = true
-        } catch (e: ServiceException) {
-            val errorText = serviceExceptionToErrorStr(e, null)
-            Toast.makeText(this, "Failed to bind to service: $errorText", Toast.LENGTH_SHORT).show()
-        }
-    }
-
-    override fun onServiceDisconnected(name: ComponentName?) {
-        Log.i(activityLogTag, "App disconnected from service")
-        mBound = false
-        mServiceState.removeService()
-    }
-
-    override fun onNewIntent(intent: Intent?) {
+    override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-        if (intent == null) {
-            return
-        }
 
         val action = intent.action ?: return
 
@@ -217,7 +183,7 @@ class MainActivity : ComponentActivity(), ServiceConnection {
             // Launch the app for this backend
             Log.d(activityLogTag, "Receive click request for '$email' backend='$backend'")
             try {
-                Log.d(serviceLogTag, "Attempting to launch $appName")
+                Log.d(activityLogTag, "Attempting to launch $appName")
                 val appIntent =
                     packageManager.getLaunchIntentForPackage(appName)
                 if (appIntent != null) {
@@ -234,6 +200,15 @@ class MainActivity : ComponentActivity(), ServiceConnection {
                 Log.e(activityLogTag, "Failed to launch $appName for backend $backend: $e")
             }
         }
+    }
+
+    override fun onDestroy() {
+        if (mState != null) {
+            mState!!.close(this)
+            mState = null
+        }
+
+        super.onDestroy()
     }
 
     @Suppress("OverrideDeprecatedMigration")
@@ -330,5 +305,4 @@ fun ShowSettingDialog(context: Context, openDialog: MutableState<Boolean>) {
             },
         )
     }
-
 }

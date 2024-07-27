@@ -2,13 +2,32 @@ package dev.lbeernaert.youhavemail.screens
 
 import android.widget.Toast
 import androidx.compose.foundation.clickable
-import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.DropdownMenuItem
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.ExposedDropdownMenuDefaults
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Switch
+import androidx.compose.material.Text
+import androidx.compose.material.TextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
 import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.platform.LocalContext
@@ -17,9 +36,9 @@ import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.unit.dp
+import dev.lbeernaert.youhavemail.Auth
+import dev.lbeernaert.youhavemail.Protocol
 import dev.lbeernaert.youhavemail.Proxy
-import dev.lbeernaert.youhavemail.ProxyAuth
-import dev.lbeernaert.youhavemail.ProxyProtocol
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
@@ -34,8 +53,66 @@ fun ProxyScreen(
     proxy: Proxy?,
     isLoginRequest: Boolean
 ) {
+    var expanded by remember { mutableStateOf(false) }
+    val proxyProtocols = listOf(Protocol.HTTP, Protocol.SOCKS5)
+    var selectedIndex by remember {
+        mutableStateOf(
+            if (proxy != null) {
+                if (proxy.protocol == Protocol.HTTP) {
+                    0
+                } else {
+                    1
+                }
+            } else {
+                0
+            }
+        )
+    }
+
+    var useProxy by rememberSaveable { mutableStateOf(proxy != null) }
+    var useAuth by rememberSaveable { mutableStateOf(proxy != null && proxy.auth != null) }
+    var proxyUrl by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(
+            TextFieldValue(
+                proxy?.host ?: ""
+            )
+        )
+    }
+    var proxyPort by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(
+            TextFieldValue(
+                if (proxy != null) {
+                    "${proxy.port}"
+                } else {
+                    ""
+                }
+            )
+        )
+    }
+    var proxyUser by rememberSaveable(stateSaver = TextFieldValue.Saver) {
+        mutableStateOf(
+            TextFieldValue(
+                if (proxy != null && proxy.auth != null) {
+                    proxy.auth!!.user
+                } else {
+                    ""
+                }
+            )
+        )
+    }
+    var proxyPassword = remember {
+        mutableStateOf(
+            TextFieldValue(
+                if (proxy != null && proxy.auth != null) {
+                    proxy.auth!!.password
+                } else {
+                    ""
+                }
+            )
+        )
+    }
     AsyncScreen(
-        title = stringResource(id = R.string.network),
+        title = stringResource(id = R.string.proxy_settings),
         onBackClicked = onBackClicked
     ) { _, runTask ->
         Column(
@@ -44,69 +121,11 @@ fun ProxyScreen(
                 .verticalScroll(rememberScrollState(), true)
         ) {
 
-            var expanded by remember { mutableStateOf(false) }
-            val proxyProtocols = listOf(ProxyProtocol.HTTPS, ProxyProtocol.SOCKS5)
-            var selectedIndex by remember {
-                mutableStateOf(
-                    if (proxy != null) {
-                        if (proxy.protocol == ProxyProtocol.HTTPS) {
-                            0
-                        } else {
-                            1
-                        }
-                    } else {
-                        0
-                    }
-                )
-            }
-
-            var useProxy by rememberSaveable { mutableStateOf(proxy != null) }
-            var useAuth by rememberSaveable { mutableStateOf(proxy != null && proxy.auth != null) }
-            var proxyUrl by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-                mutableStateOf(
-                    TextFieldValue(
-                        proxy?.url ?: ""
-                    )
-                )
-            }
-            var proxyPort by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-                mutableStateOf(
-                    TextFieldValue(
-                        if (proxy != null) {
-                            "${proxy.port}"
-                        } else {
-                            ""
-                        }
-                    )
-                )
-            }
-            var proxyUser by rememberSaveable(stateSaver = TextFieldValue.Saver) {
-                mutableStateOf(
-                    TextFieldValue(
-                        if (proxy != null && proxy.auth != null) {
-                            proxy.auth!!.username
-                        } else {
-                            ""
-                        }
-                    )
-                )
-            }
-            var proxyPassword = remember {
-                mutableStateOf(
-                    TextFieldValue(
-                        if (proxy != null && proxy.auth != null) {
-                            proxy.auth!!.password
-                        } else {
-                            ""
-                        }
-                    )
-                )
-            }
             val context = LocalContext.current
 
             fun buildProxyObject(
                 useProxy: Boolean,
-                protocol: ProxyProtocol,
+                protocol: Protocol,
                 proxyUrl: String,
                 proxyPort: String,
                 useAuth: Boolean,
@@ -134,12 +153,12 @@ fun ProxyScreen(
                         throw RuntimeException("Proxy Port can't be empty")
                     }
 
-                    ProxyAuth(username, password)
+                    Auth(username, password)
                 } else {
                     null
                 }
 
-                return Proxy(protocol, auth = auth, url = proxyUrl, port = proxyPort.toUShort())
+                return Proxy(protocol, auth = auth, host = proxyUrl, port = proxyPort.toUShort())
             }
 
             val onApplyLabel = stringResource(id = R.string.apply_proxy)

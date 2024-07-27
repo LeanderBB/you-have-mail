@@ -1,4 +1,4 @@
-package dev.lbeernaert.youhavemail.service
+package dev.lbeernaert.youhavemail.app
 
 import android.content.Context
 import android.net.Uri

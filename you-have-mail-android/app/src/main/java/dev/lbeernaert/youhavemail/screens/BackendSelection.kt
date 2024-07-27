@@ -7,6 +7,7 @@ import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.material.*
 import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.automirrored.filled.ArrowBack
 import androidx.compose.material.icons.filled.ArrowBack
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Modifier
@@ -18,10 +19,10 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import dev.lbeernaert.youhavemail.Backend
 import dev.lbeernaert.youhavemail.R
-import dev.lbeernaert.youhavemail.service.ServiceWrapper
+import dev.lbeernaert.youhavemail.app.State
 
 @Composable
-fun BackendSelection(serviceWrapper: ServiceWrapper, navController: NavController) {
+fun BackendSelection(state: State, navController: NavController) {
     Scaffold(topBar = {
         TopAppBar(title = {
             Text(text = stringResource(id = R.string.backend_title))
@@ -32,7 +33,7 @@ fun BackendSelection(serviceWrapper: ServiceWrapper, navController: NavControlle
                     navController.popBackStack()
                 }) {
                     Icon(
-                        imageVector = Icons.Filled.ArrowBack,
+                        imageVector = Icons.AutoMirrored.Filled.ArrowBack,
                         contentDescription = "Back"
                     )
                 }
@@ -40,8 +41,7 @@ fun BackendSelection(serviceWrapper: ServiceWrapper, navController: NavControlle
         )
     },
         content = { _ ->
-            BackendList(backends = serviceWrapper.getBackends(), onClicked = {
-                serviceWrapper.setInLoginProxy(null)
+            BackendList(backends = state.backends(), onClicked = {
                 navController.navigate(Routes.newProxyLoginRoute(it))
             })
         }
@@ -49,12 +49,12 @@ fun BackendSelection(serviceWrapper: ServiceWrapper, navController: NavControlle
 }
 
 @Composable
-fun BackendListItem(backend: Backend, index: Int, onClicked: (Int) -> Unit) {
+fun BackendListItem(backend: Backend, onClicked: (String) -> Unit) {
     Row(
         modifier = Modifier
             .padding(10.dp)
             .fillMaxWidth()
-            .clickable { onClicked(index) },
+            .clickable { onClicked(backend.name()) },
     ) {
         val name = backend.name()
         Column(
@@ -85,10 +85,10 @@ fun BackendListItem(backend: Backend, index: Int, onClicked: (Int) -> Unit) {
 }
 
 @Composable
-fun BackendList(backends: List<Backend>, onClicked: (index: Int) -> Unit) {
+fun BackendList(backends: List<Backend>, onClicked: (index: String) -> Unit) {
     LazyColumn(contentPadding = PaddingValues(horizontal = 10.dp, vertical = 10.dp)) {
-        itemsIndexed(backends) { index, backend ->
-            BackendListItem(backend = backend, index = index, onClicked = onClicked)
+        itemsIndexed(backends) { _, backend ->
+            BackendListItem(backend = backend, onClicked = onClicked)
         }
     }
 }

@@ -1,30 +1,35 @@
 [package]
 name = "you-have-mail-mobile"
-version = "0.11.0"
+version = "0.12.0"
 edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
 categories = ["email", "api-bindings"]
-readme = "README.md"
-description= "You-Have-Mail mobile API bindings"
+description = "You-Have-Mail mobile API bindings"
 
 [lib]
 crate-type = ["cdylib"]
 name = "youhavemail"
 
 [dependencies]
-uniffi = "0.23.0"
-you-have-mail-common = {git= "https://github.com/LeanderBB/you-have-mail-common" }
+uniffi = { version = "0.28.0", features = ["cli"] }
+you-have-mail-common = { git = "https://github.com/LeanderBB/you-have-mail-common", branch = "refactor" }
 thiserror = "1"
 parking_lot = "0.12"
-log4rs = "1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+tracing-appender = "0.2.3"
+chrono = "0.4"
+anyhow = "1.0.86"
 
-[features]
-default = []
-null_backend =[]
+[lints.clippy]
+pedantic = "deny"
 
-[build-dependencies]
-uniffi = {version ="0.23.0", features=["build", "cli"]}
+[[bin]]
+# This can be whatever name makes sense for your project, but the rest of this tutorial assumes uniffi-bindgen.
+name = "uniffi-bindgen"
+path = "uniffi-bindgen/uniffi-bindgen.rs"
+
 
 [profile.release]
 strip = true

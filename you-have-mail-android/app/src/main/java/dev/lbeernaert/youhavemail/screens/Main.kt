@@ -41,45 +41,40 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
-import dev.lbeernaert.youhavemail.ObserverAccountStatus
+import dev.lbeernaert.youhavemail.Account
 import dev.lbeernaert.youhavemail.R
-import dev.lbeernaert.youhavemail.components.BackgroundTask
-import dev.lbeernaert.youhavemail.service.ServiceAccount
-import dev.lbeernaert.youhavemail.service.ServiceWrapper
+import dev.lbeernaert.youhavemail.app.State
+import dev.lbeernaert.youhavemail.app.accountStatusString
 import java.util.Timer
 import java.util.TimerTask
 
 @Composable
 fun Main(
-    service: ServiceWrapper,
+    state: State,
     navController: NavController,
     requestPermissions: () -> Unit,
     onSettingsClicked: () -> Unit,
     onPollClicked: () -> Unit,
 ) {
-    if (!service.isReady()) {
-        BackgroundTask(text = stringResource(id = R.string.connecting_to_service))
-    } else {
-        AccountList(
-            service = service,
-            navController = navController,
-            requestPermissions = requestPermissions,
-            onSettingsClicked = onSettingsClicked,
-            onPollClicked = onPollClicked,
-        )
-    }
+    AccountList(
+        state = state,
+        navController = navController,
+        requestPermissions = requestPermissions,
+        onSettingsClicked = onSettingsClicked,
+        onPollClicked = onPollClicked,
+    )
 }
 
 
 @Composable
 fun AccountList(
-    service: ServiceWrapper,
+    state: State,
     navController: NavController,
     requestPermissions: () -> Unit,
     onSettingsClicked: () -> Unit,
     onPollClicked: () -> Unit,
 ) {
-    val accounts by service.getAccountsStateFlow().collectAsState()
+    val accounts by state.accounts().collectAsState()
     var pollActive by remember { mutableStateOf(true) }
 
     Scaffold(topBar = {
@@ -105,6 +100,7 @@ fun AccountList(
                     modifier = Modifier.size(30.dp)
                 )
             }
+            Spacer(modifier = Modifier.size(10.dp))
             Button(
                 onClick = onSettingsClicked,
                 colors = ButtonDefaults.outlinedButtonColors()
@@ -153,8 +149,8 @@ fun AccountList(
                             vertical = 10.dp
                         )
                     ) {
-                        itemsIndexed(accounts) { index, account ->
-                            ActiveAccount(account = account, index = index, onClicked = {
+                        itemsIndexed(accounts) { _, account ->
+                            ActiveAccount(account = account, onClicked = {
                                 navController.navigate(Routes.newAccountRoute(it))
                             })
                         }
@@ -166,15 +162,14 @@ fun AccountList(
 
 
 @Composable
-fun ActiveAccount(account: ServiceAccount, index: Int, onClicked: (Int) -> Unit) {
+fun ActiveAccount(account: Account, onClicked: (String) -> Unit) {
     Row(
         modifier = Modifier
             .padding(10.dp)
             .fillMaxWidth()
-            .clickable { onClicked(index) },
+            .clickable { onClicked(account.email()) },
     ) {
-        val email = account.email
-        var status = account.state.collectAsState()
+        val email = account.email()
 
         Column(
             verticalArrangement = Arrangement.Center,
@@ -198,13 +193,9 @@ fun ActiveAccount(account: ServiceAccount, index: Int, onClicked: (Int) -> Unit)
                 style = MaterialTheme.typography.subtitle1,
                 fontWeight = FontWeight.Bold
             )
-            val statusString = when (status.value) {
-                ObserverAccountStatus.OFFLINE -> stringResource(id = R.string.status_offline)
-                ObserverAccountStatus.LOGGED_OUT -> stringResource(id = R.string.status_logged_out)
-                ObserverAccountStatus.ONLINE -> stringResource(id = R.string.status_online)
-            }
+
             Text(
-                text = stringResource(id = R.string.status, statusString),
+                text = stringResource(id = R.string.status, accountStatusString(account)),
                 style = MaterialTheme.typography.body2
             )
         }

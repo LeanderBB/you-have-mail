@@ -1,29 +1,45 @@
 package dev.lbeernaert.youhavemail.screens
 
 import android.app.Activity
-import android.content.Intent
-import androidx.compose.foundation.layout.*
-import androidx.compose.material.*
-import androidx.compose.runtime.*
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxSize
+import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.material.Divider
+import androidx.compose.material.DropdownMenu
+import androidx.compose.material.DropdownMenuItem
+import androidx.compose.material.ExperimentalMaterialApi
+import androidx.compose.material.ExposedDropdownMenuDefaults
+import androidx.compose.material.MaterialTheme
+import androidx.compose.material.Text
+import androidx.compose.material.TextField
+import androidx.compose.runtime.Composable
+import androidx.compose.runtime.collectAsState
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.remember
+import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
-import androidx.core.app.ActivityCompat.startActivityForResult
 import dev.lbeernaert.youhavemail.R
+import dev.lbeernaert.youhavemail.app.State
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
-import dev.lbeernaert.youhavemail.service.LOG_EXPORT_REQUEST
-import dev.lbeernaert.youhavemail.service.ServiceWrapper
 
 
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun Settings(
     context: Activity,
-    service: ServiceWrapper,
+    state: State,
     onBackClicked: () -> Unit,
-    onPollIntervalUpdate: (ULong) -> Unit
+    onPollIntervalUpdate: (ULong) -> Unit,
+    onExportLogsClicked: () -> Unit,
 ) {
     val secondsStr = stringResource(id = R.string.seconds)
     val minutesStr = stringResource(id = R.string.minutes)
@@ -32,7 +48,7 @@ fun Settings(
         onBackClicked = onBackClicked
     ) { _, runTask ->
 
-        val pollIntervalValue by service.getPollIntervalValueStateFlow().collectAsState()
+        val pollIntervalValue by state.getPollInterval().collectAsState()
         val updatingPollIntervalLabel = stringResource(id = R.string.update_poll_interval)
 
         Column(
@@ -85,14 +101,10 @@ fun Settings(
 
             Spacer(modifier = Modifier.padding(10.dp))
 
-            ActionButton(text = stringResource(id = R.string.export_logs), onClick = {
-                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                    addCategory(Intent.CATEGORY_OPENABLE)
-                    type = "application/zip"
-                    putExtra(Intent.EXTRA_TITLE, "you-have-mail-logs.zip")
-                }
-                startActivityForResult(context, intent, LOG_EXPORT_REQUEST, null)
-            })
+            ActionButton(
+                text = stringResource(id = R.string.export_logs),
+                onClick = onExportLogsClicked
+            )
 
             Spacer(modifier = Modifier.padding(10.dp))
 

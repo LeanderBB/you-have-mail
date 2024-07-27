@@ -13,7 +13,9 @@
     <string name="account_add_success">Account Successfully added</string>
     <string name="backend_title">Select Backend</string>
     <string name="login_to_account">Logging into %1$s</string>
+    <string name="status_no_colon">Status</string>
     <string name="status"><b>Status:</b> %1$s</string>
+    <string name="result"><b>Result:</b> %1$s</string>
     <string name="status_online">Online</string>
     <string name="status_error">Error</string>
     <string name="status_offline">Offline</string>
@@ -44,7 +46,6 @@
         Frequency at which the observer should poll the accounts. A higher poll interval can help
         reduce battery usage.
     </string>
-    <string name="network">Network</string>
     <string name="use_proxy">Use Proxy</string>
     <string name="apply_proxy">Applying Proxy Settings...</string>
     <string name="ip_address">IP Address</string>

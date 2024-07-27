@@ -3,6 +3,7 @@
 import com.android.tools.profgen.ArtProfileKt
 import com.android.tools.profgen.ArtProfileSerializer
 import com.android.tools.profgen.DexFile
+import org.gradle.internal.os.OperatingSystem
 
 plugins {
     id 'com.android.application'
@@ -13,14 +14,14 @@ plugins {
 
 android {
     namespace 'dev.lbeernaert.youhavemail'
-    compileSdk 33
+    compileSdk 34
 
     defaultConfig {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 29
         targetSdk 33
-        versionCode 31
-        versionName "0.15.0"
+        versionCode 32
+        versionName "0.16.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -35,11 +36,11 @@ android {
         }
     }
     compileOptions {
-        sourceCompatibility JavaVersion.VERSION_1_8
-        targetCompatibility JavaVersion.VERSION_1_8
+        sourceCompatibility JavaVersion.VERSION_11
+        targetCompatibility JavaVersion.VERSION_11
     }
     kotlinOptions {
-        jvmTarget = '1.8'
+        jvmTarget = '11'
     }
     buildFeatures {
         compose true
@@ -66,26 +67,26 @@ dependencies {
     // WorkManager dependency
     implementation "androidx.work:work-runtime-ktx:$versions_work"
 
-    implementation 'androidx.core:core-ktx:1.10.1'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.6.1'
-    implementation 'androidx.activity:activity-compose:1.7.2'
+    implementation 'androidx.core:core-ktx:1.13.1'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.8.4'
+    implementation 'androidx.activity:activity-compose:1.9.1'
     implementation "androidx.compose.ui:ui:$compose_ui_version"
     implementation "androidx.compose.ui:ui-tooling-preview:$compose_ui_version"
-    implementation 'androidx.compose.material:material:1.4.3'
+    implementation 'androidx.compose.material:material:1.6.8'
     implementation 'androidx.security:security-crypto-ktx:1.1.0-alpha06'
-    implementation 'androidx.appcompat:appcompat:1.6.1'
-    implementation 'com.google.android.material:material:1.9.0'
+    implementation 'androidx.appcompat:appcompat:1.7.0'
+    implementation 'com.google.android.material:material:1.12.0'
     testImplementation 'junit:junit:4.13.2'
-    androidTestImplementation 'androidx.test.ext:junit:1.1.5'
-    androidTestImplementation 'androidx.test.espresso:espresso-core:3.5.1'
+    androidTestImplementation 'androidx.test.ext:junit:1.2.1'
+    androidTestImplementation 'androidx.test.espresso:espresso-core:3.6.1'
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_ui_version"
     debugImplementation "androidx.compose.ui:ui-tooling:$compose_ui_version"
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_ui_version"
-    implementation 'androidx.navigation:navigation-compose:2.6.0'
+    implementation 'androidx.navigation:navigation-compose:2.7.7'
     implementation "androidx.compose.material:material-icons-extended:$compose_ui_version"
 
     // Required for JNI
-    implementation "net.java.dev.jna:jna:5.7.0@aar"
+    implementation 'net.java.dev.jna:jna:5.14.0@aar'
 }
 
 apply plugin: 'org.mozilla.rust-android-gradle.rust-android'
@@ -97,10 +98,6 @@ cargo {
     targetIncludes = ["libyouhavemail.so", "libgo-srp.so"]
     targetDirectory = "/tmp/build-yhm"
     profile = "release"
-    // Uncomment for testing only.
-    /*features {
-        defaultAnd("null_backend")
-    }*/
 
     // Ensure paths are consistent for reproducible builds.
     exec { spec, _ ->
@@ -113,12 +110,39 @@ cargo {
     extraCargoBuildArguments = ['--locked']
 }
 
+task bindingBuild(type: Exec) {
+    workingDir "../../you-have-mail-mobile"
+    commandLine "cargo", "build"
+}
+
+var ext = "so"
+if (OperatingSystem.current().isMacOsX()) {
+    ext = "dylib"
+}
+
+task genBindings(type: Exec) {
+    workingDir "../../you-have-mail-mobile"
+    commandLine "cargo", "run", "--bin", "uniffi-bindgen", "--", "generate", "--library",
+            "target/debug/libyouhavemail.$ext",
+            "--language", "kotlin", "--config", "uniffi.toml",
+            "--out-dir", "../you-have-mail-android/app/src/main/java"
+}
+
 tasks.whenTaskAdded { task ->
     // Require cargo to be run before copying native libraries.
     if ((task.name == 'mergeDebugJniLibFolders' || task.name == 'mergeReleaseJniLibFolders')) {
         task.dependsOn 'cargoBuild'
     }
+
+    if (task.name == 'preBuild') {
+        task.dependsOn genBindings
+    }
+
+    if (task.name == 'genBindings') {
+        task.dependsOn 'cargoBuild'
+    }
 }
+
 
 afterEvaluate {
 
@@ -157,5 +181,12 @@ project.afterEvaluate {
                 }
             }
         }
+    }
+}
+
+afterEvaluate {
+    genBindings.dependsOn(bindingBuild, cargoBuild)
+    android.applicationVariants.all { variant ->
+        variant.javaCompiler.dependsOn(genBindings)
     }
 }
