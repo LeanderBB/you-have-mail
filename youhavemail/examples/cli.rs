@@ -150,8 +150,7 @@ fn get_or_create_encryption_key() -> Secret<Key> {
         }
         Ok(s) => {
             info!("Using existing key");
-            let key = Key::with_base64(s).expect("Failed to decode key");
-            Secret::new(key)
+            Key::with_base64(s).expect("Failed to decode key")
         }
     }
 }

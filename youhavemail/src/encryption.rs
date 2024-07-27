@@ -51,7 +51,7 @@ impl Key {
     /// # Errors
     ///
     /// Returns error if the key is not valid or the string is not valid base64.
-    pub fn with_base64(str: impl AsRef<str>) -> Result<Self, Error> {
+    pub fn with_base64(str: impl AsRef<str>) -> Result<Secret<Self>, Error> {
         let engine = base64::engine::GeneralPurpose::new(
             &base64::alphabet::STANDARD,
             base64::engine::general_purpose::PAD,
@@ -59,7 +59,7 @@ impl Key {
 
         let bytes = engine.decode(str.as_ref())?;
         let key = Self::try_from(bytes.as_slice())?;
-        Ok(key)
+        Ok(Secret::new(key))
     }
 
     /// Convert the current Key to a base64 string.
