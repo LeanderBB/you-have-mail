@@ -4,6 +4,7 @@ use crate::backend::{Error as BackendError, NewEmail, Result as BackendResult};
 use crate::encryption::Key;
 use crate::state::{Account, IntoAccount, State};
 use http::{Client, Proxy};
+use parking_lot::Mutex;
 use proton_api::auth::{new_thread_safe_store, Auth as ProtonAuth, InMemoryStore, StoreError};
 use proton_api::client::ProtonExtension;
 use proton_api::domain::event::MoreEvents;
@@ -23,6 +24,10 @@ use tracing::{debug, error, warn, Level};
 pub struct Backend {
     db: Arc<State>,
     base_url: Option<http::url::Url>,
+    // The default client for proton servers can be shared between multiple accounts as long as
+    // the process is still alive. Authentication is always read from the database, so there is no
+    // risk of the clients interfering with one another.
+    default_client: Mutex<Option<Arc<Client>>>,
 }
 
 impl Backend {
@@ -32,7 +37,11 @@ impl Backend {
     /// url will be used.
     #[must_use]
     pub fn new(db: Arc<State>, base_url: Option<http::url::Url>) -> Arc<Self> {
-        Arc::new(Backend { db, base_url })
+        Arc::new(Backend {
+            db,
+            base_url,
+            default_client: Mutex::new(None),
+        })
     }
 
     /// Create a new login sequence for proton accounts.
@@ -61,7 +70,20 @@ impl crate::backend::Backend for Backend {
     }
 
     fn create_client(&self, proxy: Option<Proxy>) -> BackendResult<Arc<Client>> {
-        Ok(new_client(proxy, self.base_url.as_ref())?)
+        // Can't cache clients that have proxies.
+        if proxy.is_some() {
+            return Ok(new_client(proxy, self.base_url.as_ref())?);
+        }
+
+        // Check if the default client was built at least once.
+        let mut guard = self.default_client.lock();
+        if let Some(client) = &*guard {
+            return Ok(Arc::clone(client));
+        }
+
+        let client = new_client(proxy, self.base_url.as_ref())?;
+        *guard = Some(Arc::clone(&client));
+        Ok(client)
     }
 
     fn new_poller(
