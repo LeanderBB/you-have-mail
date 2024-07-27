@@ -2,6 +2,7 @@ use http::url;
 use proton_api::mocks::mockito;
 use std::sync::Arc;
 use temp_dir::TempDir;
+use you_have_mail_common::backend::Backend;
 use you_have_mail_common::encryption::Key;
 use you_have_mail_common::state::State;
 use you_have_mail_common::yhm::Yhm;
@@ -26,8 +27,8 @@ impl TestCtx {
         let url = url::Url::parse(&proton_api::mocks::server_url(&server)).unwrap();
         tracing::info!("Mock Server: {}", url.to_string());
 
-        let backend =
-            you_have_mail_common::backend::proton::new_backend(Arc::clone(&state), Some(url));
+        let backend: Arc<dyn Backend> =
+            you_have_mail_common::backend::proton::Backend::new(Arc::clone(&state), Some(url));
         let yhm = Yhm::with_backends(Arc::clone(&state), [backend]);
 
         Self {

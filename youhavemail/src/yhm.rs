@@ -40,10 +40,9 @@ impl Yhm {
     #[must_use]
     pub fn new(state: Arc<State>) -> Self {
         let state_cloned = Arc::clone(&state);
-        Self::with_backends(
-            state,
-            [crate::backend::proton::new_backend(state_cloned, None)],
-        )
+        let backends: [Arc<dyn Backend>; 1] =
+            [crate::backend::proton::Backend::new(state_cloned, None)];
+        Self::with_backends(state, backends)
     }
 
     /// Create new instance with the given `state` and custom list of `backends`.

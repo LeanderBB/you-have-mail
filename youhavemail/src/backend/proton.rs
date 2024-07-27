@@ -1,6 +1,6 @@
 //! You have mail implementation for proton mail accounts.
 
-use crate::backend::{Backend, Error as BackendError, NewEmail, Poller, Result as BackendResult};
+use crate::backend::{Error as BackendError, NewEmail, Result as BackendResult};
 use crate::encryption::Key;
 use crate::state::{Account, IntoAccount, State};
 use http::{Client, Proxy};
@@ -19,38 +19,41 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, warn, Level};
 
-/// Create a proton mail backend.
-///
-/// The `base_url` can be optionally overridden. If no value is specified, the default
-/// url will be used.
-#[must_use]
-pub fn new_backend(db: Arc<State>, base_url: Option<http::url::Url>) -> Arc<dyn Backend> {
-    Arc::new(ProtonBackend { db, base_url })
-}
-
-/// Create a new login sequence for proton accounts.
-///
-/// # Errors
-///
-/// Returns error  if the http client could not be constructed.
-pub fn new_login_sequence(proxy: Option<Proxy>) -> http::Result<Sequence> {
-    let client = new_client(proxy, None)?;
-    let store = new_thread_safe_store(InMemoryStore::default());
-    let session = Session::new(client, store);
-
-    Ok(Sequence::new(session))
-}
-
-struct ProtonBackend {
+/// Proton Mail backend.
+pub struct Backend {
     db: Arc<State>,
     base_url: Option<http::url::Url>,
 }
 
-pub const PROTON_BACKEND_NAME: &str = "Proton Mail";
+impl Backend {
+    /// Create a new proton mail backend.
+    ///
+    /// The `base_url` can be optionally overridden. If no value is specified, the default
+    /// url will be used.
+    #[must_use]
+    pub fn new(db: Arc<State>, base_url: Option<http::url::Url>) -> Arc<Self> {
+        Arc::new(Backend { db, base_url })
+    }
 
-impl Backend for ProtonBackend {
+    /// Create a new login sequence for proton accounts.
+    ///
+    /// # Errors
+    ///
+    /// Returns error  if the http client could not be constructed.
+    pub fn login_sequence(proxy: Option<Proxy>) -> http::Result<Sequence> {
+        let client = new_client(proxy, None)?;
+        let store = new_thread_safe_store(InMemoryStore::default());
+        let session = Session::new(client, store);
+
+        Ok(Sequence::new(session))
+    }
+}
+
+pub const NAME: &str = "Proton Mail";
+
+impl crate::backend::Backend for Backend {
     fn name(&self) -> &str {
-        PROTON_BACKEND_NAME
+        NAME
     }
 
     fn description(&self) -> &str {
@@ -61,7 +64,11 @@ impl Backend for ProtonBackend {
         Ok(new_client(proxy, self.base_url.as_ref())?)
     }
 
-    fn new_poller(&self, client: Arc<Client>, account: &Account) -> BackendResult<Box<dyn Poller>> {
+    fn new_poller(
+        &self,
+        client: Arc<Client>,
+        account: &Account,
+    ) -> BackendResult<Box<dyn crate::backend::Poller>> {
         let auth = account
             .secret::<ProtonAuth>(self.db.encryption_key().expose_secret())
             .map_err(|e| {
@@ -81,7 +88,7 @@ impl Backend for ProtonBackend {
 
         let session = Session::new(client, auth_store);
 
-        let account = ProtonPoller {
+        let account = Poller {
             email: account.email().to_owned(),
             session,
             state: state.unwrap_or(TaskState::new()),
@@ -125,14 +132,14 @@ impl proton_api::auth::Store for AuthStore {
     }
 }
 
-struct ProtonPoller {
+struct Poller {
     email: String,
     session: Session,
     state: TaskState,
     db: Arc<State>,
 }
 
-impl Poller for ProtonPoller {
+impl crate::backend::Poller for Poller {
     #[tracing::instrument(level=Level::DEBUG,skip(self),fields(email=%self.email))]
     fn check(&mut self) -> BackendResult<Vec<NewEmail>> {
         let mut check_fn = || -> BackendResult<Vec<NewEmail>> {
@@ -451,7 +458,7 @@ impl IntoAccount for Sequence {
             )));
         };
 
-        let mut account = Account::new(user_info.email, PROTON_BACKEND_NAME.to_owned());
+        let mut account = Account::new(user_info.email, NAME.to_owned());
 
         account.set_secret(encryption_key, Some(&auth))?;
         account.set_proxy(encryption_key, session.client().proxy())?;

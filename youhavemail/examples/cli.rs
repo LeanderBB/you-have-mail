@@ -94,7 +94,8 @@ fn main() {
             std::env::var("YHM_PASSWORD").expect("Failed to resolve env YHM_PASSWORD"),
         );
 
-        let mut sequence = you_have_mail_common::backend::proton::new_login_sequence(None).unwrap();
+        let mut sequence =
+            you_have_mail_common::backend::proton::Backend::login_sequence(None).unwrap();
 
         sequence
             .login(&email, password.expose_secret().as_str(), None)

@@ -14,7 +14,7 @@ fn login_sequence() {
     let mut ctx = TestCtx::new();
     let backend = ctx
         .yhm
-        .backend_with_name(you_have_mail_common::backend::proton::PROTON_BACKEND_NAME)
+        .backend_with_name(you_have_mail_common::backend::proton::NAME)
         .unwrap()
         .clone();
 
@@ -113,10 +113,7 @@ fn poll_sequence() {
         let output = result.remove(0);
 
         assert_eq!(output.email, ACCOUNT_EMAIL);
-        assert_eq!(
-            output.backend,
-            you_have_mail_common::backend::proton::PROTON_BACKEND_NAME
-        );
+        assert_eq!(output.backend, you_have_mail_common::backend::proton::NAME);
         let new_emails = output.result.unwrap();
         assert!(new_emails.is_empty());
 
@@ -138,10 +135,7 @@ fn poll_sequence() {
         let output = result.remove(0);
 
         assert_eq!(output.email, ACCOUNT_EMAIL);
-        assert_eq!(
-            output.backend,
-            you_have_mail_common::backend::proton::PROTON_BACKEND_NAME
-        );
+        assert_eq!(output.backend, you_have_mail_common::backend::proton::NAME);
         let new_emails = output.result.unwrap();
         assert!(new_emails.is_empty());
 
@@ -294,7 +288,7 @@ fn no_poll_after_delete() {
 fn create_authenticated_account(ctx: &TestCtx, state: Option<TaskState>) {
     let mut account = Account::new(
         ACCOUNT_EMAIL.to_string(),
-        you_have_mail_common::backend::proton::PROTON_BACKEND_NAME.to_string(),
+        you_have_mail_common::backend::proton::NAME.to_string(),
     );
     let auth = proton_api::auth::Auth {
         uid: Uid(proton_api::mocks::session_id().to_owned()),
