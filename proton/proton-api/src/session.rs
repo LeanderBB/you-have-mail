@@ -67,6 +67,7 @@ impl Session {
     }
 
     /// Create a new instance with a given `client` and an [`crate::auth::InMemoryStore`].
+    #[must_use]
     pub fn with_in_memory_auth_store(client: Arc<Client>) -> Self {
         Self {
             auth_store: new_thread_safe_store(InMemoryStore::default()),

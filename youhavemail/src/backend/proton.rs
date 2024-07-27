@@ -21,10 +21,19 @@ use std::time::Duration;
 use tracing::{debug, error, warn, Level};
 
 /// Create a proton mail backend.
+///
+/// The `base_url` can be optionally overridden. If no value is specified, the default
+/// url will be used.
+#[must_use]
 pub fn new_backend(db: Arc<State>, base_url: Option<http::url::Url>) -> Arc<dyn Backend> {
     Arc::new(ProtonBackend { db, base_url })
 }
 
+/// Create a new login sequence for proton accounts.
+///
+/// # Errors
+///
+/// Returns error  if the http client could not be constructed.
 pub fn new_login_sequence(proxy: Option<Proxy>) -> http::Result<Sequence> {
     let client = new_client(proxy, None)?;
     let store = new_thread_safe_store(InMemoryStore::default());
@@ -164,7 +173,7 @@ impl Poller for ProtonPoller {
                 debug!(
                     "Account has following list of custom folders: {:?}",
                     self.state.active_folder_ids
-                )
+                );
             }
 
             let mut result = EventState::new();
@@ -180,7 +189,7 @@ impl Poller for ProtonPoller {
                         })?;
                     if event.event_id != event_id || has_more == MoreEvents::Yes {
                         if let Some(label_events) = &event.labels {
-                            self.state.handle_label_events(label_events)
+                            self.state.handle_label_events(label_events);
                         }
 
                         if let Some(message_events) = &event.messages {
@@ -246,7 +255,7 @@ fn new_client(
         Client::proton_client()
     };
     if let Some(p) = proxy {
-        builder = builder.with_proxy(p)
+        builder = builder.with_proxy(p);
     }
 
     builder
@@ -261,13 +270,24 @@ struct MsgInfo {
     subject: String,
 }
 
+/// Contains the necessary state to process events.
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TaskState {
+    /// The last event that was processed.
     pub last_event_id: Option<event::Id>,
+    /// The current list of folders that have the notification setting enabled.
     pub active_folder_ids: HashSet<label::Id>,
 }
 
+impl Default for TaskState {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl TaskState {
+    /// Create new instance.
+    #[must_use]
     pub fn new() -> Self {
         Self {
             last_event_id: None,
@@ -275,6 +295,8 @@ impl TaskState {
         }
     }
 
+    /// Create the new instance and set the last event to `id`.
+    #[must_use]
     pub fn with_event_id(id: event::Id) -> Self {
         Self {
             last_event_id: Some(id),
@@ -394,7 +416,7 @@ impl EventState {
                 result.push(NewEmail {
                     sender: msg.sender,
                     subject: msg.subject,
-                })
+                });
             }
         }
 

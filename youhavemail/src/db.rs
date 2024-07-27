@@ -15,6 +15,7 @@ const MAX_DB_CONNECTIONS: usize = 4;
 
 impl Pool {
     /// Create new instance for a database at `path`.
+    #[must_use]
     pub fn new(path: PathBuf) -> Arc<Self> {
         Arc::new(Self {
             connections: Mutex::new(Vec::with_capacity(MAX_DB_CONNECTIONS)),
@@ -84,7 +85,7 @@ impl Pool {
     fn release(&self, conn: rusqlite::Connection) {
         let mut guard = self.connections.lock();
         if guard.len() < MAX_DB_CONNECTIONS {
-            guard.push(conn)
+            guard.push(conn);
         }
     }
 
@@ -110,7 +111,7 @@ pub struct Connection {
 impl Drop for Connection {
     fn drop(&mut self) {
         if let Some(conn) = self.conn.take() {
-            self.pool.release(conn)
+            self.pool.release(conn);
         }
     }
 }
@@ -145,6 +146,7 @@ impl Connection {
     ///
     /// Returns error if we failed to create the transaction.
     #[inline]
+    #[allow(clippy::missing_panics_doc)]
     pub fn transaction(&mut self) -> Result<Transaction<'_, '_>> {
         let guard = self.pool.writer_lock.lock();
         let tx = self.conn.as_mut().unwrap().transaction()?;

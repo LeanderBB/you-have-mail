@@ -16,8 +16,8 @@ use std::time::Duration;
 pub enum Error {
     #[error("Serialization: {0}")]
     Serialization(#[from] serde_json::error::Error),
-    #[error("Decryption: {0}")]
-    Decryption(anyhow::Error),
+    #[error("Crypto: {0}")]
+    Crypto(#[from] crate::encryption::Error),
     #[error("Encryption: {0}")]
     Encryption(anyhow::Error),
     #[error("Db: {0}")]
@@ -47,6 +47,8 @@ pub struct Account {
 }
 
 impl Account {
+    /// Create a new account with `email` and `backend` name.
+    #[must_use]
     pub fn new(email: String, backend: String) -> Self {
         Self {
             email,
@@ -58,11 +60,13 @@ impl Account {
     }
 
     /// Get the account's email.
+    #[must_use]
     pub fn email(&self) -> &str {
         &self.email
     }
 
     /// Get the account's backend name.
+    #[must_use]
     pub fn backend(&self) -> &str {
         &self.backend
     }
@@ -161,6 +165,7 @@ impl Account {
     /// Check whether the account is logged in.
     ///
     /// An account is considered logged in if there is some value in the secret state.
+    #[must_use]
     pub fn is_logged_out(&self) -> bool {
         self.secret.is_none()
     }
@@ -168,6 +173,11 @@ impl Account {
 
 /// Conversion trait for new accounts.
 pub trait IntoAccount {
+    /// Convert type into an [`Account`].
+    ///
+    /// # Errors
+    ///
+    /// Return error if the operation failed.
     fn into_account(self, encryption_key: &Key) -> Result<Account, Error>;
 }
 
@@ -205,6 +215,7 @@ impl State {
     /// # Errors
     ///
     /// Returns errors if we failed to create the tables.
+    #[must_use]
     pub fn without_init(db_path: PathBuf, encryption_key: Secret<Key>) -> Arc<Self> {
         let pool = Pool::new(db_path);
         Arc::new(Self {
@@ -214,6 +225,7 @@ impl State {
     }
 
     /// Get the encryption key.
+    #[must_use]
     pub fn encryption_key(&self) -> &Secret<Key> {
         &self.encryption_key
     }
@@ -264,6 +276,10 @@ impl State {
     }
 
     /// Check if account with `email` exists.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the query failed.
     pub fn has_account(&self, email: &str) -> Result<bool, Error> {
         self.pool.with_connection(|conn| {
             Ok(conn
@@ -469,7 +485,7 @@ CREATE TABLE IF NOT EXISTS yhm_settings (
 ///
 /// Returns error if the decryption or deserialization failed.
 fn secret_from_bytes<T: DeserializeOwned>(key: &Key, bytes: &[u8]) -> Result<T, Error> {
-    let decrypted = Secret::new(key.decrypt(bytes).map_err(Error::Decryption)?);
+    let decrypted = Secret::new(key.decrypt(bytes)?);
     Ok(serde_json::from_slice::<T>(decrypted.expose_secret())?)
 }
 
@@ -480,9 +496,7 @@ fn secret_from_bytes<T: DeserializeOwned>(key: &Key, bytes: &[u8]) -> Result<T, 
 /// Returns error if the encryption or serialization failed.
 fn secret_to_bytes<T: Serialize>(key: &Key, value: &T) -> Result<Vec<u8>, Error> {
     let serialized = Secret::new(serde_json::to_vec(value)?);
-    let encrypted = key
-        .encrypt(serialized.expose_secret())
-        .map_err(Error::Encryption)?;
+    let encrypted = key.encrypt(serialized.expose_secret())?;
     Ok(encrypted)
 }
 

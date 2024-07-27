@@ -37,6 +37,7 @@ pub struct PollOutput {
 }
 impl Yhm {
     /// Create new instance with the given `state` and a default list of backends.
+    #[must_use]
     pub fn new(state: Arc<State>) -> Self {
         let state_cloned = Arc::clone(&state);
         Self::with_backends(
@@ -87,18 +88,20 @@ impl Yhm {
                 email: account.email().to_owned(),
                 backend: account.backend().to_owned(),
                 result,
-            })
+            });
         }
 
         Ok(results)
     }
 
     /// Get the current active backend.
+    #[must_use]
     pub fn backends(&self) -> &[Arc<dyn Backend>] {
         &self.backends
     }
 
     /// Get a backend by `name`
+    #[must_use]
     pub fn backend_with_name(&self, name: &str) -> Option<&Arc<dyn Backend>> {
         self.backends.iter().find(|b| b.name() == name)
     }
@@ -205,14 +208,12 @@ impl Yhm {
 
     #[tracing::instrument(level=Level::DEBUG, skip(self, config_path))]
     pub fn import_v1(&self, config_path: &Path) -> Result<(), crate::v1::config::Error> {
-        let config = crate::v1::config::load_v1_config(
-            self.state.encryption_key().expose_secret(),
-            config_path,
-        )
-        .map_err(|e| {
-            error!("Failed to load v1 config: {e}");
-            e
-        })?;
+        let config =
+            crate::v1::config::load(self.state.encryption_key().expose_secret(), config_path)
+                .map_err(|e| {
+                    error!("Failed to load v1 config: {e}");
+                    e
+                })?;
         let accounts = config
             .to_v2_accounts(self.state.encryption_key().expose_secret())
             .map_err(|e| {

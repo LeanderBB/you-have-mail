@@ -41,3 +41,6 @@ tracing-test = { version = "0.2.5", features = ["no-env-filter"] }
 [package.metadata.docs.rs]
 all-features = true
 rustdoc-args = ["--cfg", "docsrc"]
+
+[lints.clippy]
+pedantic = "deny"

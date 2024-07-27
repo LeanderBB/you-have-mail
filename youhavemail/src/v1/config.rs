@@ -62,7 +62,7 @@ impl Config {
 }
 
 /// Load v1 config file.
-pub fn load_v1_config(encryption_key: &Key, file_path: &Path) -> Result<Config> {
+pub fn load(encryption_key: &Key, file_path: &Path) -> Result<Config> {
     match std::fs::read(file_path) {
         Err(e) => {
             if e.kind() != std::io::ErrorKind::NotFound {
@@ -78,7 +78,7 @@ pub fn load_v1_config(encryption_key: &Key, file_path: &Path) -> Result<Config> 
         Ok(data) => {
             let decrypted = encryption_key
                 .decrypt(&data)
-                .map_err(crate::state::Error::Encryption)?;
+                .map_err(crate::state::Error::from)?;
             Ok(serde_json::from_slice::<Config>(&decrypted)?)
         }
     }
@@ -146,7 +146,7 @@ fn test_config_v1_into_v2() {
         .unwrap();
     std::fs::write(&config_path, encrypted).unwrap();
 
-    let config_loaded = load_v1_config(encryption_key.expose_secret(), &config_path).unwrap();
+    let config_loaded = load(encryption_key.expose_secret(), &config_path).unwrap();
     assert_eq!(config_loaded, config);
 
     let accounts_v2 = config_loaded

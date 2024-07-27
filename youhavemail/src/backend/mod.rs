@@ -68,5 +68,9 @@ pub trait Poller {
     fn check(&mut self) -> Result<Vec<NewEmail>>;
 
     /// Logout the account.
+    ///
+    /// # Errors
+    ///
+    /// Return error if the operation failed.
     fn logout(&mut self) -> Result<()>;
 }

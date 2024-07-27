@@ -1,9 +1,22 @@
 //! Basic file encryption
-use anyhow::anyhow;
 use base64::Engine;
 use chacha20poly1305::aead::{Aead, OsRng};
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key as CryptoKey, KeyInit, Nonce};
 use secrecy::{Secret, Zeroize};
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("Base64: {0}")]
+    Base64(#[from] base64::DecodeError),
+    #[error("Supplied data does not match expected size")]
+    InvalidLength,
+    #[error("No input was provided")]
+    NoInput,
+    #[error("Encryption Error")]
+    Encryption,
+    #[error("Decryption Error")]
+    Decryption,
+}
 
 #[derive(Clone, Eq, PartialEq)]
 /// Encryption Key for use with [`encrypt`] and [`decrypt`].
@@ -11,7 +24,7 @@ pub struct Key(CryptoKey);
 
 impl Zeroize for Key {
     fn zeroize(&mut self) {
-        self.0.zeroize()
+        self.0.zeroize();
     }
 }
 
@@ -26,24 +39,31 @@ impl Drop for Key {
 }
 
 impl Key {
+    /// Create a new random encryption key.
+    #[must_use]
     pub fn new() -> Secret<Self> {
         let mut rng = OsRng {};
         Secret::new(Self(ChaCha20Poly1305::generate_key(&mut rng)))
     }
 
-    pub fn with_base64(str: impl AsRef<str>) -> Result<Self, anyhow::Error> {
+    /// Create a new encryption key from a base64 encoded string.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the key is not valid or the string is not valid base64.
+    pub fn with_base64(str: impl AsRef<str>) -> Result<Self, Error> {
         let engine = base64::engine::GeneralPurpose::new(
             &base64::alphabet::STANDARD,
             base64::engine::general_purpose::PAD,
         );
 
-        let bytes = engine
-            .decode(str.as_ref())
-            .map_err(|e| anyhow!("Failed to decode base64: {e}"))?;
-        let key = Self::try_from(bytes.as_slice()).map_err(|_| anyhow!("Invalid Key bytes"))?;
+        let bytes = engine.decode(str.as_ref())?;
+        let key = Self::try_from(bytes.as_slice())?;
         Ok(key)
     }
 
+    /// Convert the current Key to a base64 string.
+    #[must_use]
     pub fn to_base64(&self) -> String {
         let engine = base64::engine::GeneralPurpose::new(
             &base64::alphabet::STANDARD,
@@ -68,10 +88,10 @@ impl From<[u8; ENCRYPTION_KEY_BYTES_LEN]> for Key {
 }
 
 impl TryFrom<&[u8]> for Key {
-    type Error = ();
+    type Error = Error;
     fn try_from(value: &[u8]) -> Result<Self, Self::Error> {
         if value.len() != ENCRYPTION_KEY_BYTES_LEN {
-            return Err(());
+            return Err(Error::InvalidLength);
         }
 
         let mut bytes = [0u8; ENCRYPTION_KEY_BYTES_LEN];
@@ -86,14 +106,16 @@ impl Key {
     /// # Errors
     ///
     /// Returns error if the encryption failed.
-    pub fn encrypt(&self, bytes: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+    pub fn encrypt(&self, bytes: &[u8]) -> Result<Vec<u8>, Error> {
         if bytes.is_empty() {
-            return Err(anyhow!("Empty data"));
+            return Err(Error::NoInput);
         }
         let mut rng = OsRng {};
         let nonce = ChaCha20Poly1305::generate_nonce(&mut rng);
         let cipher = ChaCha20Poly1305::new(&self.0);
-        let mut encrypted = cipher.encrypt(&nonce, bytes).map_err(|e| anyhow!(e))?;
+        let mut encrypted = cipher
+            .encrypt(&nonce, bytes)
+            .map_err(|_| Error::Encryption)?;
         encrypted.extend_from_slice(nonce.as_slice());
         Ok(encrypted)
     }
@@ -103,10 +125,10 @@ impl Key {
     /// # Errors
     ///
     /// Returns error if the decryption failed.
-    pub fn decrypt(&self, bytes: &[u8]) -> Result<Vec<u8>, anyhow::Error> {
+    pub fn decrypt(&self, bytes: &[u8]) -> Result<Vec<u8>, Error> {
         const NONCE_LEN: usize = 12;
         if bytes.len() < NONCE_LEN {
-            return Err(anyhow!("Data is not large enough"));
+            return Err(Error::InvalidLength);
         }
         let data_len = bytes.len() - NONCE_LEN;
         let nonce = Nonce::from_slice(&bytes[data_len..]);
@@ -114,7 +136,7 @@ impl Key {
         let cipher = ChaCha20Poly1305::new(&self.0);
         let decrypted = cipher
             .decrypt(nonce, &bytes[0..data_len])
-            .map_err(|e| anyhow!(e))?;
+            .map_err(|_| Error::Decryption)?;
         Ok(decrypted)
     }
 }
