@@ -22,6 +22,7 @@ fn login_sequence() {
     let session = proton_api::session::Session::with_in_memory_auth_store(client);
     let mut sequence = proton_api::login::Sequence::without_server_proof_check(session);
 
+    assert_eq!(ctx.yhm.account_count().unwrap(), 0);
     {
         let _auth_mocks = proton_api::mocks::auth::login_flow(&mut ctx.server, false);
         sequence
@@ -33,6 +34,8 @@ fn login_sequence() {
             .unwrap();
         ctx.yhm.add(sequence).unwrap();
     }
+
+    assert_eq!(ctx.yhm.account_count().unwrap(), 1);
 
     assert!(account_state(&ctx).is_none());
     let auth = account_auth(&ctx).unwrap();
@@ -258,6 +261,34 @@ fn message_event_creates_notification() {
 
     let state = account_state(&ctx).expect("account should have state");
     assert_eq!(state.last_event_id, Some(event_id1));
+}
+
+#[test]
+fn no_poll_after_logout() {
+    let mut ctx = TestCtx::new();
+    create_authenticated_account(&ctx, None);
+
+    {
+        let _mock = proton_api::mocks::auth::logout(&mut ctx.server);
+        ctx.yhm.logout(ACCOUNT_EMAIL).unwrap();
+    }
+
+    assert_eq!(ctx.yhm.account_count().unwrap(), 1);
+    assert!(ctx.yhm.poll().unwrap().is_empty());
+}
+
+#[test]
+fn no_poll_after_delete() {
+    let mut ctx = TestCtx::new();
+    create_authenticated_account(&ctx, None);
+
+    {
+        let _mock = proton_api::mocks::auth::logout(&mut ctx.server);
+        ctx.yhm.delete(ACCOUNT_EMAIL).unwrap();
+    }
+
+    assert!(ctx.yhm.poll().unwrap().is_empty());
+    assert_eq!(ctx.yhm.account_count().unwrap(), 0);
 }
 
 fn create_authenticated_account(ctx: &TestCtx, state: Option<TaskState>) {
