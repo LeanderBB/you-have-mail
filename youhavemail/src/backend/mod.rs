@@ -56,7 +56,7 @@ pub trait Backend: Send + Sync {
     /// # Errors
     ///
     /// Should return error if we could not create the account.
-    fn new_poller(&self, client: Arc<Client>, account: &Account) -> Result<Box<dyn Poller>>;
+    fn new_poller(&self, client: Arc<Client>, account: Account) -> Result<Box<dyn Poller>>;
 }
 
 /// Trait that needs to be implemented for all backend accounts

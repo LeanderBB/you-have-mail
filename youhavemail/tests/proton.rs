@@ -6,7 +6,7 @@ use proton_api::domain::event::MoreEvents;
 use proton_api::domain::{event, label, message, Boolean, SecretString};
 use secrecy::ExposeSecret;
 use you_have_mail_common::backend::proton::TaskState;
-use you_have_mail_common::state::Account;
+use you_have_mail_common::yhm::IntoAccount;
 
 #[test]
 fn login_sequence() {
@@ -32,7 +32,7 @@ fn login_sequence() {
                 None,
             )
             .unwrap();
-        ctx.yhm.add(sequence).unwrap();
+        sequence.into_account(&ctx.yhm).unwrap();
     }
 
     assert_eq!(ctx.yhm.account_count().unwrap(), 1);
@@ -286,10 +286,13 @@ fn no_poll_after_delete() {
 }
 
 fn create_authenticated_account(ctx: &TestCtx, state: Option<TaskState>) {
-    let mut account = Account::new(
-        ACCOUNT_EMAIL.to_string(),
-        you_have_mail_common::backend::proton::NAME.to_string(),
-    );
+    let account = ctx
+        .yhm
+        .new_account(ACCOUNT_EMAIL, you_have_mail_common::backend::proton::NAME)
+        .expect(
+            "Failed \
+        to create account",
+        );
     let auth = proton_api::auth::Auth {
         uid: Uid(proton_api::mocks::session_id().to_owned()),
         auth_token: Token(SecretString::new(
@@ -301,10 +304,7 @@ fn create_authenticated_account(ctx: &TestCtx, state: Option<TaskState>) {
     };
 
     account.set_state(state.as_ref()).unwrap();
-    account
-        .set_secret(ctx.state.encryption_key().expose_secret(), Some(&auth))
-        .unwrap();
-    ctx.yhm.add(account).expect("Failed to add account");
+    account.set_secret(Some(&auth)).unwrap();
 }
 
 fn account_state(ctx: &TestCtx) -> Option<TaskState> {
@@ -322,9 +322,7 @@ fn account_auth(ctx: &TestCtx) -> Option<Auth> {
         .account(ACCOUNT_EMAIL)
         .unwrap()
         .expect("failed to find account");
-    account
-        .secret::<Auth>(ctx.state.encryption_key().expose_secret())
-        .unwrap()
+    account.secret::<Auth>().unwrap()
 }
 
 fn event_id(id: u32) -> event::Id {

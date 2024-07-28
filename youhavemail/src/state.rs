@@ -4,7 +4,6 @@ use crate::db::{Pool, Transaction};
 use crate::encryption::Key;
 use http::Proxy;
 use rusqlite::OptionalExtension;
-use rusqlite_from_row::FromRow;
 use secrecy::{ExposeSecret, Secret};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -37,25 +36,21 @@ pub enum Error {
 /// Since the authentication tokens are stored in the secret state, an account is considered logged
 /// in if there is a secret value. If no such value is present, it is treated as logged out.
 ///
-#[derive(FromRow)]
+#[derive(Clone)]
 pub struct Account {
     email: String,
     backend: String,
-    secret: Option<Vec<u8>>,
-    state: Option<Vec<u8>>,
-    proxy: Option<Vec<u8>>,
+    state: Arc<State>,
 }
 
 impl Account {
     /// Create a new account with `email` and `backend` name.
     #[must_use]
-    pub fn new(email: String, backend: String) -> Self {
+    fn new(email: String, backend: String, state: Arc<State>) -> Self {
         Self {
             email,
             backend,
-            secret: None,
-            state: None,
-            proxy: None,
+            state,
         }
     }
 
@@ -77,11 +72,7 @@ impl Account {
     ///
     /// Return error if the state construction failed.
     pub fn state<T: DeserializeOwned>(&self) -> Result<Option<T>, Error> {
-        let Some(state) = &self.state else {
-            return Ok(None);
-        };
-
-        Ok(Some(serde_json::from_slice::<T>(state)?))
+        self.state.account_state(&self.email)
     }
 
     /// Get the secret state.
@@ -89,12 +80,8 @@ impl Account {
     /// # Errors
     ///
     /// Return error if the state construction failed.
-    pub fn secret<T: DeserializeOwned>(&self, key: &Key) -> Result<Option<T>, Error> {
-        let Some(secret) = &self.secret else {
-            return Ok(None);
-        };
-
-        Ok(Some(secret_from_bytes::<T>(key, secret)?))
+    pub fn secret<T: DeserializeOwned>(&self) -> Result<Option<T>, Error> {
+        self.state.secret_state(&self.email)
     }
 
     /// Get the proxy configuration.
@@ -102,12 +89,8 @@ impl Account {
     /// # Errors
     ///
     /// Return error if the state construction failed.
-    pub fn proxy(&self, key: &Key) -> Result<Option<Proxy>, Error> {
-        let Some(proxy) = &self.proxy else {
-            return Ok(None);
-        };
-
-        Ok(Some(secret_from_bytes(key, proxy)?))
+    pub fn proxy(&self) -> Result<Option<Proxy>, Error> {
+        self.state.proxy(&self.email)
     }
 
     /// Update the account with new `state`.
@@ -119,13 +102,12 @@ impl Account {
     /// # Errors
     ///
     /// Return error if the state construction failed.
-    pub fn set_state<T: Serialize>(&mut self, state: Option<&T>) -> Result<(), Error> {
-        let Some(state) = state else {
-            self.state = None;
-            return Ok(());
-        };
-        self.state = Some(serde_json::to_vec(state)?);
-        Ok(())
+    pub fn set_state<T: Serialize>(&self, state: Option<&T>) -> Result<(), Error> {
+        if let Some(state) = state {
+            self.state.set_account_state(&self.email, state)
+        } else {
+            self.state.delete_account_state(&self.email)
+        }
     }
 
     /// Update the account with new `secret` state.
@@ -137,12 +119,12 @@ impl Account {
     /// # Errors
     ///
     /// Return error if the state construction failed.
-    pub fn set_secret<T: Serialize>(&mut self, key: &Key, secret: Option<&T>) -> Result<(), Error> {
-        self.secret = match secret {
-            None => None,
-            Some(secret) => Some(secret_to_bytes(key, secret)?),
-        };
-        Ok(())
+    pub fn set_secret<T: Serialize>(&self, secret: Option<&T>) -> Result<(), Error> {
+        if let Some(secret) = secret {
+            self.state.set_secret_state(&self.email, secret)
+        } else {
+            self.state.delete_secret_state(&self.email)
+        }
     }
 
     /// Update the account with new `proxy` config.
@@ -150,40 +132,19 @@ impl Account {
     /// # Errors
     ///
     /// Return error if the state construction failed.
-    pub fn set_proxy(&mut self, key: &Key, proxy: Option<&Proxy>) -> Result<(), Error> {
-        match proxy {
-            Some(p) => {
-                self.proxy = Some(secret_to_bytes(key, p)?);
-            }
-            None => {
-                self.proxy = None;
-            }
-        }
-        Ok(())
+    pub fn set_proxy(&self, proxy: Option<&Proxy>) -> Result<(), Error> {
+        self.state.set_proxy(&self.email, proxy)
     }
 
     /// Check whether the account is logged in.
     ///
     /// An account is considered logged in if there is some value in the secret state.
-    #[must_use]
-    pub fn is_logged_out(&self) -> bool {
-        self.secret.is_none()
-    }
-}
-
-/// Conversion trait for new accounts.
-pub trait IntoAccount {
-    /// Convert type into an [`Account`].
     ///
     /// # Errors
     ///
-    /// Return error if the operation failed.
-    fn into_account(self, encryption_key: &Key) -> Result<Account, Error>;
-}
-
-impl IntoAccount for Account {
-    fn into_account(self, _: &Key) -> Result<Account, Error> {
-        Ok(self)
+    /// Returns error if the query failed.
+    pub fn is_logged_out(&self) -> Result<bool, Error> {
+        self.state.is_logged_out(&self.email)
     }
 }
 
@@ -235,10 +196,38 @@ impl State {
     /// # Errors
     ///
     /// Returns error if the query failed.
-    pub fn accounts(&self) -> Result<Vec<Account>, Error> {
+    pub fn accounts(self: &Arc<Self>) -> Result<Vec<Account>, Error> {
         self.pool.with_connection(|conn| {
-            let mut stmt = conn.prepare("SELECT * FROM yhm ORDER BY email")?;
-            let rows = stmt.query_map((), Account::try_from_row)?;
+            let mut stmt = conn.prepare("SELECT email, backend FROM yhm ORDER BY email")?;
+            let rows = stmt.query_map((), |r| {
+                let email = r.get(0)?;
+                let backend = r.get(1)?;
+                Ok(Account::new(email, backend, Arc::clone(self)))
+            })?;
+            let mut result = Vec::new();
+            for row in rows {
+                result.push(row?);
+            }
+            Ok(result)
+        })
+    }
+
+    /// Get all accounts recorded in the database that are logged in.
+    ///
+    /// This returns any account which does not have their secret state set to NULL.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the query failed.
+    pub fn active_accounts(self: &Arc<Self>) -> Result<Vec<Account>, Error> {
+        self.pool.with_connection(|conn| {
+            let mut stmt =
+                conn.prepare("SELECT email, backend FROM yhm WHERE secret IS NOT NULL")?;
+            let rows = stmt.query_map((), |r| {
+                let email = r.get(0)?;
+                let backend = r.get(1)?;
+                Ok(Account::new(email, backend, Arc::clone(self)))
+            })?;
             let mut result = Vec::new();
             for row in rows {
                 result.push(row?);
@@ -252,13 +241,17 @@ impl State {
     /// # Errors
     ///
     /// Returns error if the query failed.
-    pub fn account(&self, email: &str) -> Result<Option<Account>, Error> {
+    pub fn account(self: &Arc<Self>, email: &str) -> Result<Option<Account>, Error> {
         self.pool.with_connection(|conn| {
             Ok(conn
                 .query_row(
-                    "SELECT * FROM yhm WHERE email=? LIMIT 1",
+                    "SELECT email, backend FROM yhm WHERE email=? LIMIT 1",
                     [email],
-                    Account::try_from_row,
+                    |r| {
+                        let email = r.get(0)?;
+                        let backend = r.get(1)?;
+                        Ok(Account::new(email, backend, Arc::clone(self)))
+                    },
                 )
                 .optional()?)
         })
@@ -291,32 +284,28 @@ impl State {
         })
     }
 
-    /// Create or update `account`.
+    /// Create new account with `email` and `backend`.
     ///
     /// # Errors
     ///
     /// Return error it the query failed.
-    pub fn store_account(&self, account: &Account) -> Result<(), Error> {
-        self.pool.with_transaction(|tx| {
-            tx.execute(
-                r"
-INSERT INTO yhm VALUES (
-    ?,?,?,?,?
-) ON CONFLICT(email) DO UPDATE SET
-    secret=excluded.secret,
-    state=excluded.state,
-    proxy=excluded.proxy
-",
-                (
-                    &account.email,
-                    &account.backend,
-                    &account.secret,
-                    &account.state,
-                    &account.proxy,
-                ),
-            )?;
-            Ok(())
-        })
+    pub fn new_account(self: &Arc<Self>, email: &str, backend: &str) -> Result<Account, Error> {
+        self.pool
+            .with_transaction(|tx| -> Result<(), rusqlite::Error> {
+                tx.execute(
+                    r"
+INSERT INTO yhm (email, backend) VALUES (
+    ?,?
+)",
+                    (email, backend),
+                )?;
+                Ok(())
+            })?;
+        Ok(Account::new(
+            email.to_owned(),
+            backend.to_owned(),
+            Arc::clone(self),
+        ))
     }
 
     /// Delete account with `email`.
@@ -348,15 +337,90 @@ INSERT INTO yhm VALUES (
         })
     }
 
+    /// Get the proxy config of the account with `email`.
+    ///
+    /// # Errors
+    ///
+    /// Return error it the query failed.
+    pub fn proxy(&self, email: &str) -> Result<Option<Proxy>, Error> {
+        let proxy_bytes: Option<Vec<u8>> = self.pool.with_connection(|conn| {
+            conn.query_row(
+                "SELECT proxy FROM yhm WHERE email=? LIMIT 1",
+                [email],
+                |r| r.get(0),
+            )
+        })?;
+
+        let proxy = match proxy_bytes {
+            None => None,
+            Some(proxy) => Some(secret_from_bytes::<Proxy>(
+                self.encryption_key.expose_secret(),
+                &proxy,
+            )?),
+        };
+
+        Ok(proxy)
+    }
+
     /// Update the `secret` state of account with `email`
     ///
     /// # Errors
     ///
     /// Return error it the query failed or the state failed to serialize.
-    pub fn update_secret_state<T: Serialize>(&self, email: &str, secret: &T) -> Result<(), Error> {
+    pub fn set_secret_state<T: Serialize>(&self, email: &str, secret: &T) -> Result<(), Error> {
         let bytes = secret_to_bytes(self.encryption_key.expose_secret(), secret)?;
         self.pool.with_transaction(|tx| {
             tx.execute("UPDATE yhm SET secret=? WHERE email=?", (bytes, email))?;
+            Ok(())
+        })
+    }
+
+    /// Get the secret state of the account with `email`.
+    ///
+    /// # Errors
+    ///
+    /// Return error it the query failed.
+    pub fn secret_state<T: DeserializeOwned>(&self, email: &str) -> Result<Option<T>, Error> {
+        let secret_bytes: Option<Vec<u8>> = self.pool.with_connection(|conn| {
+            conn.query_row(
+                "SELECT secret FROM yhm WHERE email=? LIMIT 1",
+                [email],
+                |r| r.get(0),
+            )
+        })?;
+
+        let secret = match secret_bytes {
+            None => None,
+            Some(secret) => Some(secret_from_bytes::<T>(
+                self.encryption_key.expose_secret(),
+                &secret,
+            )?),
+        };
+
+        Ok(secret)
+    }
+
+    /// Remove the state of the account with `email`.
+    ///
+    /// # Errors
+    ///
+    /// Return error it the query failed.
+    pub fn delete_account_state(&self, email: &str) -> Result<(), Error> {
+        self.pool.with_transaction(|tx| {
+            tx.execute("UPDATE yhm SET state=NULL WHERE email=?", [email])?;
+            Ok(())
+        })
+    }
+
+    /// Update the `state` of account with `email`
+    ///
+    /// # Errors
+    ///
+    /// Return error it the query failed or the state failed to serialize.
+    pub fn set_account_state<T: Serialize>(&self, email: &str, state: &T) -> Result<(), Error> {
+        let bytes = serde_json::to_vec(state)?;
+        self.pool.with_transaction(|tx| {
+            tx.execute("UPDATE yhm SET state=? WHERE email=?", (bytes, email))?;
             Ok(())
         })
     }
@@ -373,34 +437,26 @@ INSERT INTO yhm VALUES (
         })
     }
 
-    /// Update the `state` of account with `email`
-    ///
-    /// # Errors
-    ///
-    /// Return error it the query failed or the state failed to serialize.
-    pub fn update_account_state<T: Serialize>(&self, email: &str, state: &T) -> Result<(), Error> {
-        let bytes = serde_json::to_vec(state)?;
-        self.pool.with_transaction(|tx| {
-            tx.execute("UPDATE yhm SET state=? WHERE email=?", (bytes, email))?;
-            Ok(())
-        })
-    }
-
-    /// Update the `proxy` config of the account with `email`.
+    /// Get the account state of the account with `email`.
     ///
     /// # Errors
     ///
     /// Return error it the query failed.
-    pub fn update_proxy(&self, key: &Key, email: &str, proxy: Option<&Proxy>) -> Result<(), Error> {
-        let bytes = match proxy {
+    pub fn account_state<T: DeserializeOwned>(&self, email: &str) -> Result<Option<T>, Error> {
+        let state_bytes: Option<Vec<u8>> = self.pool.with_connection(|conn| {
+            conn.query_row(
+                "SELECT state FROM yhm WHERE email=? LIMIT 1",
+                [email],
+                |r| r.get(0),
+            )
+        })?;
+
+        let state = match state_bytes {
             None => None,
-            Some(proxy) => Some(secret_to_bytes(key, proxy)?),
+            Some(state) => Some(serde_json::from_slice(&state)?),
         };
 
-        self.pool.with_transaction(|tx| {
-            tx.execute("UPDATE yhm SET proxy=? WHERE email=?", (bytes, email))?;
-            Ok(())
-        })
+        Ok(state)
     }
 
     /// Delete account with `email`.
@@ -444,6 +500,21 @@ INSERT INTO yhm VALUES (
             )?;
             Ok(())
         })
+    }
+
+    /// Check if account with `email` is logged out.
+    ///
+    /// # Errors
+    ///
+    /// Return error if the query failed.
+    pub fn is_logged_out(&self, email: &str) -> Result<bool, Error> {
+        Ok(self.pool.with_connection(|conn| {
+            conn.query_row(
+                "SELECT IIF(secret IS NULL, 0, 1) FROM yhm WHERE email =?",
+                [email],
+                |r| r.get(0),
+            )
+        })?)
     }
 }
 

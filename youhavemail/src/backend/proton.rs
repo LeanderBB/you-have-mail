@@ -1,8 +1,8 @@
 //! You have mail implementation for proton mail accounts.
 
 use crate::backend::{Error as BackendError, NewEmail, Result as BackendResult};
-use crate::encryption::Key;
-use crate::state::{Account, IntoAccount, State};
+use crate::state::Account;
+use crate::yhm::{IntoAccount, Yhm};
 use http::{Client, Proxy};
 use parking_lot::Mutex;
 use proton_api::auth::{new_thread_safe_store, Auth as ProtonAuth, InMemoryStore, StoreError};
@@ -12,7 +12,6 @@ use proton_api::domain::{event, label, message, Boolean};
 use proton_api::login::Sequence;
 use proton_api::requests::{GetEventRequest, GetLabelsRequest, GetLatestEventRequest};
 use proton_api::session::Session;
-use secrecy::ExposeSecret;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 use std::fmt::Debug;
@@ -22,7 +21,6 @@ use tracing::{debug, error, warn, Level};
 
 /// Proton Mail backend.
 pub struct Backend {
-    db: Arc<State>,
     base_url: Option<http::url::Url>,
     // The default client for proton servers can be shared between multiple accounts as long as
     // the process is still alive. Authentication is always read from the database, so there is no
@@ -36,9 +34,8 @@ impl Backend {
     /// The `base_url` can be optionally overridden. If no value is specified, the default
     /// url will be used.
     #[must_use]
-    pub fn new(db: Arc<State>, base_url: Option<http::url::Url>) -> Arc<Self> {
+    pub fn new(base_url: Option<http::url::Url>) -> Arc<Self> {
         Arc::new(Backend {
-            db,
             base_url,
             default_client: Mutex::new(None),
         })
@@ -89,32 +86,25 @@ impl crate::backend::Backend for Backend {
     fn new_poller(
         &self,
         client: Arc<Client>,
-        account: &Account,
+        account: Account,
     ) -> BackendResult<Box<dyn crate::backend::Poller>> {
-        let auth = account
-            .secret::<ProtonAuth>(self.db.encryption_key().expose_secret())
-            .map_err(|e| {
-                error!("Failed to load secret state: {e}");
-                e
-            })?;
+        let auth = account.secret::<ProtonAuth>().map_err(|e| {
+            error!("Failed to load secret state: {e}");
+            e
+        })?;
         let state = account.state::<TaskState>().map_err(|e| {
             error!("Failed to load state: {e}");
             e
         })?;
 
-        let auth_store = new_thread_safe_store(AuthStore::new(
-            account.email().to_owned(),
-            auth,
-            Arc::clone(&self.db),
-        ));
+        let auth_store = new_thread_safe_store(AuthStore::new(account.clone(), auth));
 
         let session = Session::new(client, auth_store);
 
         let account = Poller {
-            email: account.email().to_owned(),
             session,
             state: state.unwrap_or(TaskState::new()),
-            db: Arc::clone(&self.db),
+            account,
         };
 
         Ok(Box::new(account))
@@ -123,14 +113,13 @@ impl crate::backend::Backend for Backend {
 
 /// Authentication store implementation for Proton.
 struct AuthStore {
-    email: String,
+    account: Account,
     auth: Option<ProtonAuth>,
-    db: Arc<State>,
 }
 
 impl AuthStore {
-    fn new(email: String, auth: Option<ProtonAuth>, db: Arc<State>) -> Self {
-        Self { email, auth, db }
+    fn new(account: Account, auth: Option<ProtonAuth>) -> Self {
+        Self { account, auth }
     }
 }
 
@@ -140,29 +129,28 @@ impl proton_api::auth::Store for AuthStore {
     }
 
     fn store(&mut self, auth: ProtonAuth) -> Result<(), StoreError> {
-        self.db
-            .update_secret_state(&self.email, &auth)
+        self.account
+            .set_secret(Some(&auth))
             .map_err(|e| StoreError::Write(anyhow::Error::new(e)))?;
         self.auth = Some(auth);
         Ok(())
     }
 
     fn delete(&mut self) -> Result<(), StoreError> {
-        self.db
-            .delete_secret_state(&self.email)
+        self.account
+            .set_secret::<ProtonAuth>(None)
             .map_err(|e| StoreError::Write(anyhow::Error::new(e)))
     }
 }
 
 struct Poller {
-    email: String,
+    account: Account,
     session: Session,
     state: TaskState,
-    db: Arc<State>,
 }
 
 impl crate::backend::Poller for Poller {
-    #[tracing::instrument(level=Level::DEBUG,skip(self),fields(email=%self.email))]
+    #[tracing::instrument(level=Level::DEBUG,skip(self),fields(email=%self.account.email()))]
     fn check(&mut self) -> BackendResult<Vec<NewEmail>> {
         let mut check_fn = || -> BackendResult<Vec<NewEmail>> {
             // First time this code is run, init state.
@@ -193,12 +181,10 @@ impl crate::backend::Poller for Poller {
                         self.state.active_folder_ids.insert(folder.id);
                     }
                 }
-                self.db
-                    .update_account_state(&self.email, &self.state)
-                    .map_err(|e| {
-                        error!("Failed to store state after init: {e}");
-                        e
-                    })?;
+                self.account.set_state(Some(&self.state)).map_err(|e| {
+                    error!("Failed to store state after init: {e}");
+                    e
+                })?;
             }
 
             let mut result = EventState::new();
@@ -225,12 +211,10 @@ impl crate::backend::Poller for Poller {
                         self.state.last_event_id = Some(event_id.clone());
                         has_more = event.more;
                     } else {
-                        self.db
-                            .update_account_state(&self.email, &self.state)
-                            .map_err(|e| {
-                                error!("Failed to update state after check: {e}");
-                                e
-                            })?;
+                        self.account.set_state(Some(&self.state)).map_err(|e| {
+                            error!("Failed to update state after check: {e}");
+                            e
+                        })?;
                         return Ok(result.into());
                     }
                 }
@@ -241,15 +225,7 @@ impl crate::backend::Poller for Poller {
         };
 
         match check_fn() {
-            Ok(v) => {
-                self.db
-                    .update_account_state(&self.email, &self.state)
-                    .map_err(|e| {
-                        error!("Failed to update state after check: {e}");
-                        e
-                    })?;
-                Ok(v)
-            }
+            Ok(v) => Ok(v),
             Err(e) => match e {
                 BackendError::Http(http::Error::Http(code, response)) => {
                     if code == 401 {
@@ -263,7 +239,7 @@ impl crate::backend::Poller for Poller {
     }
 
     fn logout(&mut self) -> BackendResult<()> {
-        debug!("Logging out of proton account {}", self.email);
+        debug!("Logging out of proton account {}", self.account.email());
         self.session.logout()?;
         Ok(())
     }
@@ -465,7 +441,8 @@ impl From<EventState> for Vec<NewEmail> {
 }
 
 impl IntoAccount for Sequence {
-    fn into_account(self, encryption_key: &Key) -> Result<Account, crate::state::Error> {
+    #[tracing::instrument(level=Level::DEBUG, skip(self, yhm))]
+    fn into_account(self, yhm: &Yhm) -> Result<(), crate::yhm::Error> {
         let (user_info, session) = self
             .finish()
             .map_err(|_| crate::state::Error::Other(anyhow::anyhow!("Account is not logged in")))?;
@@ -477,15 +454,16 @@ impl IntoAccount for Sequence {
         else {
             return Err(crate::state::Error::Other(anyhow::anyhow!(
                 "No authentication data available"
-            )));
+            ))
+            .into());
         };
 
-        let mut account = Account::new(user_info.email, NAME.to_owned());
+        let account = yhm.new_account(&user_info.email, NAME)?;
 
-        account.set_secret(encryption_key, Some(&auth))?;
-        account.set_proxy(encryption_key, session.client().proxy())?;
+        account.set_secret(Some(&auth))?;
+        account.set_proxy(session.client().proxy())?;
 
-        Ok(account)
+        Ok(())
     }
 }
 

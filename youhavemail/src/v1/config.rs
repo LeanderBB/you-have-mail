@@ -25,6 +25,13 @@ struct Account {
     proxy: Option<Proxy>,
 }
 
+/// Account data converted from v1.
+pub struct Converted {
+    pub email: String,
+    pub backend: String,
+    pub proxy: Option<http::Proxy>,
+}
+
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
 pub struct Config {
     pub poll_interval: Option<u64>,
@@ -33,14 +40,9 @@ pub struct Config {
 
 impl Config {
     /// Convert existing information to v2 accounts.
-    pub fn to_v2_accounts(&self, encryption_key: &Key) -> Result<Vec<crate::state::Account>> {
+    pub fn to_v2_accounts(&self) -> Vec<Converted> {
         let mut result = Vec::with_capacity(self.accounts.len());
         for account in &self.accounts {
-            let mut v2 = crate::state::Account::new(
-                account.email.clone(),
-                // there were no other accounts in v1.
-                crate::backend::proton::NAME.to_owned(),
-            );
             let proxy = account.proxy.clone().map(|v| http::Proxy {
                 protocol: match v.protocol {
                     ProxyProtocol::Https => http::ProxyProtocol::Https,
@@ -53,11 +55,16 @@ impl Config {
                 host: v.url,
                 port: v.port,
             });
-            v2.set_proxy(encryption_key, proxy.as_ref())?;
-            result.push(v2);
+
+            result.push(Converted {
+                email: account.email.clone(),
+                // there were no other accounts in v1.
+                backend: crate::backend::proton::NAME.to_owned(),
+                proxy,
+            });
         }
 
-        Ok(result)
+        result
     }
 }
 
@@ -149,23 +156,13 @@ fn test_config_v1_into_v2() {
     let config_loaded = load(encryption_key.expose_secret(), &config_path).unwrap();
     assert_eq!(config_loaded, config);
 
-    let accounts_v2 = config_loaded
-        .to_v2_accounts(encryption_key.expose_secret())
-        .unwrap();
+    let accounts_v2 = config_loaded.to_v2_accounts();
 
-    assert_eq!(accounts_v2[0].email(), config_loaded.accounts[0].email);
-    assert_eq!(accounts_v2[0].backend(), crate::backend::proton::NAME);
-    assert!(accounts_v2[0].is_logged_out());
-    assert!(accounts_v2[0]
-        .proxy(encryption_key.expose_secret())
-        .unwrap()
-        .is_some());
+    assert_eq!(accounts_v2[0].email, config_loaded.accounts[0].email);
+    assert_eq!(accounts_v2[0].backend, crate::backend::proton::NAME);
+    assert!(accounts_v2[0].proxy.is_some());
 
-    assert_eq!(accounts_v2[1].email(), config_loaded.accounts[1].email);
-    assert_eq!(accounts_v2[1].backend(), crate::backend::proton::NAME);
-    assert!(accounts_v2[1].is_logged_out());
-    assert!(accounts_v2[1]
-        .proxy(encryption_key.expose_secret())
-        .unwrap()
-        .is_none());
+    assert_eq!(accounts_v2[1].email, config_loaded.accounts[1].email);
+    assert_eq!(accounts_v2[1].backend, crate::backend::proton::NAME);
+    assert!(accounts_v2[1].proxy.is_none());
 }

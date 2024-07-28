@@ -8,7 +8,7 @@ use std::time::Duration;
 use tracing::info;
 use you_have_mail_common::encryption::Key;
 use you_have_mail_common::state::State;
-use you_have_mail_common::yhm::Yhm;
+use you_have_mail_common::yhm::{IntoAccount, Yhm};
 /*
 struct StdOutNotifier {}
 
@@ -113,7 +113,7 @@ fn main() {
             sequence.submit_totp(totp).expect("Failed to submit totp");
         }
 
-        yhm.add(sequence).expect("Failed to add account");
+        sequence.into_account(&yhm).expect("Failed to add account");
     }
 
     info!("Starting observer loop - Ctrl+C to Quit");

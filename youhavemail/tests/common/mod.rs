@@ -28,7 +28,7 @@ impl TestCtx {
         tracing::info!("Mock Server: {}", url.to_string());
 
         let backend: Arc<dyn Backend> =
-            you_have_mail_common::backend::proton::Backend::new(Arc::clone(&state), Some(url));
+            you_have_mail_common::backend::proton::Backend::new(Some(url));
         let yhm = Yhm::with_backends(Arc::clone(&state), [backend]);
 
         Self {

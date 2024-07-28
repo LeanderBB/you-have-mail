@@ -1,11 +1,21 @@
 use crate::backend::{Backend, NewEmail, Poller};
-use crate::state::{Account, Error as StateError, IntoAccount, State};
+use crate::state::{Account, Error as StateError, State};
 use http::Proxy;
 use secrecy::ExposeSecret;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, Level};
+use tracing::{error, Level};
+
+/// Conversion trait for new accounts.
+pub trait IntoAccount {
+    /// Convert type into an [`Account`].
+    ///
+    /// # Errors
+    ///
+    /// Return error if the operation failed.
+    fn into_account(self, yhm: &Yhm) -> Result<(), Error>;
+}
 
 /// You Have Mail main entry point.
 pub struct Yhm {
@@ -19,6 +29,8 @@ pub enum Error {
     AccountAlreadyExist(String),
     #[error("Account '{0}' does not exist")]
     AccountNotFound(String),
+    #[error("Backend '{0}' does not exist")]
+    BackendNotFound(String),
     #[error("Backend: {0}")]
     Backend(#[from] crate::backend::Error),
     #[error("State: {0}")]
@@ -39,9 +51,7 @@ impl Yhm {
     /// Create new instance with the given `state` and a default list of backends.
     #[must_use]
     pub fn new(state: Arc<State>) -> Self {
-        let state_cloned = Arc::clone(&state);
-        let backends: [Arc<dyn Backend>; 1] =
-            [crate::backend::proton::Backend::new(state_cloned, None)];
+        let backends: [Arc<dyn Backend>; 1] = [crate::backend::proton::Backend::new(None)];
         Self::with_backends(state, backends)
     }
 
@@ -64,30 +74,25 @@ impl Yhm {
     /// errors are returned in the result field.
     #[tracing::instrument(level=Level::DEBUG,skip(self))]
     pub fn poll(&self) -> Result<Vec<PollOutput>, Error> {
-        let accounts = self.state.accounts()?;
-        debug!("Loaded {} accounts", accounts.len());
-
+        let accounts = self.state.active_accounts()?;
         let mut results = Vec::with_capacity(accounts.len());
 
         for account in accounts {
-            if account.is_logged_out() {
-                debug!("Skipping {} (Logged Out)", account.email());
-                continue;
-            }
-
             let result = tracing::debug_span!("account", email = account.email()).in_scope(
-                || -> crate::backend::Result<Vec<NewEmail>> {
-                    let mut account = self.build_account_poller(&account)?;
+                || -> Result<PollOutput, Error> {
+                    let email = account.email().to_owned();
+                    let backend = account.backend().to_owned();
+                    let mut account = self.build_account_poller(account)?;
 
-                    account.check()
+                    Ok(PollOutput {
+                        email,
+                        backend,
+                        result: account.check(),
+                    })
                 },
             );
 
-            results.push(PollOutput {
-                email: account.email().to_owned(),
-                backend: account.backend().to_owned(),
-                result,
-            });
+            results.push(result?);
         }
 
         Ok(results)
@@ -114,26 +119,18 @@ impl Yhm {
         Ok(self.state.account_count()?)
     }
 
-    /// Add a new `account` to you have mail.
-    ///
-    /// New account builders should implement the [`IntoAccount`] trait.
+    /// Add a new account to you have mail with `email` and `backend`.
     ///
     /// # Errors
     ///
     /// If the type could not be converted or the db query failed.
-    #[tracing::instrument(level=Level::DEBUG, skip(self, account))]
-    pub fn add(&self, account: impl IntoAccount) -> Result<(), Error> {
-        let account = account
-            .into_account(self.state.encryption_key().expose_secret())
-            .map_err(|e| {
-                error!("Failed to convert into account: {e}");
-                e
-            })?;
-        self.state.store_account(&account).map_err(|e| {
-            error!("Failed to store account '{}': {e}", account.email());
-            e
-        })?;
-        Ok(())
+    #[tracing::instrument(level=Level::DEBUG, skip(self))]
+    pub fn new_account(&self, email: &str, backend: &str) -> Result<Account, Error> {
+        if self.backend_with_name(backend).is_none() {
+            return Err(Error::BackendNotFound(backend.to_string()));
+        };
+
+        Ok(self.state.new_account(email, backend)?)
     }
 
     /// Update the `proxy` the account with `email`
@@ -181,7 +178,7 @@ impl Yhm {
             .account(email)?
             .ok_or(Error::AccountNotFound(email.to_owned()))?;
 
-        let mut account = self.build_account_poller(&account)?;
+        let mut account = self.build_account_poller(account)?;
         if let Err(e) = account.logout() {
             error!("Failed to logout account: {e}");
         }
@@ -201,7 +198,7 @@ impl Yhm {
             .account(email)?
             .ok_or(Error::AccountNotFound(email.to_owned()))?;
 
-        let mut account = self.build_account_poller(&account)?;
+        let mut account = self.build_account_poller(account)?;
         Ok(account.logout()?)
     }
 
@@ -213,12 +210,7 @@ impl Yhm {
                     error!("Failed to load v1 config: {e}");
                     e
                 })?;
-        let accounts = config
-            .to_v2_accounts(self.state.encryption_key().expose_secret())
-            .map_err(|e| {
-                error!("Failed to convert into now format: {e}");
-                e
-            })?;
+        let accounts = config.to_v2_accounts();
 
         if let Some(interval) = config.poll_interval.map(Duration::from_secs) {
             self.state.set_poll_interval(interval).map_err(|e| {
@@ -228,14 +220,25 @@ impl Yhm {
         }
 
         for account in accounts {
-            self.state.store_account(&account).map_err(|e| {
-                error!(
-                    "Failed to store account '{}'({}): {e}",
-                    account.email(),
-                    account.backend()
-                );
-                e
-            })?;
+            let new_account = self
+                .state
+                .new_account(&account.email, &account.backend)
+                .map_err(|e| {
+                    error!(
+                        "Failed to store account '{}'({}): {e}",
+                        account.email, account.backend
+                    );
+                    e
+                })?;
+            if account.proxy.is_some() {
+                new_account.set_proxy(account.proxy.as_ref()).map_err(|e| {
+                    error!(
+                        "Failed to set account proxy '{}'({}): {e}",
+                        account.email, account.backend,
+                    );
+                    e
+                })?;
+            }
         }
 
         Ok(())
@@ -251,19 +254,17 @@ impl Yhm {
     ///
     /// Returns error if we can't find the backend, the client fails to build or there was an
     /// issue processing the account data.
-    fn build_account_poller(&self, account: &Account) -> crate::backend::Result<Box<dyn Poller>> {
+    fn build_account_poller(&self, account: Account) -> crate::backend::Result<Box<dyn Poller>> {
         let Some(backend) = self.find_backend(account.backend()) else {
             return Err(crate::backend::Error::UnknownBackend(
                 account.backend().to_owned(),
             ));
         };
 
-        let proxy = account
-            .proxy(self.state.encryption_key().expose_secret())
-            .map_err(|e| {
-                error!("Failed to load proxy info from config");
-                e
-            })?;
+        let proxy = account.proxy().map_err(|e| {
+            error!("Failed to load proxy info from config");
+            e
+        })?;
         let client = backend.create_client(proxy).map_err(|e| {
             error!("Failed to create client: {e}");
             e
