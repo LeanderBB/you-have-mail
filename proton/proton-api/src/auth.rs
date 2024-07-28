@@ -167,8 +167,8 @@ impl Store for InMemoryStore {
     }
 }
 
-pub type ThreadSafeStore = Arc<RwLock<dyn Store>>;
+pub type ThreadSafeStore = Arc<RwLock<dyn Store + Send + Sync>>;
 
-pub fn new_thread_safe_store<T: Store + 'static>(store: T) -> ThreadSafeStore {
+pub fn new_thread_safe_store<T: Store + 'static + Send + Sync>(store: T) -> ThreadSafeStore {
     Arc::new(RwLock::new(store))
 }

@@ -110,6 +110,24 @@ impl Yhm {
         self.backends.iter().find(|b| b.name() == name)
     }
 
+    /// Get all accounts.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the operation failed.
+    pub fn accounts(&self) -> Result<Vec<Account>, Error> {
+        Ok(self.state.accounts()?)
+    }
+
+    /// Get account with `email`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the operation failed.
+    pub fn account(&self, email: &str) -> Result<Option<Account>, Error> {
+        Ok(self.state.account(email)?)
+    }
+
     /// Returns the number of registered accounts
     ///
     /// # Errors

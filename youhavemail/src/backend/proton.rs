@@ -19,6 +19,9 @@ use std::sync::Arc;
 use std::time::Duration;
 use tracing::{debug, error, warn, Level};
 
+#[allow(clippy::module_name_repetitions)]
+pub use proton_api;
+
 /// Proton Mail backend.
 pub struct Backend {
     base_url: Option<http::url::Url>,
