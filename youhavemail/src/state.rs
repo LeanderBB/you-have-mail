@@ -510,7 +510,7 @@ INSERT INTO yhm (email, backend) VALUES (
     pub fn is_logged_out(&self, email: &str) -> Result<bool, Error> {
         Ok(self.pool.with_connection(|conn| {
             conn.query_row(
-                "SELECT IIF(secret IS NULL, 0, 1) FROM yhm WHERE email =?",
+                "SELECT IIF(secret IS NULL, 1, 0) FROM yhm WHERE email =?",
                 [email],
                 |r| r.get(0),
             )
