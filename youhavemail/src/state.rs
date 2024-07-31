@@ -294,7 +294,7 @@ impl State {
             .with_transaction(|tx| -> Result<(), rusqlite::Error> {
                 tx.execute(
                     r"
-INSERT INTO yhm (email, backend) VALUES (
+INSERT OR IGNORE INTO yhm (email, backend) VALUES (
     ?,?
 )",
                     (email, backend),

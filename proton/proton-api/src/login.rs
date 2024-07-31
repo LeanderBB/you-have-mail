@@ -57,6 +57,7 @@ pub struct Sequence {
     session: Session,
     state: State,
     skip_server_proof: bool,
+    user: Option<User>,
 }
 
 impl Sequence {
@@ -67,6 +68,7 @@ impl Sequence {
             session,
             state: State::LoggedOut,
             skip_server_proof: false,
+            user: None,
         }
     }
 
@@ -82,6 +84,7 @@ impl Sequence {
             session,
             state: State::LoggedOut,
             skip_server_proof: true,
+            user: None,
         }
     }
 
@@ -130,68 +133,73 @@ impl Sequence {
             }
         }
 
-        let auth_info_response = self
-            .session
-            .execute(PostAuthInfoRequest { username: email })
-            .map_err(|e| {
-                error!("Failed to get auth info: {e}");
-                e
-            })?;
+        self.catch_captcha(|this| {
+            let auth_info_response = this
+                .session
+                .execute(PostAuthInfoRequest { username: email })
+                .map_err(|e| {
+                    error!("Failed to get auth info: {e}");
+                    e
+                })?;
 
-        let srp_auth = SRPAuth::generate(
-            email,
-            password,
-            auth_info_response.version,
-            &auth_info_response.salt,
-            &auth_info_response.modulus,
-            &auth_info_response.server_ephemeral,
-        )
-        .map_err(Error::SRPServerProof)?;
+            let srp_auth = SRPAuth::generate(
+                email,
+                password,
+                auth_info_response.version,
+                &auth_info_response.salt,
+                &auth_info_response.modulus,
+                &auth_info_response.server_ephemeral,
+            )
+            .map_err(Error::SRPServerProof)?;
 
-        let auth_response = self
-            .session
-            .execute(PostAuthRequest {
-                username: email,
-                client_ephemeral: &srp_auth.client_ephemeral,
-                client_proof: &srp_auth.client_proof,
-                srp_session: &auth_info_response.srp_session,
-                human_verification: human_verification_login_data,
-            })
-            .map_err(|e| {
-                error!("Failed to get auth response: {e}");
-                e
-            })?;
+            let auth_response = this
+                .session
+                .execute(PostAuthRequest {
+                    username: email,
+                    client_ephemeral: &srp_auth.client_ephemeral,
+                    client_proof: &srp_auth.client_proof,
+                    srp_session: &auth_info_response.srp_session,
+                    human_verification: human_verification_login_data,
+                })
+                .map_err(|e| {
+                    error!("Failed to get auth response: {e}");
+                    e
+                })?;
 
-        if !self.skip_server_proof && srp_auth.expected_server_proof != auth_response.server_proof {
-            return Err(Error::SRPServerProof(
-                "Server Proof does not match".to_string(),
-            ));
-        }
-
-        match auth_response.tfa.enabled {
-            TFAStatus::None => {
-                self.state = State::LoggedIn;
+            if !this.skip_server_proof
+                && srp_auth.expected_server_proof != auth_response.server_proof
+            {
+                return Err(Error::SRPServerProof(
+                    "Server Proof does not match".to_string(),
+                ));
             }
-            TFAStatus::Totp | TFAStatus::TotpOrFIDO2 => {
-                self.state = State::AwaitingTotp;
+
+            match auth_response.tfa.enabled {
+                TFAStatus::None => {
+                    this.state = State::LoggedIn;
+                }
+                TFAStatus::Totp | TFAStatus::TotpOrFIDO2 => {
+                    this.state = State::AwaitingTotp;
+                }
+                TFAStatus::FIDO2 => return Err(Error::Unsupported2FA(TwoFactorAuth::FIDO2)),
             }
-            TFAStatus::FIDO2 => return Err(Error::Unsupported2FA(TwoFactorAuth::FIDO2)),
-        }
 
-        let mut guard = self.session.auth_store().write();
-        guard
-            .store(Auth {
-                uid: auth_response.uid,
-                auth_token: auth_response.access_token,
-                refresh_token: auth_response.refresh_token,
-            })
-            .map_err(|e| {
-                error!("Failed to write authentication data to store: {e}");
-                self.state = State::LoggedOut;
-                e
-            })?;
-
-        Ok(())
+            let mut guard = this.session.auth_store().write();
+            guard
+                .store(Auth {
+                    uid: auth_response.uid,
+                    auth_token: auth_response.access_token,
+                    refresh_token: auth_response.refresh_token,
+                })
+                .map_err(|e| {
+                    error!("Failed to write authentication data to store: {e}");
+                    this.state = State::LoggedOut;
+                    e
+                })?;
+            drop(guard);
+            this.next()?;
+            Ok(())
+        })
     }
 
     /// Submit `totp` 2FA Code
@@ -204,18 +212,21 @@ impl Sequence {
     /// [`Error::InvalidState`] is returned if the sequence is not in a logged out state.
     #[tracing::instrument(level=Level::DEBUG,skip(self, totp))]
     pub fn submit_totp(&mut self, totp: &str) -> Result<()> {
-        if !matches!(self.state, State::AwaitingTotp) {
-            return Err(Error::InvalidState);
-        };
-        self.session
-            .execute_with_auth(PostTOTPRequest::new(totp))
-            .map_err(|e| {
-                error!("Failed to submit totp code: {e}");
-                e
-            })?;
+        self.catch_captcha(|this| {
+            if !matches!(this.state, State::AwaitingTotp) {
+                return Err(Error::InvalidState);
+            };
+            this.session
+                .execute_with_auth(PostTOTPRequest::new(totp))
+                .map_err(|e| {
+                    error!("Failed to submit totp code: {e}");
+                    e
+                })?;
 
-        self.state = State::LoggedIn;
-        Ok(())
+            this.state = State::LoggedIn;
+            this.next()?;
+            Ok(())
+        })
     }
 
     /// Abort login by triggering a logout
@@ -227,7 +238,10 @@ impl Sequence {
             return Err(Error::InvalidState);
         };
 
-        Ok(self.session.logout()?)
+        self.session.logout()?;
+        self.state = State::LoggedOut;
+        self.user = None;
+        Ok(())
     }
 
     /// Conclude the login process.
@@ -235,15 +249,14 @@ impl Sequence {
     /// # Errors
     /// If the state is not logged in, the sequence will be returned as error.
     #[tracing::instrument(level=Level::DEBUG,skip(self))]
-    pub fn finish(&self) -> Result<(User, Session)> {
+    pub fn finish(&mut self) -> Result<(User, Session)> {
         if !matches!(self.state, State::LoggedIn) {
             return Err(Error::InvalidState);
         }
 
-        let user = self.session.user_info().map_err(|e| {
-            error!("Failed to fetch user info: {e}");
-            e
-        })?;
+        let Some(user) = self.user.take() else {
+            return Err(Error::InvalidState);
+        };
 
         Ok((user, self.session.clone()))
     }
@@ -252,6 +265,29 @@ impl Sequence {
     #[must_use]
     pub fn session(&self) -> &Session {
         &self.session
+    }
+
+    fn next(&mut self) -> Result<()> {
+        if self.is_logged_in() && self.user.is_none() {
+            let user = self.session.user_info().map_err(|e| {
+                error!("Failed to fetch user info: {e}");
+                e
+            })?;
+            self.user = Some(user);
+        }
+
+        Ok(())
+    }
+
+    fn catch_captcha(&mut self, f: impl FnOnce(&mut Self) -> Result<()>) -> Result<()> {
+        if let Err(e) = f(self) {
+            if matches!(&e, Error::HumanVerificationRequired(_)) {
+                self.state = State::LoggedOut;
+            }
+
+            return Err(e);
+        }
+        Ok(())
     }
 }
 

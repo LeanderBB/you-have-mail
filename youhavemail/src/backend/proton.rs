@@ -445,7 +445,7 @@ impl From<EventState> for Vec<NewEmail> {
 
 impl IntoAccount for Sequence {
     #[tracing::instrument(level=Level::DEBUG, skip(self, yhm))]
-    fn into_account(self, yhm: &Yhm) -> Result<(), crate::yhm::Error> {
+    fn into_account(mut self, yhm: &Yhm) -> Result<(), crate::yhm::Error> {
         let (user_info, session) = self
             .finish()
             .map_err(|_| crate::state::Error::Other(anyhow::anyhow!("Account is not logged in")))?;
