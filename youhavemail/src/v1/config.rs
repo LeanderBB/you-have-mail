@@ -45,7 +45,7 @@ impl Config {
         for account in &self.accounts {
             let proxy = account.proxy.clone().map(|v| http::Proxy {
                 protocol: match v.protocol {
-                    ProxyProtocol::Https => http::ProxyProtocol::Https,
+                    ProxyProtocol::Https => http::ProxyProtocol::Http,
                     ProxyProtocol::Socks5 => http::ProxyProtocol::Socks5,
                 },
                 auth: v.auth.map(|auth| http::ProxyAuth {

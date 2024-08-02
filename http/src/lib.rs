@@ -208,7 +208,7 @@ impl RequestBuilder {
 
 #[derive(Debug, Copy, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub enum ProxyProtocol {
-    Https,
+    Http,
     Socks5,
 }
 
@@ -262,7 +262,7 @@ impl Proxy {
     /// Returns error if the generated url is not valid.
     pub fn to_url(&self) -> Result<Url> {
         let protocol = match self.protocol {
-            ProxyProtocol::Https => "https",
+            ProxyProtocol::Http => "http",
             ProxyProtocol::Socks5 => "socks5",
         };
 
@@ -482,14 +482,14 @@ fn proxy_config_generates_valid_url() {
     let port = 22;
     // Https configuration.
     let proxy = Proxy {
-        protocol: ProxyProtocol::Https,
+        protocol: ProxyProtocol::Http,
         auth: None,
         host: host.to_owned(),
         port,
     };
 
     let url = proxy.to_url().unwrap();
-    assert_eq!(url.scheme(), "https");
+    assert_eq!(url.scheme(), "http");
     assert_eq!(url.host_str().unwrap(), host);
     assert_eq!(url.port().unwrap(), port);
 
