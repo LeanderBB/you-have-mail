@@ -6,6 +6,7 @@ use proton_api::domain::event::MoreEvents;
 use proton_api::domain::{event, label, message, Boolean, SecretString};
 use secrecy::ExposeSecret;
 use you_have_mail_common::backend::proton::TaskState;
+use you_have_mail_common::events::Event;
 use you_have_mail_common::yhm::IntoAccount;
 
 #[test]
@@ -99,6 +100,16 @@ fn poll_sequence() {
         },
     ];
 
+    assert_eq!(
+        ctx.yhm
+            .account(ACCOUNT_EMAIL)
+            .unwrap()
+            .unwrap()
+            .last_event()
+            .unwrap(),
+        None
+    );
+
     // First time, no state. Things need to be fetched.
     {
         let _mock_latest_event =
@@ -127,6 +138,15 @@ fn poll_sequence() {
         assert!(state.active_folder_ids.contains(&label::Id::inbox()));
     }
 
+    assert_eq!(
+        account_event(&ctx),
+        Some(Event::NewEmail {
+            email: ACCOUNT_EMAIL.to_owned(),
+            backend: you_have_mail_common::backend::proton::NAME.to_owned(),
+            emails: vec![],
+        })
+    );
+
     // 2nd time state, only fetch events.
     {
         let _mock_event =
@@ -148,6 +168,15 @@ fn poll_sequence() {
             .contains(&label_id_with_notification));
         assert!(state.active_folder_ids.contains(&label::Id::inbox()));
     }
+
+    assert_eq!(
+        account_event(&ctx),
+        Some(Event::NewEmail {
+            email: ACCOUNT_EMAIL.to_owned(),
+            backend: you_have_mail_common::backend::proton::NAME.to_owned(),
+            emails: vec![],
+        })
+    );
 }
 
 #[test]
@@ -251,6 +280,14 @@ fn message_event_creates_notification() {
         assert!(!info.is_empty());
         assert_eq!(info[0].subject, subject);
         assert_eq!(info[0].sender, sender_address);
+        assert_eq!(
+            account_event(&ctx),
+            Some(Event::NewEmail {
+                email: ACCOUNT_EMAIL.to_owned(),
+                backend: you_have_mail_common::backend::proton::NAME.to_owned(),
+                emails: info,
+            })
+        );
     }
 
     let state = account_state(&ctx).expect("account should have state");
@@ -269,6 +306,15 @@ fn no_poll_after_logout() {
 
     assert_eq!(ctx.yhm.account_count().unwrap(), 1);
     assert!(ctx.yhm.poll().unwrap().is_empty());
+    assert_eq!(
+        ctx.yhm
+            .account(ACCOUNT_EMAIL)
+            .unwrap()
+            .unwrap()
+            .last_event()
+            .unwrap(),
+        None,
+    );
 }
 
 #[test]
@@ -323,6 +369,16 @@ fn account_auth(ctx: &TestCtx) -> Option<Auth> {
         .unwrap()
         .expect("failed to find account");
     account.secret::<Auth>().unwrap()
+}
+
+fn account_event(ctx: &TestCtx) -> Option<Event> {
+    ctx.yhm
+        .account(ACCOUNT_EMAIL)
+        .unwrap()
+        .unwrap()
+        .last_event()
+        .unwrap()
+        .map(|(_, e)| e)
 }
 
 fn event_id(id: u32) -> event::Id {

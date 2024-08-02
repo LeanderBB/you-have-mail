@@ -1,4 +1,5 @@
 use crate::backend::{Backend, NewEmail, Poller};
+use crate::events::Event;
 use crate::state::{Account, Error as StateError, State};
 use http::Proxy;
 use secrecy::ExposeSecret;
@@ -95,6 +96,12 @@ impl Yhm {
             results.push(result?);
         }
 
+        let events = results.iter().map(Event::new).collect::<Vec<_>>();
+        self.state.create_or_update_events(&events).map_err(|e| {
+            error!("Failed to store result as events: {e}");
+            e
+        })?;
+
         Ok(results)
     }
 
@@ -116,7 +123,10 @@ impl Yhm {
     ///
     /// Returns error if the operation failed.
     pub fn accounts(&self) -> Result<Vec<Account>, Error> {
-        Ok(self.state.accounts()?)
+        Ok(self.state.accounts().map_err(|e| {
+            error!("Failed to retrieve accounts:{e}");
+            e
+        })?)
     }
 
     /// Get account with `email`.
@@ -125,7 +135,10 @@ impl Yhm {
     ///
     /// Returns error if the operation failed.
     pub fn account(&self, email: &str) -> Result<Option<Account>, Error> {
-        Ok(self.state.account(email)?)
+        Ok(self.state.account(email).map_err(|e| {
+            error!("Failed to get account by email: {e}");
+            e
+        })?)
     }
 
     /// Returns the number of registered accounts
@@ -144,11 +157,15 @@ impl Yhm {
     /// If the type could not be converted or the db query failed.
     #[tracing::instrument(level=Level::DEBUG, skip(self))]
     pub fn new_account(&self, email: &str, backend: &str) -> Result<Account, Error> {
+        tracing::info!("Adding new account");
         if self.backend_with_name(backend).is_none() {
             return Err(Error::BackendNotFound(backend.to_string()));
         };
 
-        Ok(self.state.new_account(email, backend)?)
+        Ok(self.state.new_account(email, backend).map_err(|e| {
+            error!("Failed to create new account:{e}");
+            e
+        })?)
     }
 
     /// Update the `proxy` the account with `email`
@@ -169,7 +186,10 @@ impl Yhm {
     ///
     /// Returns error if the operation failed.
     pub fn poll_interval(&self) -> Result<Duration, Error> {
-        Ok(self.state.poll_interval()?)
+        Ok(self.state.poll_interval().map_err(|e| {
+            error!("Failed to get poll interval:{e}");
+            e
+        })?)
     }
 
     /// Set the poll interval.
@@ -178,7 +198,11 @@ impl Yhm {
     ///
     /// Returns error if the operation failed.
     pub fn set_poll_interval(&self, interval: Duration) -> Result<(), Error> {
-        Ok(self.state.set_poll_interval(interval)?)
+        tracing::info!("Poll interval updated: {} Seconds", interval.as_secs());
+        Ok(self.state.set_poll_interval(interval).map_err(|e| {
+            error!("Failed to set poll interval:{e}");
+            e
+        })?)
     }
 
     /// Delete an existing account.
@@ -191,6 +215,7 @@ impl Yhm {
     /// Returns error if the account is not found or if the operation failed.
     #[tracing::instrument(level=Level::DEBUG, skip(self))]
     pub fn delete(&self, email: &str) -> Result<(), Error> {
+        tracing::info!("Deleting account");
         let account = self
             .state
             .account(email)?
@@ -201,7 +226,10 @@ impl Yhm {
             error!("Failed to logout account: {e}");
         }
 
-        Ok(self.state.delete(email)?)
+        Ok(self.state.delete(email).map_err(|e| {
+            error!("Failed to delete account:{e}");
+            e
+        })?)
     }
 
     /// Logout an existing account.
@@ -211,17 +239,27 @@ impl Yhm {
     /// Returns error if the account is not found or the logout failed.
     #[tracing::instrument(level=Level::DEBUG, skip(self))]
     pub fn logout(&self, email: &str) -> Result<(), Error> {
+        tracing::info!("Logging out account");
         let account = self
             .state
             .account(email)?
             .ok_or(Error::AccountNotFound(email.to_owned()))?;
 
         let mut account = self.build_account_poller(account)?;
-        Ok(account.logout()?)
+        Ok(account.logout().map_err(|e| {
+            error!("Failed to logout account:{e}");
+            e
+        })?)
     }
 
+    /// Import V1 Configuration and extract all existing accounts.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if the process failed.
     #[tracing::instrument(level=Level::DEBUG, skip(self, config_path))]
     pub fn import_v1(&self, config_path: &Path) -> Result<(), crate::v1::config::Error> {
+        tracing::info!("Importing V1 Config");
         let config =
             crate::v1::config::load(self.state.encryption_key().expose_secret(), config_path)
                 .map_err(|e| {
@@ -260,6 +298,18 @@ impl Yhm {
         }
 
         Ok(())
+    }
+
+    /// Get the last poll events.
+    ///
+    /// # Errors
+    ///
+    /// Returns errors if the poll failed.
+    pub fn last_events(&self) -> Result<Vec<Event>, Error> {
+        Ok(self.state.last_events().map_err(|e| {
+            error!("Failed to get last events:{e}");
+            e
+        })?)
     }
 
     fn find_backend(&self, name: &str) -> Option<&Arc<dyn Backend>> {

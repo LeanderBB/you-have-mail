@@ -452,9 +452,11 @@ impl IntoAccount for Sequence {
 
         let guard = session.auth_store().read();
         let Some(auth) = guard.get().map_err(|e| {
+            error!("Failed to get auth data: {e}");
             crate::state::Error::Other(anyhow::anyhow!("Failed to get authentication data: {e}"))
         })?
         else {
+            error!("No authentication data available");
             return Err(crate::state::Error::Other(anyhow::anyhow!(
                 "No authentication data available"
             ))
@@ -463,8 +465,14 @@ impl IntoAccount for Sequence {
 
         let account = yhm.new_account(&user_info.email, NAME)?;
 
-        account.set_secret(Some(&auth))?;
-        account.set_proxy(session.client().proxy())?;
+        account.set_secret(Some(&auth)).map_err(|e| {
+            error!("Failed to set secret on account: {e}");
+            e
+        })?;
+        account.set_proxy(session.client().proxy()).map_err(|e| {
+            error!("Failed to set proxy on account: {e}");
+            e
+        })?;
 
         Ok(())
     }

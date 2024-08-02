@@ -2,6 +2,8 @@
 
 use crate::db::{Pool, Transaction};
 use crate::encryption::Key;
+use crate::events::Event;
+use chrono::{DateTime, Utc};
 use http::Proxy;
 use rusqlite::OptionalExtension;
 use secrecy::{ExposeSecret, Secret};
@@ -145,6 +147,15 @@ impl Account {
     /// Returns error if the query failed.
     pub fn is_logged_out(&self) -> Result<bool, Error> {
         self.state.is_logged_out(&self.email)
+    }
+
+    /// Get the last poll event for this account.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the query failed.
+    pub fn last_event(&self) -> Result<Option<(DateTime<Utc>, Event)>, Error> {
+        self.state.last_event_for_account(&self.email)
     }
 }
 
@@ -516,6 +527,62 @@ INSERT OR IGNORE INTO yhm (email, backend) VALUES (
             )
         })?)
     }
+
+    /// Store `events` into the database
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the process failed
+    pub fn create_or_update_events(&self, events: &[Event]) -> Result<(), Error> {
+        let time = Utc::now();
+        self.pool.with_transaction(|tx| {
+            tx.execute("DELETE FROM yhm_poll_event", ())?;
+            let mut stmt = tx.prepare("INSERT OR REPLACE INTO yhm_poll_event VALUES (?,?,?)")?;
+
+            for event in events {
+                stmt.execute((event.email(), time, event))?;
+            }
+
+            Ok(())
+        })
+    }
+
+    /// Load all events
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the query failed.
+    ///
+    pub fn last_events(&self) -> Result<Vec<Event>, Error> {
+        self.pool.with_connection(|conn| {
+            let mut stmt = conn.prepare("SELECT event FROM yhm_poll_event")?;
+            let mut events = Vec::new();
+            for row in stmt.query_map((), |r| r.get(0))? {
+                events.push(row?);
+            }
+            Ok(events)
+        })
+    }
+
+    /// Get the last event result for the account with `email`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the query fails.
+    pub fn last_event_for_account(
+        &self,
+        email: &str,
+    ) -> Result<Option<(DateTime<Utc>, Event)>, Error> {
+        self.pool.with_connection(|conn| {
+            Ok(conn
+                .query_row(
+                    "SELECT date, event FROM yhm_poll_event WHERE email=? LIMIT 1",
+                    [email],
+                    |r| Ok((r.get(0)?, r.get(1)?)),
+                )
+                .optional()?)
+        })
+    }
 }
 
 fn create_tables(tx: &mut Transaction) -> rusqlite::Result<()> {
@@ -545,6 +612,18 @@ CREATE TABLE IF NOT EXISTS yhm_settings (
     tx.execute(
         "INSERT OR IGNORE INTO yhm_settings VALUES (?,?)",
         (SETTINGS_ID, DEFAULT_POLL_INTERVAL_SECONDS),
+    )?;
+
+    tx.execute(
+        r"
+CREATE TABLE IF NOT EXISTS yhm_poll_event (
+    email STRING NOT NULL UNIQUE,
+    date INTEGER NOT NULL,
+    event STRING,
+    FOREIGN KEY (email) REFERENCES yhm(email) ON DELETE CASCADE
+)
+",
+        (),
     )?;
 
     Ok(())

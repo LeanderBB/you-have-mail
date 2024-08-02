@@ -4,6 +4,7 @@
 use crate::state;
 use crate::state::Account;
 use http::{Client, Proxy};
+use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::Arc;
 
@@ -28,7 +29,7 @@ pub enum Error {
 pub type Result<T> = std::result::Result<T, Error>;
 
 /// Data type returned when a new email has been received.
-#[derive(Debug, Clone, Eq, PartialEq)]
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
 pub struct NewEmail {
     /// Sender of the email.
     pub sender: String,

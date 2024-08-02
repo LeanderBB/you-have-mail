@@ -168,6 +168,9 @@ impl Session {
         )) {
             Ok(response) => response,
             Err(e) => {
+                if let Err(e) = guard.delete() {
+                    error!("Failed to delete auth data after failed refresh: {e}");
+                }
                 error!("Failed to refresh auth token: {e}");
                 return Err(error);
             }
