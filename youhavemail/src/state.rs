@@ -5,7 +5,7 @@ use crate::encryption::Key;
 use crate::events::Event;
 use chrono::{DateTime, Utc};
 use http::Proxy;
-use rusqlite::OptionalExtension;
+use rusqlite::{OptionalExtension, Row};
 use secrecy::{ExposeSecret, Secret};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
@@ -42,16 +42,23 @@ pub enum Error {
 pub struct Account {
     email: String,
     backend: String,
+    last_poll: Option<DateTime<Utc>>,
     state: Arc<State>,
 }
 
 impl Account {
     /// Create a new account with `email` and `backend` name.
     #[must_use]
-    fn new(email: String, backend: String, state: Arc<State>) -> Self {
+    fn new(
+        email: String,
+        backend: String,
+        last_poll: Option<DateTime<Utc>>,
+        state: Arc<State>,
+    ) -> Self {
         Self {
             email,
             backend,
+            last_poll,
             state,
         }
     }
@@ -66,6 +73,14 @@ impl Account {
     #[must_use]
     pub fn backend(&self) -> &str {
         &self.backend
+    }
+
+    /// Get the last time this account was polled.
+    ///
+    /// Returns `None` if never polled.
+    #[must_use]
+    pub fn last_poll(&self) -> Option<&DateTime<Utc>> {
+        self.last_poll.as_ref()
     }
 
     /// Get the account state.
@@ -154,8 +169,15 @@ impl Account {
     /// # Errors
     ///
     /// Returns error if the query failed.
-    pub fn last_event(&self) -> Result<Option<(DateTime<Utc>, Event)>, Error> {
+    pub fn last_event(&self) -> Result<Option<Event>, Error> {
         self.state.last_event_for_account(&self.email)
+    }
+
+    fn from_row(row: &Row, state: &Arc<State>) -> rusqlite::Result<Self> {
+        let email = row.get(0)?;
+        let backend = row.get(1)?;
+        let last_poll = row.get(2)?;
+        Ok(Account::new(email, backend, last_poll, Arc::clone(state)))
     }
 }
 
@@ -209,12 +231,9 @@ impl State {
     /// Returns error if the query failed.
     pub fn accounts(self: &Arc<Self>) -> Result<Vec<Account>, Error> {
         self.pool.with_connection(|conn| {
-            let mut stmt = conn.prepare("SELECT email, backend FROM yhm ORDER BY email")?;
-            let rows = stmt.query_map((), |r| {
-                let email = r.get(0)?;
-                let backend = r.get(1)?;
-                Ok(Account::new(email, backend, Arc::clone(self)))
-            })?;
+            let mut stmt =
+                conn.prepare("SELECT email, backend, last_poll FROM yhm ORDER BY email")?;
+            let rows = stmt.query_map((), |r| Account::from_row(r, self))?;
             let mut result = Vec::new();
             for row in rows {
                 result.push(row?);
@@ -233,12 +252,8 @@ impl State {
     pub fn active_accounts(self: &Arc<Self>) -> Result<Vec<Account>, Error> {
         self.pool.with_connection(|conn| {
             let mut stmt =
-                conn.prepare("SELECT email, backend FROM yhm WHERE secret IS NOT NULL")?;
-            let rows = stmt.query_map((), |r| {
-                let email = r.get(0)?;
-                let backend = r.get(1)?;
-                Ok(Account::new(email, backend, Arc::clone(self)))
-            })?;
+                conn.prepare("SELECT email, backend, last_poll FROM yhm WHERE secret IS NOT NULL")?;
+            let rows = stmt.query_map((), |r| Account::from_row(r, self))?;
             let mut result = Vec::new();
             for row in rows {
                 result.push(row?);
@@ -256,13 +271,9 @@ impl State {
         self.pool.with_connection(|conn| {
             Ok(conn
                 .query_row(
-                    "SELECT email, backend FROM yhm WHERE email=? LIMIT 1",
+                    "SELECT email, backend, last_poll FROM yhm WHERE email=? LIMIT 1",
                     [email],
-                    |r| {
-                        let email = r.get(0)?;
-                        let backend = r.get(1)?;
-                        Ok(Account::new(email, backend, Arc::clone(self)))
-                    },
+                    |r| Account::from_row(r, self),
                 )
                 .optional()?)
         })
@@ -315,6 +326,7 @@ INSERT OR IGNORE INTO yhm (email, backend) VALUES (
         Ok(Account::new(
             email.to_owned(),
             backend.to_owned(),
+            None,
             Arc::clone(self),
         ))
     }
@@ -537,10 +549,14 @@ INSERT OR IGNORE INTO yhm (email, backend) VALUES (
         let time = Utc::now();
         self.pool.with_transaction(|tx| {
             tx.execute("DELETE FROM yhm_poll_event", ())?;
-            let mut stmt = tx.prepare("INSERT OR REPLACE INTO yhm_poll_event VALUES (?,?,?)")?;
+            let mut event_stmt =
+                tx.prepare("INSERT OR REPLACE INTO yhm_poll_event VALUES (?,?)")?;
+            let mut update_account_stmt = tx.prepare("UPDATE yhm SET last_poll=? WHERE email=?")?;
 
             for event in events {
-                stmt.execute((event.email(), time, event))?;
+                let email = event.email();
+                update_account_stmt.execute((time, email))?;
+                event_stmt.execute((email, event))?;
             }
 
             Ok(())
@@ -569,16 +585,13 @@ INSERT OR IGNORE INTO yhm (email, backend) VALUES (
     /// # Errors
     ///
     /// Returns error if the query fails.
-    pub fn last_event_for_account(
-        &self,
-        email: &str,
-    ) -> Result<Option<(DateTime<Utc>, Event)>, Error> {
+    pub fn last_event_for_account(&self, email: &str) -> Result<Option<Event>, Error> {
         self.pool.with_connection(|conn| {
             Ok(conn
                 .query_row(
-                    "SELECT date, event FROM yhm_poll_event WHERE email=? LIMIT 1",
+                    "SELECT event FROM yhm_poll_event WHERE email=? LIMIT 1",
                     [email],
-                    |r| Ok((r.get(0)?, r.get(1)?)),
+                    |r| r.get(0),
                 )
                 .optional()?)
         })
@@ -593,7 +606,8 @@ CREATE TABLE IF NOT EXISTS yhm (
     backend TEXT NOT NULL,
     secret BLOB DEFAULT NULL,
     state BLOD DEFAULT NULL,
-    proxy BLOB DEFAULT NULL
+    proxy BLOB DEFAULT NULL,
+    last_poll INTEGER DEFAULT NULL
 )
 ",
         (),
@@ -618,7 +632,6 @@ CREATE TABLE IF NOT EXISTS yhm_settings (
         r"
 CREATE TABLE IF NOT EXISTS yhm_poll_event (
     email STRING NOT NULL UNIQUE,
-    date INTEGER NOT NULL,
     event STRING,
     FOREIGN KEY (email) REFERENCES yhm(email) ON DELETE CASCADE
 )

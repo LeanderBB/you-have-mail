@@ -378,7 +378,6 @@ fn account_event(ctx: &TestCtx) -> Option<Event> {
         .unwrap()
         .last_event()
         .unwrap()
-        .map(|(_, e)| e)
 }
 
 fn event_id(id: u32) -> event::Id {
