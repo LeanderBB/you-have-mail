@@ -1,6 +1,6 @@
+use crate::events::Event;
 use chrono::{DateTime, Local};
 use you_have_mail_common as yhm;
-use crate::events::Event;
 
 /// An account in the system.
 #[derive(uniffi::Object)]

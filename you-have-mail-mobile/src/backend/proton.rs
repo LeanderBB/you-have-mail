@@ -135,7 +135,6 @@ pub struct ProtonLoginSequence {
 
 #[uniffi::export]
 impl ProtonLoginSequence {
-
     /// Create new instance.
     ///
     /// # Errors
@@ -260,12 +259,14 @@ impl ProtonLoginSequence {
     /// # Errors
     ///
     /// Returns error if request failed.
-    pub fn captcha(&self, token:&str) -> Result<String, ProtonLoginError> {
+    pub fn captcha(&self, token: &str) -> Result<String, ProtonLoginError> {
         let mut guard = self.sequence.lock();
         let Some(sequence) = guard.take() else {
             return Err(ProtonLoginError::Invalid);
         };
 
-        Ok(sequence.session().execute(GetCaptchaRequest::new(token,false))?)
+        Ok(sequence
+            .session()
+            .execute(GetCaptchaRequest::new(token, false))?)
     }
 }

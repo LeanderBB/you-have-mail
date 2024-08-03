@@ -1,5 +1,5 @@
-use tracing::error;
 use crate::yhm::YhmError;
+use tracing::error;
 use you_have_mail_common as yhm;
 use you_have_mail_common::backend::proton::proton_api::client::ProtonExtension;
 use you_have_mail_common::backend::proton::proton_api::requests::Ping;
@@ -21,7 +21,7 @@ impl From<yhm::http::ProxyProtocol> for Protocol {
     }
 }
 
-impl From<Protocol> for yhm::http::ProxyProtocol{
+impl From<Protocol> for yhm::http::ProxyProtocol {
     fn from(value: Protocol) -> Self {
         match value {
             Protocol::Http => yhm::http::ProxyProtocol::Http,
@@ -79,7 +79,7 @@ impl From<yhm::http::Proxy> for Proxy {
 }
 
 impl From<Proxy> for yhm::http::Proxy {
-    fn from(value:Proxy) -> Self {
+    fn from(value: Proxy) -> Self {
         yhm::http::Proxy {
             protocol: value.protocol.into(),
             host: value.host,
@@ -87,7 +87,6 @@ impl From<Proxy> for yhm::http::Proxy {
             port: value.port,
         }
     }
-
 }
 
 /// Test a proxy by constructing a client and trying to ping a server.
@@ -104,11 +103,9 @@ pub fn test_proxy(proxy: Proxy) -> Result<(), YhmError> {
             error!("Failed to build client with proxy: {e}");
             YhmError::ProxyTest(e.to_string())
         })?;
-    client
-        .execute(&Ping {})
-        .map_err(|e| {
-            error!("Failed ping server using proxy: {e}");
-            YhmError::ProxyTest(e.to_string())
-        })?;
+    client.execute(&Ping {}).map_err(|e| {
+        error!("Failed ping server using proxy: {e}");
+        YhmError::ProxyTest(e.to_string())
+    })?;
     Ok(())
 }
