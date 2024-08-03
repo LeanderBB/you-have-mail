@@ -1,6 +1,7 @@
 package dev.lbeernaert.youhavemail
 
 import android.Manifest
+import android.app.Activity
 import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
@@ -37,7 +38,6 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.unit.dp
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
-import dev.lbeernaert.youhavemail.app.LOG_EXPORT_REQUEST
 import dev.lbeernaert.youhavemail.app.NotificationActionClicked
 import dev.lbeernaert.youhavemail.app.NotificationIntentAppNameKey
 import dev.lbeernaert.youhavemail.app.NotificationIntentBackendKey
@@ -91,6 +91,15 @@ class MainActivity : ComponentActivity() {
         if (mState != null) {
             mState!!.migrateAccounts(this)
         }
+
+        var exportLogsLauncher =
+            registerForActivityResult(ActivityResultContracts.StartActivityForResult()) { result ->
+                if (result.resultCode == Activity.RESULT_OK) {
+                    result.data?.data?.let {
+                        exportLogs(this, it)
+                    }
+                }
+            }
 
         setContent {
             YouHaveMailTheme {
@@ -161,6 +170,14 @@ class MainActivity : ComponentActivity() {
                                     launcher.launch(Manifest.permission.POST_NOTIFICATIONS)
                                 }
                                 oneshotWorker(this)
+                            },
+                            onExportLogsClicked = {
+                                val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
+                                    addCategory(Intent.CATEGORY_OPENABLE)
+                                    type = "application/zip"
+                                    putExtra(Intent.EXTRA_TITLE, "you-have-mail-logs.zip")
+                                }
+                                exportLogsLauncher.launch(intent)
                             }
                         )
                     }
@@ -209,16 +226,6 @@ class MainActivity : ComponentActivity() {
         }
 
         super.onDestroy()
-    }
-
-    @Suppress("OverrideDeprecatedMigration")
-    override fun onActivityResult(requestCode: Int, resultCode: Int, data: Intent?) {
-        super.onActivityResult(requestCode, resultCode, data)
-        when (requestCode) {
-            LOG_EXPORT_REQUEST -> data?.data?.let {
-                exportLogs(this, it)
-            }
-        }
     }
 }
 

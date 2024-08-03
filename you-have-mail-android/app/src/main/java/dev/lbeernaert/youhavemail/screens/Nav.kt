@@ -1,19 +1,16 @@
 package dev.lbeernaert.youhavemail.screens
 
 import android.app.Activity
-import android.content.Intent
 import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
-import androidx.core.app.ActivityCompat.startActivityForResult
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import dev.lbeernaert.youhavemail.R
-import dev.lbeernaert.youhavemail.app.LOG_EXPORT_REQUEST
 import dev.lbeernaert.youhavemail.app.State
 import dev.lbeernaert.youhavemail.testProxy
 import kotlinx.coroutines.Dispatchers
@@ -27,6 +24,7 @@ fun MainNavController(
     state: State,
     requestPermissions: () -> Unit,
     onPollClicked: () -> Unit,
+    onExportLogsClicked: () -> Unit
 ) {
     val navController = rememberNavController()
 
@@ -130,21 +128,13 @@ fun MainNavController(
         composable(Routes.Settings.route) {
             Settings(
                 state = state,
-                context = context,
                 onBackClicked = {
                     navController.popBackStack()
                 },
                 onPollIntervalUpdate = { interval ->
                     state.setPollInterval(context, interval)
                 },
-                onExportLogsClicked = {
-                    val intent = Intent(Intent.ACTION_CREATE_DOCUMENT).apply {
-                        addCategory(Intent.CATEGORY_OPENABLE)
-                        type = "application/zip"
-                        putExtra(Intent.EXTRA_TITLE, "you-have-mail-logs.zip")
-                    }
-                    startActivityForResult(context, intent, LOG_EXPORT_REQUEST, null)
-                }
+                onExportLogsClicked = onExportLogsClicked
             )
         }
         // ------------------ PROXY LOGIN --------------------------------------------------------

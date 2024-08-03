@@ -1,6 +1,5 @@
 package dev.lbeernaert.youhavemail.screens
 
-import android.app.Activity
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -35,7 +34,6 @@ import dev.lbeernaert.youhavemail.components.AsyncScreen
 @OptIn(ExperimentalMaterialApi::class)
 @Composable
 fun Settings(
-    context: Activity,
     state: State,
     onBackClicked: () -> Unit,
     onPollIntervalUpdate: (ULong) -> Unit,
