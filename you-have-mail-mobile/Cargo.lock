@@ -536,7 +536,7 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 [[package]]
 name = "go-srp"
 version = "0.1.6"
-source = "git+https://github.com/LeanderBB/you-have-mail-common?branch=refactor#eb7476538383e5c45c9419911e5ac6a3a849fd39"
+source = "git+https://github.com/LeanderBB/you-have-mail-common#0b5dfd97d1d822b68d748479ce8daf560230298a"
 dependencies = [
  "base64",
  "bindgen",
@@ -589,7 +589,7 @@ dependencies = [
 [[package]]
 name = "http"
 version = "0.1.0"
-source = "git+https://github.com/LeanderBB/you-have-mail-common?branch=refactor#eb7476538383e5c45c9419911e5ac6a3a849fd39"
+source = "git+https://github.com/LeanderBB/you-have-mail-common#0b5dfd97d1d822b68d748479ce8daf560230298a"
 dependencies = [
  "anyhow",
  "secrecy",
@@ -912,7 +912,7 @@ dependencies = [
 [[package]]
 name = "proton-api"
 version = "0.14.0"
-source = "git+https://github.com/LeanderBB/you-have-mail-common?branch=refactor#eb7476538383e5c45c9419911e5ac6a3a849fd39"
+source = "git+https://github.com/LeanderBB/you-have-mail-common#0b5dfd97d1d822b68d748479ce8daf560230298a"
 dependencies = [
  "anyhow",
  "go-srp",
@@ -1870,7 +1870,7 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 [[package]]
 name = "you-have-mail-common"
 version = "0.11.0"
-source = "git+https://github.com/LeanderBB/you-have-mail-common?branch=refactor#eb7476538383e5c45c9419911e5ac6a3a849fd39"
+source = "git+https://github.com/LeanderBB/you-have-mail-common#0b5dfd97d1d822b68d748479ce8daf560230298a"
 dependencies = [
  "anyhow",
  "base64",
