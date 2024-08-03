@@ -1,0 +1,13 @@
+# Changed
+
+* Removed background service and notification
+* Polling is now preformed by WorkManager
+* Account state is persisted to disk between OS reboots
+* Update dependencies and deprecated APIs
+
+# Fixes
+
+* Startup crash when starting service from a worker
+* Fix proxy screen not remembering values
+* Https is not a valid proxy protocol
+
