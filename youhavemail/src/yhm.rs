@@ -232,6 +232,20 @@ impl Yhm {
         })?)
     }
 
+    /// Delete an existing account with `email` without logging out first.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the operation failed.
+    #[tracing::instrument(level=Level::DEBUG, skip(self))]
+    pub fn delete_without_logout(&self, email: &str) -> Result<(), Error> {
+        tracing::info!("Deleting account without logout");
+        Ok(self.state.delete(email).map_err(|e| {
+            error!("Failed to delete account:{e}");
+            e
+        })?)
+    }
+
     /// Logout an existing account.
     ///
     /// # Errors

@@ -54,6 +54,42 @@ fn login_sequence() {
         proton_api::mocks::auth::REFRESH_TOKEN
     );
 }
+
+#[test]
+fn remove_old_account_without_domain_suffix() {
+    // Login after migration for an account with domain suffix (foo) should be removed and
+    // we only should have one account with the full suffix (foo@proton.me).
+    let mut ctx = TestCtx::new();
+    let backend = ctx
+        .yhm
+        .backend_with_name(you_have_mail_common::backend::proton::NAME)
+        .unwrap()
+        .clone();
+
+    let client = backend.create_client(None).unwrap();
+    let session = proton_api::session::Session::with_in_memory_auth_store(client);
+    let mut sequence = proton_api::login::Sequence::without_server_proof_check(session);
+
+    create_v1_suffixless_account(&ctx);
+    assert_eq!(ctx.yhm.account_count().unwrap(), 1);
+    assert!(ctx.yhm.account(ACCOUNT_EMAIL_NO_SUFFIX,).unwrap().is_some());
+    {
+        let _auth_mocks = proton_api::mocks::auth::login_flow(&mut ctx.server, false);
+        sequence
+            .login(
+                proton_api::mocks::DEFAULT_USER_EMAIL,
+                proton_api::mocks::DEFAULT_USER_PASSWORD,
+                None,
+            )
+            .unwrap();
+        sequence.into_account(&ctx.yhm).unwrap();
+    }
+
+    assert_eq!(ctx.yhm.account_count().unwrap(), 1);
+    assert!(ctx.yhm.account(ACCOUNT_EMAIL_NO_SUFFIX).unwrap().is_none());
+    assert!(ctx.yhm.account(ACCOUNT_EMAIL).unwrap().is_some());
+}
+
 #[test]
 fn poll_sequence() {
     // Test basic flow when polling an account, from basic initialization to subsequent runs.
@@ -335,10 +371,7 @@ fn create_authenticated_account(ctx: &TestCtx, state: Option<TaskState>) {
     let account = ctx
         .yhm
         .new_account(ACCOUNT_EMAIL, you_have_mail_common::backend::proton::NAME)
-        .expect(
-            "Failed \
-        to create account",
-        );
+        .expect("Failed to create account");
     let auth = proton_api::auth::Auth {
         uid: Uid(proton_api::mocks::session_id().to_owned()),
         auth_token: Token(SecretString::new(
@@ -351,6 +384,15 @@ fn create_authenticated_account(ctx: &TestCtx, state: Option<TaskState>) {
 
     account.set_state(state.as_ref()).unwrap();
     account.set_secret(Some(&auth)).unwrap();
+}
+
+fn create_v1_suffixless_account(ctx: &TestCtx) {
+    ctx.yhm
+        .new_account(
+            ACCOUNT_EMAIL_NO_SUFFIX,
+            you_have_mail_common::backend::proton::NAME,
+        )
+        .expect("Failed to create account");
 }
 
 fn account_state(ctx: &TestCtx) -> Option<TaskState> {
@@ -385,3 +427,4 @@ fn event_id(id: u32) -> event::Id {
 }
 
 const ACCOUNT_EMAIL: &str = proton_api::mocks::DEFAULT_USER_EMAIL;
+const ACCOUNT_EMAIL_NO_SUFFIX: &str = "foo";

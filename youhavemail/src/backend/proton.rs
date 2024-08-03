@@ -474,6 +474,29 @@ impl IntoAccount for Sequence {
             e
         })?;
 
+        // This snippet is to patch ported accounts from v1 which do not have the full
+        // email address. E.g: It was possible to register an account "foo@proton.me" only
+        // as "foo". When we add a new entry, in this version it always has the full address,
+        // so we end up with 2 entries.
+        if let Some((name, _)) = user_info.email.split_once('@') {
+            let found = match yhm.account(name) {
+                Ok(account) => account.is_some(),
+                Err(e) => {
+                    error!("Failed to check for v1 style account: {e}");
+                    return Ok(());
+                }
+            };
+
+            if found {
+                debug!("Found old account without domain suffix");
+                if let Err(e) = yhm.delete_without_logout(name) {
+                    error!("Failed to delete account without domain suffix: {e}");
+                } else {
+                    debug!("Old account without domain suffix removed");
+                }
+            }
+        }
+
         Ok(())
     }
 }
