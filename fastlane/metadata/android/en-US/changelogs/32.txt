@@ -1,3 +1,8 @@
+# Notice
+
+* All accounts will be in logged out state after migration
+  to new storage format.
+
 # Changed
 
 * Removed background service and notification
