@@ -57,7 +57,6 @@ class State(context: Context) : BroadcastReceiver() {
 
         val filter = IntentFilter()
         filter.addAction(POLL_INTENT)
-        filter.addAction(START_INTENT)
         LocalBroadcastManager.getInstance(context)
             .registerReceiver(this, filter)
     }
@@ -207,11 +206,6 @@ class State(context: Context) : BroadcastReceiver() {
             POLL_INTENT -> {
                 Log.d(STATE_LOG_TAG, "Received poll intent")
                 onPolled(context, intent.getStringExtra(POLL_INTENT))
-            }
-
-            START_INTENT -> {
-                Log.d(STATE_LOG_TAG, "Received start intent")
-                registerWorker(context, mPollInterval.value.toLong(), true)
             }
         }
     }

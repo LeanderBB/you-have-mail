@@ -4,9 +4,8 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
-
-const val START_INTENT= "APP_STARTED"
+import dev.lbeernaert.youhavemail.Yhm
+import dev.lbeernaert.youhavemail.YhmException
 
 class StartReceiver : BroadcastReceiver() {
     override fun onReceive(context: Context, intent: Intent) {
@@ -14,10 +13,17 @@ class StartReceiver : BroadcastReceiver() {
             Log.i("BOOT", "Received boot notification")
 
             try {
-                val localIntent = Intent(START_INTENT)
-                LocalBroadcastManager.getInstance(context).sendBroadcast(localIntent)
-            } catch (e: Exception) {
-                Log.e("BOOT", "Failed to send intent: $e")
+                val key = getOrCreateEncryptionKey(context)
+                val dbPath = getDatabasePath(context)
+                val yhm = Yhm.withoutDbInit(dbPath, encryptionKey = key)
+                registerWorker(context, yhm.pollInterval().toLong() / 60, false)
+            } catch (e: YhmException) {
+                createServiceErrorNotification(
+                    context,
+                    "Failed to Create Yhm on boot and register work",
+                    e
+                )
+                return;
             }
         }
     }
