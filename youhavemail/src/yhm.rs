@@ -6,7 +6,7 @@ use secrecy::ExposeSecret;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{error, Level};
+use tracing::{debug, error, Level};
 
 /// Conversion trait for new accounts.
 pub trait IntoAccount {
@@ -81,6 +81,7 @@ impl Yhm {
         for account in accounts {
             let result = tracing::debug_span!("account", email = account.email()).in_scope(
                 || -> Result<PollOutput, Error> {
+                    debug!("Polling...");
                     let email = account.email().to_owned();
                     let backend = account.backend().to_owned();
                     let mut account = self.build_account_poller(account)?;
