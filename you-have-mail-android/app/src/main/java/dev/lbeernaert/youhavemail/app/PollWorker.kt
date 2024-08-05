@@ -15,8 +15,10 @@ import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
 import androidx.work.hasKeyWithValueOfType
+import dev.lbeernaert.youhavemail.Event
 import dev.lbeernaert.youhavemail.Yhm
 import dev.lbeernaert.youhavemail.YhmException
+import dev.lbeernaert.youhavemail.initLog
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "PollWorker"
@@ -86,8 +88,44 @@ private fun poll(context: Context) {
     var error: String? = null
     try {
         yhm.poll()
+        try {
+            val events = yhm.lastEvents()
+            for (event in events) {
+                when (event) {
+                    is Event.Email -> {
+                        for (email in event.emails) {
+                            NOTIFICATION_STATE.onNewEmail(
+                                context,
+                                event.email,
+                                event.backend,
+                                email.sender,
+                                email.subject
+                            )
+                        }
+                    }
+
+                    is Event.Error -> {
+                        NOTIFICATION_STATE.onError(context, event.v1, event.v2)
+                    }
+
+                    is Event.LoggedOut -> {
+                        NOTIFICATION_STATE.onLoggedOut(
+                            context,
+                            event.v1,
+                        )
+                    }
+
+                    is Event.Offline -> {
+                        // Do nothing.
+                    }
+                }
+            }
+        } catch (e: Exception) {
+            createServiceErrorNotification(context, "Failed to retrieve events: $e")
+        }
     } catch (e: YhmException) {
         error = e.toString()
+        createServiceErrorNotification(context, error)
     } finally {
         yhm.close()
     }
@@ -110,6 +148,7 @@ private fun constraints(): Constraints {
 }
 
 fun registerWorker(ctx: Context, minutes: Long, cancel: Boolean) {
+    initLog(getLogPath(ctx).path);
     val inputData = Data.Builder().putLong("INTERVAL", minutes).build()
     val constraints = constraints()
     val wm = WorkManager.getInstance(ctx)
@@ -130,7 +169,7 @@ fun registerWorker(ctx: Context, minutes: Long, cancel: Boolean) {
         wm
             .enqueueUniquePeriodicWork(
                 POLL_WORKER_JOB_NAME,
-                ExistingPeriodicWorkPolicy.CANCEL_AND_REENQUEUE,
+                ExistingPeriodicWorkPolicy.KEEP,
                 work
             )
     } else {
@@ -142,7 +181,7 @@ fun registerWorker(ctx: Context, minutes: Long, cancel: Boolean) {
 
         wm.enqueueUniqueWork(
             POLL_WORKER_JOB_NAME,
-            ExistingWorkPolicy.REPLACE,
+            ExistingWorkPolicy.KEEP,
             work
         )
     }
@@ -158,5 +197,5 @@ fun oneshotWorker(ctx: Context) {
         .build()
 
     val wm = WorkManager.getInstance(ctx)
-    wm.enqueueUniqueWork(ONE_SHOT_WORKER_JOB_NAME, ExistingWorkPolicy.REPLACE, work)
+    wm.enqueueUniqueWork(ONE_SHOT_WORKER_JOB_NAME, ExistingWorkPolicy.KEEP, work)
 }

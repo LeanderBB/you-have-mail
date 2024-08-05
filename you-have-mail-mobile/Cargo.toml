@@ -1,6 +1,6 @@
 [package]
 name = "you-have-mail-mobile"
-version = "0.12.0"
+version = "0.13.0"
 edition = "2021"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
@@ -14,6 +14,7 @@ name = "youhavemail"
 [dependencies]
 uniffi = { version = "0.28.0", features = ["cli"] }
 you-have-mail-common = { git = "https://github.com/LeanderBB/you-have-mail-common"}
+# you-have-mail-common = { path = "../../you-have-mail-common/youhavemail"}
 thiserror = "1"
 parking_lot = "0.12"
 tracing = "0.1"

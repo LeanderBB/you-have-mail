@@ -480,9 +480,9 @@ checksum = "7360491ce676a36bf9bb3c56c1aa791658183a54d2744120f27285738d90465a"
 
 [[package]]
 name = "flate2"
-version = "1.0.30"
+version = "1.0.31"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5f54427cfd1c7829e2a139fcefea601bf088ebca651d2bf53ebc600eac295dae"
+checksum = "7f211bbe8e69bbd0cfdea405084f128ae8b4aaa6b0b522fc8f2b009084797920"
 dependencies = [
  "crc32fast",
  "miniz_oxide",
@@ -536,7 +536,7 @@ checksum = "d2fabcfbdc87f4758337ca535fb41a6d701b65693ce38287d856d1674551ec9b"
 [[package]]
 name = "go-srp"
 version = "0.1.6"
-source = "git+https://github.com/LeanderBB/you-have-mail-common#0b5dfd97d1d822b68d748479ce8daf560230298a"
+source = "git+https://github.com/LeanderBB/you-have-mail-common#07583e2655f331c6d50358b75c9726c60803f097"
 dependencies = [
  "base64",
  "bindgen",
@@ -589,7 +589,7 @@ dependencies = [
 [[package]]
 name = "http"
 version = "0.1.0"
-source = "git+https://github.com/LeanderBB/you-have-mail-common#0b5dfd97d1d822b68d748479ce8daf560230298a"
+source = "git+https://github.com/LeanderBB/you-have-mail-common#07583e2655f331c6d50358b75c9726c60803f097"
 dependencies = [
  "anyhow",
  "secrecy",
@@ -912,7 +912,7 @@ dependencies = [
 [[package]]
 name = "proton-api"
 version = "0.14.0"
-source = "git+https://github.com/LeanderBB/you-have-mail-common#0b5dfd97d1d822b68d748479ce8daf560230298a"
+source = "git+https://github.com/LeanderBB/you-have-mail-common#07583e2655f331c6d50358b75c9726c60803f097"
 dependencies = [
  "anyhow",
  "go-srp",
@@ -1870,7 +1870,7 @@ checksum = "589f6da84c646204747d1270a2a5661ea66ed1cced2631d546fdfb155959f9ec"
 [[package]]
 name = "you-have-mail-common"
 version = "0.11.0"
-source = "git+https://github.com/LeanderBB/you-have-mail-common#0b5dfd97d1d822b68d748479ce8daf560230298a"
+source = "git+https://github.com/LeanderBB/you-have-mail-common#07583e2655f331c6d50358b75c9726c60803f097"
 dependencies = [
  "anyhow",
  "base64",
@@ -1891,7 +1891,7 @@ dependencies = [
 
 [[package]]
 name = "you-have-mail-mobile"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "anyhow",
  "chrono",

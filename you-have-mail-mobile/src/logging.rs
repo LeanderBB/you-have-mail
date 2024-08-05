@@ -26,7 +26,7 @@ pub fn init_log(filepath: String) -> Option<String> {
 fn init_log_fn(path: PathBuf) -> Result<(), Box<dyn Error + Send + Sync>> {
     let appender = tracing_appender::rolling::never(path, "yhm.log");
     let filter = EnvFilter::builder().parse_lossy(
-        "info,you_have_mail_mobile=debug,you_have_mail_common=debug,http=debug,proton_api=debug",
+        "info,you_have_mail_common=debug,http=debug,proton_api=debug",
     );
     tracing_subscriber::FmtSubscriber::builder()
         .with_ansi(false)
@@ -39,11 +39,6 @@ fn init_log_fn(path: PathBuf) -> Result<(), Box<dyn Error + Send + Sync>> {
 #[export]
 fn yhm_log_info(text: &str) {
     tracing::info!("[APP] {text}");
-}
-
-#[export]
-fn yhm_log_debug(text: &str) {
-    tracing::debug!("[APP] {text}");
 }
 
 #[export]

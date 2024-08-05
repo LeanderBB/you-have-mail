@@ -1,0 +1,4 @@
+# Fixed
+
+* Some notifications not being delivered
+* Do not cancel work on startup if no change has been made to poll interval

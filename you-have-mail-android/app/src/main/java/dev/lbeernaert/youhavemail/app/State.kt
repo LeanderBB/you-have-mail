@@ -38,12 +38,16 @@ class ObserverServiceState {
 
 const val STATE_LOG_TAG = "state"
 
+// Has to be global singleton for now so that the ids are accessible for the worker
+// and the system. Could be moved to a shared preferences setup for persistent
+// changes.
+var NOTIFICATION_STATE = NotificationState()
+
 class State(context: Context) : BroadcastReceiver() {
     private var mPollInterval = MutableStateFlow(15UL)
     private var mYhm: Yhm
     private var mAccounts: MutableStateFlow<List<Account>>
     private var mOpenAccount: MutableStateFlow<Account?> = MutableStateFlow(null)
-    private var mNotificationState = NotificationState()
     var mLoginSequence: LoginSequence? = null
 
     init {
@@ -53,7 +57,7 @@ class State(context: Context) : BroadcastReceiver() {
         mAccounts = MutableStateFlow(mYhm.accounts())
         val pollInterval = mYhm.pollInterval()
         mPollInterval.value = pollInterval
-        registerWorker(context, pollInterval.toLong() / 60, true)
+        registerWorker(context, pollInterval.toLong() / 60, false)
 
         val filter = IntentFilter()
         filter.addAction(POLL_INTENT)
@@ -205,54 +209,9 @@ class State(context: Context) : BroadcastReceiver() {
         when (intent.action) {
             POLL_INTENT -> {
                 Log.d(STATE_LOG_TAG, "Received poll intent")
-                onPolled(context, intent.getStringExtra(POLL_INTENT))
+                refreshData()
             }
         }
-    }
-
-    private fun onPolled(context: Context, errorMsg: String?) {
-        if (errorMsg != null) {
-            createServiceErrorNotification(context, errorMsg)
-            return
-        }
-
-        try {
-            val events = mYhm.lastEvents()
-            for (event in events) {
-                when (event) {
-                    is Event.Email -> {
-                        for (email in event.emails) {
-                            mNotificationState.onNewEmail(
-                                context,
-                                event.email,
-                                event.backend,
-                                email.sender,
-                                email.subject
-                            )
-                        }
-                    }
-
-                    is Event.Error -> {
-                        mNotificationState.onError(context, event.v1, event.v2)
-                    }
-
-                    is Event.LoggedOut -> {
-                        mNotificationState.onLoggedOut(
-                            context,
-                            event.v1,
-                        )
-                    }
-
-                    is Event.Offline -> {
-                        // Do nothing.
-                    }
-                }
-            }
-        } catch (e: Exception) {
-            createServiceErrorNotification(context, "Failed to retrieve events: $e")
-        }
-
-        refreshData()
     }
 }
 
