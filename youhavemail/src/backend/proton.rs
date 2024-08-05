@@ -194,6 +194,8 @@ impl crate::backend::Poller for Poller {
             if let Some(mut event_id) = self.state.last_event_id.clone() {
                 let mut has_more = MoreEvents::No;
                 loop {
+                    let scope = tracing::trace_span!("Event Poll", Id = event_id.to_string());
+                    let _enter = scope.enter();
                     let event = self
                         .session
                         .execute_with_auth(GetEventRequest::new(&event_id))
@@ -201,8 +203,11 @@ impl crate::backend::Poller for Poller {
                             error!("Failed to get event: {e}");
                             e
                         })?;
+                    tracing::trace!("Next={} HasMore={:?}", event.event_id, has_more);
                     if event.event_id != event_id || has_more == MoreEvents::Yes {
+                        tracing::trace!("Handling event");
                         if let Some(label_events) = event.labels {
+                            tracing::trace!("Handling label events");
                             self.state.handle_label_events(label_events);
                         }
 
@@ -211,9 +216,14 @@ impl crate::backend::Poller for Poller {
                         }
 
                         event_id = event.event_id;
+                        tracing::trace!("Next Event={}", event_id);
                         self.state.last_event_id = Some(event_id.clone());
                         has_more = event.more;
                     } else {
+                        tracing::trace!(
+                            "No more work left. Next Event = {:?}",
+                            self.state.last_event_id
+                        );
                         self.account.set_state(Some(&self.state)).map_err(|e| {
                             error!("Failed to update state after check: {e}");
                             e
@@ -377,17 +387,23 @@ impl EventState {
         state: &TaskState,
     ) {
         for msg_event in msg_events {
+            let scope = tracing::trace_span!("Message Event", Id = msg_event.id.to_string());
+            let _enter = scope.enter();
             match msg_event.action {
                 event::Action::Create => {
                     if let Some(message) = msg_event.message {
+                        tracing::trace!("Create Event");
+
                         // If the newly created message is not unread, it must have been read
                         // already.
                         if message.unread == Boolean::False {
+                            tracing::trace!("Is read, skipping");
                             continue;
                         }
 
                         // Check if the message has arrived in the inbox.
                         if state.should_publish_notification(&message.labels) {
+                            tracing::trace!("Arrived to notifiable folder, recording");
                             self.new_emails.push(MessageInfo {
                                 id: message.id.clone(),
                                 subject: message.subject.clone(),
@@ -398,20 +414,27 @@ impl EventState {
                                 },
                             });
                             self.unseen.insert(message.id.clone());
+                        } else {
+                            tracing::trace!("Arrived to non-notifiable folder, skipping");
                         }
                     }
                 }
                 event::Action::Update | event::Action::UpdateFlags => {
+                    tracing::trace!("Update Event");
                     if let Some(message) = msg_event.message {
                         // If message switches to unread state, remove
                         if message.unread == Boolean::False {
+                            tracing::trace!("Message has been read, removing from valid list");
                             self.unseen.remove(&message.id);
                         }
                     }
                 }
                 // Message Deleted, remove from the list.
                 event::Action::Delete => {
-                    self.unseen.remove(&msg_event.id);
+                    tracing::trace!("Delete Event");
+                    if self.unseen.remove(&msg_event.id) {
+                        tracing::trace!("Tracked message has been removed");
+                    }
                 }
             };
         }
