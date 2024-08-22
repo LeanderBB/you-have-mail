@@ -1,0 +1,3 @@
+# Fixed
+
+- Fixed poll not triggering for intervals less than 15 min.

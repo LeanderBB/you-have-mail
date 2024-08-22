@@ -19,6 +19,8 @@ import dev.lbeernaert.youhavemail.Event
 import dev.lbeernaert.youhavemail.Yhm
 import dev.lbeernaert.youhavemail.YhmException
 import dev.lbeernaert.youhavemail.initLog
+import dev.lbeernaert.youhavemail.yhmLogError
+import dev.lbeernaert.youhavemail.yhmLogInfo
 import java.util.concurrent.TimeUnit
 
 private const val TAG = "PollWorker"
@@ -55,19 +57,25 @@ class OneTimePollWorker(ctx: Context, params: WorkerParameters) :
     Worker(ctx, params) {
 
     override fun doWork(): Result {
-        return try {
+        try {
             poll(applicationContext)
+        } catch (e: Exception) {
+            Log.e(TAG, "Failed to poll: $e")
+            yhmLogError("Unhandled exception: $e")
+            return Result.failure()
+        }
 
+        try {
             if (inputData.hasKeyWithValueOfType<Long>("INTERVAL")) {
-                val interval = inputData.getLong("INTERVAL", 15 * 60)
+                val interval = inputData.getLong("INTERVAL", 15)
                 registerWorker(applicationContext, interval, false)
             }
-
-            Result.success()
         } catch (e: Exception) {
-            Log.e(TAG, "Failed to send local broadcast: $e")
-            Result.failure()
+            yhmLogError("Failed to re-register one time poll worker: $e");
+            createServiceErrorNotification(applicationContext, "Failed to create worker: $e")
         }
+
+        return Result.success()
     }
 }
 
@@ -135,9 +143,14 @@ private fun poll(context: Context) {
     // since currently there exists no such thing for rust, we simply broad cast the success of
     // this work and let the main activity handle the notification state.
 
-    val localIntent = Intent(POLL_INTENT)
-    localIntent.putExtra(POLL_ERROR_KEY, error)
-    LocalBroadcastManager.getInstance(context).sendBroadcast(localIntent)
+    try {
+        val localIntent = Intent(POLL_INTENT)
+        localIntent.putExtra(POLL_ERROR_KEY, error)
+        LocalBroadcastManager.getInstance(context).sendBroadcast(localIntent)
+    } catch (e: Exception) {
+        yhmLogError("Failed to publish broadcast: $e")
+        createServiceErrorNotification(context, "Failed to publish broadcast: $e")
+    }
 }
 
 /**
@@ -181,7 +194,7 @@ fun registerWorker(ctx: Context, minutes: Long, cancel: Boolean) {
 
         wm.enqueueUniqueWork(
             POLL_WORKER_JOB_NAME,
-            ExistingWorkPolicy.KEEP,
+            ExistingWorkPolicy.REPLACE,
             work
         )
     }
