@@ -10,9 +10,11 @@ import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dev.lbeernaert.youhavemail.Account
+import dev.lbeernaert.youhavemail.AccountsUpdated
 import dev.lbeernaert.youhavemail.Backend
 import dev.lbeernaert.youhavemail.Event
 import dev.lbeernaert.youhavemail.Proxy
+import dev.lbeernaert.youhavemail.WatchHandle
 import dev.lbeernaert.youhavemail.Yhm
 import dev.lbeernaert.youhavemail.activityLogTag
 import dev.lbeernaert.youhavemail.newEncryptionKey
@@ -43,26 +45,23 @@ const val STATE_LOG_TAG = "state"
 // changes.
 var NOTIFICATION_STATE = NotificationState()
 
-class State(context: Context) : BroadcastReceiver() {
+class State(context: Context) : AccountsUpdated {
     private var mPollInterval = MutableStateFlow(15UL)
     private var mYhm: Yhm
     private var mAccounts: MutableStateFlow<List<Account>>
     private var mOpenAccount: MutableStateFlow<Account?> = MutableStateFlow(null)
     var mLoginSequence: LoginSequence? = null
+    private var mWatchHandle: WatchHandle? = null
 
     init {
         val key = getOrCreateEncryptionKey(context)
         val dbPath = getDatabasePath(context)
         mYhm = Yhm(dbPath, encryptionKey = key)
+        mWatchHandle = mYhm.addAccountObserver(this)
         mAccounts = MutableStateFlow(mYhm.accounts())
         val pollInterval = mYhm.pollInterval()
         mPollInterval.value = pollInterval
         registerWorker(context, pollInterval.toLong() / 60, false)
-
-        val filter = IntentFilter()
-        filter.addAction(POLL_INTENT)
-        LocalBroadcastManager.getInstance(context)
-            .registerReceiver(this, filter)
     }
 
 
@@ -89,8 +88,6 @@ class State(context: Context) : BroadcastReceiver() {
                 yhmLogError("Failed to delete old config file: $e")
             }
         }
-
-        refreshData()
     }
 
     /**
@@ -133,18 +130,10 @@ class State(context: Context) : BroadcastReceiver() {
     }
 
     /**
-     * Call this function when a new account has been added.
-     */
-    fun onAccountAdded() {
-        refreshData()
-    }
-
-    /**
      * Logout account by email.
      */
     fun logout(email: String) {
         mYhm.logout(email)
-        refreshData()
     }
 
     /**
@@ -152,7 +141,6 @@ class State(context: Context) : BroadcastReceiver() {
      */
     fun delete(email: String) {
         mYhm.delete(email)
-        refreshData()
     }
 
     fun yhm(): Yhm {
@@ -175,15 +163,13 @@ class State(context: Context) : BroadcastReceiver() {
      */
     fun close(context: Context) {
         Log.i(STATE_LOG_TAG, "Closing")
-        LocalBroadcastManager.getInstance(context).unregisterReceiver(this)
         mAccounts.value = ArrayList()
         mLoginSequence = null
+        mWatchHandle = null
         mYhm.close()
     }
 
-    // Refresh internal state from the database.
-    private fun refreshData() {
-        val accounts = mYhm.accounts()
+    override fun onAccountsUpdated(accounts: List<Account>) {
         if (mOpenAccount.value != null) {
             val accountEmail = mOpenAccount.value!!.email()
             mOpenAccount.value = accounts.find {
@@ -191,27 +177,6 @@ class State(context: Context) : BroadcastReceiver() {
             }
         }
         mAccounts.value = accounts
-    }
-
-    override fun onReceive(context: Context?, intent: Intent?) {
-        if (intent == null) {
-            return
-        }
-        if (intent.action == null) {
-            return
-        }
-
-        if (context == null) {
-            Log.e("STATE", "No context")
-            return
-        }
-
-        when (intent.action) {
-            POLL_INTENT -> {
-                Log.d(STATE_LOG_TAG, "Received poll intent")
-                refreshData()
-            }
-        }
     }
 }
 

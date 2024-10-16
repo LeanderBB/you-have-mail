@@ -1,5 +1,7 @@
 use crate::events::Event;
 use chrono::{DateTime, Local};
+use std::fmt::Debug;
+use std::sync::Arc;
 use you_have_mail_common as yhm;
 
 /// An account in the system.
@@ -63,5 +65,22 @@ impl Account {
 impl Account {
     pub fn new(account: yhm::state::Account) -> Self {
         Self { account }
+    }
+}
+
+#[uniffi::export(with_foreign)]
+pub trait AccountWatcher: Send + Sync + Debug {
+    fn on_accounts_updated(&self, accounts: Vec<Arc<Account>>);
+}
+pub(crate) struct FFIAccountTableObserver(pub Arc<dyn AccountWatcher>);
+
+impl you_have_mail_common::state::AccountWatcher for FFIAccountTableObserver {
+    fn on_accounts_updated(&self, accounts: Vec<you_have_mail_common::state::Account>) {
+        self.0.on_accounts_updated(
+            accounts
+                .into_iter()
+                .map(|v| Arc::new(Account::new(v)))
+                .collect(),
+        );
     }
 }

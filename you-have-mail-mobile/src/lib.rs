@@ -7,6 +7,7 @@ mod account;
 pub mod backend;
 mod events;
 mod logging;
+mod watcher;
 pub mod yhm;
 
 uniffi::setup_scaffolding!();

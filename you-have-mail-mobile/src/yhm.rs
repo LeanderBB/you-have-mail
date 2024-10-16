@@ -1,12 +1,20 @@
-use crate::account::Account;
+use crate::account::{Account, AccountWatcher, FFIAccountTableObserver};
 use crate::backend::Backend;
 use crate::events::Event;
 use crate::proxy::Proxy;
+use crate::watcher::WatchHandle;
+use sqlite_watcher::watcher::Watcher;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, OnceLock};
 use std::time::Duration;
 use you_have_mail_common as yhm;
 use you_have_mail_common::secrecy::ExposeSecret;
+
+static WATCHER: OnceLock<Arc<Watcher>> = OnceLock::new();
+
+pub(crate) fn watcher() -> &'static Arc<Watcher> {
+    WATCHER.get_or_init(|| Watcher::new().unwrap())
+}
 
 #[derive(Debug, uniffi::Error, thiserror::Error)]
 pub enum YhmError {
@@ -55,8 +63,8 @@ impl Yhm {
     pub fn new(db_path: String, encryption_key: String) -> Result<Self, YhmError> {
         let key = yhm::encryption::Key::with_base64(encryption_key)
             .map_err(|e| yhm::yhm::Error::from(yhm::state::Error::from(e)))?;
-        let state =
-            yhm::state::State::new(PathBuf::from(db_path), key).map_err(yhm::yhm::Error::from)?;
+        let state = yhm::state::State::new(PathBuf::from(db_path), key, Arc::clone(watcher()))
+            .map_err(yhm::yhm::Error::from)?;
         Ok(Self {
             yhm: yhm::yhm::Yhm::new(state),
         })
@@ -71,7 +79,8 @@ impl Yhm {
     pub fn without_db_init(db_path: String, encryption_key: String) -> Result<Self, YhmError> {
         let key = yhm::encryption::Key::with_base64(encryption_key)
             .map_err(|e| yhm::yhm::Error::from(yhm::state::Error::from(e)))?;
-        let state = yhm::state::State::without_init(PathBuf::from(db_path), key);
+        let state =
+            yhm::state::State::without_init(PathBuf::from(db_path), key, Arc::clone(watcher()));
         Ok(Self {
             yhm: yhm::yhm::Yhm::new(state),
         })
@@ -202,6 +211,22 @@ impl Yhm {
             .into_iter()
             .map(Event::from)
             .collect())
+    }
+
+    /// Watch available accounts and receive an updated list when any changes
+    /// are made.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the registration failed.
+    pub fn watch_accounts(
+        &self,
+        observer: Arc<dyn AccountWatcher>,
+    ) -> Result<WatchHandle, YhmError> {
+        Ok(self
+            .yhm
+            .watch_accounts(FFIAccountTableObserver(observer))?
+            .into())
     }
 }
 

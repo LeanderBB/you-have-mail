@@ -41,7 +41,7 @@ impl From<yhm::http::ProxyAuth> for Auth {
     fn from(value: yhm::http::ProxyAuth) -> Self {
         Self {
             user: value.username,
-            password: value.password.expose_secret().clone(),
+            password: value.password.expose_secret().to_owned(),
         }
     }
 }
@@ -50,7 +50,7 @@ impl From<Auth> for yhm::http::ProxyAuth {
     fn from(value: Auth) -> Self {
         yhm::http::ProxyAuth {
             username: value.user,
-            password: SecretString::new(value.password),
+            password: SecretString::new(value.password.into()),
         }
     }
 }

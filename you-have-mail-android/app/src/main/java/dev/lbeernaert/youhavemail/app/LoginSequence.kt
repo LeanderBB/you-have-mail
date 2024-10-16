@@ -96,7 +96,6 @@ class ProtonLogin(state: State, proxy: Proxy?) : LoginSequence {
             navController.navigate(Routes.TOTP.route)
         } else if (mSequence.isLoggedIn()) {
             mSequence.createAccount(mState.yhm())
-            mState.onAccountAdded()
             navController.popBackStack(Routes.Main.route, false)
         }
     }
