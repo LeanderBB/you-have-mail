@@ -6,7 +6,7 @@ use crate::events::Event;
 use chrono::{DateTime, Utc};
 use http::Proxy;
 use rusqlite::{OptionalExtension, Row};
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretBox, SecretSlice};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
 use sqlite_watcher::watcher::{DropRemoveTableObserverHandle, TableObserver, Watcher};
@@ -215,7 +215,7 @@ impl<T: AccountWatcher> TableObserver for AccountsUpdatedTableObserver<T> {
 /// Contains all state serialized in the database.
 pub struct State {
     pool: Arc<Pool>,
-    encryption_key: Secret<Key>,
+    encryption_key: SecretBox<Key>,
 }
 
 impl State {
@@ -226,7 +226,7 @@ impl State {
     /// Returns errors if we failed to create the tables.
     pub fn new(
         db_path: PathBuf,
-        encryption_key: Secret<Key>,
+        encryption_key: SecretBox<Key>,
         watcher: Arc<Watcher>,
     ) -> Result<Arc<Self>, Error> {
         let pool = Pool::new(db_path, watcher);
@@ -247,7 +247,7 @@ impl State {
     #[must_use]
     pub fn without_init(
         db_path: PathBuf,
-        encryption_key: Secret<Key>,
+        encryption_key: SecretBox<Key>,
         watcher: Arc<Watcher>,
     ) -> Arc<Self> {
         let pool = Pool::new(db_path, watcher);
@@ -259,7 +259,7 @@ impl State {
 
     /// Get the encryption key.
     #[must_use]
-    pub fn encryption_key(&self) -> &Secret<Key> {
+    pub fn encryption_key(&self) -> &SecretBox<Key> {
         &self.encryption_key
     }
 
@@ -711,7 +711,7 @@ CREATE TABLE IF NOT EXISTS yhm_poll_event (
 ///
 /// Returns error if the decryption or deserialization failed.
 fn secret_from_bytes<T: DeserializeOwned>(key: &Key, bytes: &[u8]) -> Result<T, Error> {
-    let decrypted = Secret::new(key.decrypt(bytes)?);
+    let decrypted = SecretSlice::new(key.decrypt(bytes)?.into());
     Ok(serde_json::from_slice::<T>(decrypted.expose_secret())?)
 }
 
@@ -721,7 +721,7 @@ fn secret_from_bytes<T: DeserializeOwned>(key: &Key, bytes: &[u8]) -> Result<T, 
 ///
 /// Returns error if the encryption or serialization failed.
 fn secret_to_bytes<T: Serialize>(key: &Key, value: &T) -> Result<Vec<u8>, Error> {
-    let serialized = Secret::new(serde_json::to_vec(value)?);
+    let serialized = SecretSlice::new(serde_json::to_vec(value)?.into());
     let encrypted = key.encrypt(serialized.expose_secret())?;
     Ok(encrypted)
 }

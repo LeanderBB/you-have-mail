@@ -50,7 +50,7 @@ impl Config {
                 },
                 auth: v.auth.map(|auth| http::ProxyAuth {
                     username: auth.username,
-                    password: SecretString::new(auth.password),
+                    password: SecretString::new(auth.password.into()),
                 }),
                 host: v.url,
                 port: v.port,

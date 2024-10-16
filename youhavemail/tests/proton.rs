@@ -375,10 +375,10 @@ fn create_authenticated_account(ctx: &TestCtx, state: Option<TaskState>) {
     let auth = proton_api::auth::Auth {
         uid: Uid(proton_api::mocks::session_id().to_owned()),
         auth_token: Token(SecretString::new(
-            proton_api::mocks::auth::ACCESS_TOKEN.to_owned(),
+            proton_api::mocks::auth::ACCESS_TOKEN.to_owned().into(),
         )),
         refresh_token: RefreshToken(SecretString::new(
-            proton_api::mocks::auth::REFRESH_TOKEN.to_owned(),
+            proton_api::mocks::auth::REFRESH_TOKEN.to_owned().into(),
         )),
     };
 

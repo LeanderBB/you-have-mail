@@ -1,5 +1,5 @@
 use proton_api::domain::SecretString;
-use secrecy::{ExposeSecret, Secret};
+use secrecy::{ExposeSecret, SecretBox};
 use sqlite_watcher::watcher::Watcher;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
@@ -10,54 +10,6 @@ use tracing::info;
 use you_have_mail_common::encryption::Key;
 use you_have_mail_common::state::State;
 use you_have_mail_common::yhm::{IntoAccount, Yhm};
-/*
-struct StdOutNotifier {}
-
-impl Notifier for StdOutNotifier {
-    fn notify<'a>(&self, notification: Notification) {
-        match notification {
-            Notification::NewEmail {
-                account,
-                backend,
-                emails,
-            } => {
-                info!("{} new email(s) for {account} on {backend}", emails.len());
-                for info in emails {
-                    info!("--> Sender={} Subject={}", info.sender, info.subject);
-                }
-            }
-            Notification::AccountAdded(email, backend, _) => {
-                info!("Account Added {email} ({backend})");
-            }
-            Notification::AccountLoggedOut(email) => {
-                info!("Account Logged out {email}");
-            }
-            Notification::AccountRemoved(email) => {
-                info!("Account Removed {email}");
-            }
-            Notification::AccountOffline(email) => {
-                warn!("Account Offline {email}");
-            }
-            Notification::AccountOnline(email) => {
-                info!("Account Online {email}");
-            }
-            Notification::AccountError(email, e) => {
-                error!("Account {email}: {e}");
-            }
-            Notification::ProxyApplied(email, _) => {
-                info!("Account {email} proxy changed");
-            }
-            Notification::ConfigError(e) => {
-                error!("Config Error: {e}");
-            }
-            Notification::Error(e) => {
-                error!("{e}");
-            }
-        }
-    }
-}
-
- */
 
 fn main() {
     let filter = tracing_subscriber::EnvFilter::builder()
@@ -93,14 +45,16 @@ fn main() {
         info!("No previous accounts logging in with ENV{{YHM_EMAIL}} and ENV{{YHM_PASSWORD}}");
         let email = std::env::var("YHM_EMAIL").expect("Failed to resolve env YHM_EMAIL");
         let password = SecretString::new(
-            std::env::var("YHM_PASSWORD").expect("Failed to resolve env YHM_PASSWORD"),
+            std::env::var("YHM_PASSWORD")
+                .expect("Failed to resolve env YHM_PASSWORD")
+                .into(),
         );
 
         let mut sequence =
             you_have_mail_common::backend::proton::Backend::login_sequence(None).unwrap();
 
         sequence
-            .login(&email, password.expose_secret().as_str(), None)
+            .login(&email, password.expose_secret(), None)
             .expect("Failed to login into account");
         if sequence.is_awaiting_totp() {
             let mut stdout = std::io::stdout();
@@ -134,7 +88,7 @@ fn main() {
     info!("Goodbye");
 }
 
-fn get_or_create_encryption_key() -> Secret<Key> {
+fn get_or_create_encryption_key() -> SecretBox<Key> {
     let entry = keyring::Entry::new("you-have-mail-common", "secret-key-b64").unwrap();
     match entry.get_password() {
         Err(e) => {

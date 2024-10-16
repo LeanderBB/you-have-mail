@@ -2,7 +2,8 @@
 use base64::Engine;
 use chacha20poly1305::aead::{Aead, OsRng};
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key as CryptoKey, KeyInit, Nonce};
-use secrecy::{Secret, Zeroize};
+use secrecy::zeroize::Zeroize;
+use secrecy::{zeroize, SecretBox};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -30,7 +31,7 @@ impl Zeroize for Key {
 
 impl secrecy::CloneableSecret for Key {}
 
-impl secrecy::zeroize::ZeroizeOnDrop for Key {}
+impl zeroize::ZeroizeOnDrop for Key {}
 
 impl Drop for Key {
     fn drop(&mut self) {
@@ -41,9 +42,9 @@ impl Drop for Key {
 impl Key {
     /// Create a new random encryption key.
     #[must_use]
-    pub fn new() -> Secret<Self> {
+    pub fn new() -> SecretBox<Self> {
         let mut rng = OsRng {};
-        Secret::new(Self(ChaCha20Poly1305::generate_key(&mut rng)))
+        SecretBox::new(Box::new(Self(ChaCha20Poly1305::generate_key(&mut rng))))
     }
 
     /// Create a new encryption key from a base64 encoded string.
@@ -51,7 +52,7 @@ impl Key {
     /// # Errors
     ///
     /// Returns error if the key is not valid or the string is not valid base64.
-    pub fn with_base64(str: impl AsRef<str>) -> Result<Secret<Self>, Error> {
+    pub fn with_base64(str: impl AsRef<str>) -> Result<SecretBox<Self>, Error> {
         let engine = base64::engine::GeneralPurpose::new(
             &base64::alphabet::STANDARD,
             base64::engine::general_purpose::PAD,
@@ -59,7 +60,7 @@ impl Key {
 
         let bytes = engine.decode(str.as_ref())?;
         let key = Self::try_from(bytes.as_slice())?;
-        Ok(Secret::new(key))
+        Ok(SecretBox::new(Box::new(key)))
     }
 
     /// Convert the current Key to a base64 string.

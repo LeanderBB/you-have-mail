@@ -9,7 +9,7 @@ members = [
 
 [workspace.dependencies]
 ureq = { version = "2.9.7", features = ["socks-proxy"] }
-secrecy = { version = "0.8.0", features = ["serde"] }
+secrecy = { version = "0.10.3", features = ["serde"] }
 thiserror = "1.0.61"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_repr = "0.1.19"
@@ -25,3 +25,4 @@ rusqlite = { version = "0.32.1", features = ["chrono", "bundled"] }
 chrono = "0.4"
 mockito = "1.4.0"
 sqlite-watcher = { version = "0.2.0", features = ["rusqlite"] }
+zeroize = "1.8.1"

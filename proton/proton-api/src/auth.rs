@@ -1,6 +1,6 @@
 use crate::domain::SecretString;
 use parking_lot::RwLock;
-use secrecy::ExposeSecret;
+use secrecy::{zeroize, ExposeSecret};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};
@@ -56,15 +56,13 @@ impl Display for Uid {
     }
 }
 
-impl secrecy::Zeroize for Uid {
+impl zeroize::Zeroize for Uid {
     fn zeroize(&mut self) {
         self.0.zeroize();
     }
 }
 
 impl secrecy::CloneableSecret for Uid {}
-
-impl secrecy::DebugSecret for Uid {}
 
 impl AsRef<str> for Uid {
     fn as_ref(&self) -> &str {

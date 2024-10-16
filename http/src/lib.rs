@@ -237,7 +237,7 @@ impl Serialize for ProxyAuth {
     {
         let mut state = serializer.serialize_struct("ProxyAuth", 2)?;
         state.serialize_field("username", self.username.as_str())?;
-        state.serialize_field("password", self.password.expose_secret().as_str())?;
+        state.serialize_field("password", self.password.expose_secret())?;
         state.end()
     }
 }
@@ -511,7 +511,7 @@ fn proxy_config_generates_valid_url() {
         protocol: ProxyProtocol::Socks5,
         auth: Some(ProxyAuth {
             username: "Foo".to_string(),
-            password: SecretString::new("bar".to_string()),
+            password: SecretString::new("bar".to_string().into()),
         }),
         host: host.to_owned(),
         port,
@@ -532,7 +532,7 @@ fn proxy_serialize_deserialize() {
         protocol: ProxyProtocol::Socks5,
         auth: Some(ProxyAuth {
             username: "Foo".to_string(),
-            password: SecretString::new("bar".to_string()),
+            password: SecretString::new("bar".to_string().into()),
         }),
         host: host.to_owned(),
         port: 1024,

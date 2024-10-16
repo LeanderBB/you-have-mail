@@ -14,7 +14,7 @@ fn main() {
         .init();
 
     let user_email = std::env::var("USER_EMAIL").unwrap();
-    let user_password = SecretString::new(std::env::var("USER_PASSWORD").unwrap());
+    let user_password = SecretString::new(std::env::var("USER_PASSWORD").unwrap().into());
 
     let client = http::Client::proton_client().debug().build().unwrap();
 
@@ -25,7 +25,7 @@ fn main() {
     let mut login_sequence = Sequence::new(session.clone());
 
     login_sequence
-        .login(&user_email, user_password.expose_secret().as_str(), None)
+        .login(&user_email, user_password.expose_secret(), None)
         .unwrap();
 
     if login_sequence.is_awaiting_totp() {
