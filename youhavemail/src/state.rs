@@ -9,9 +9,12 @@ use rusqlite::{OptionalExtension, Row};
 use secrecy::{ExposeSecret, Secret};
 use serde::de::DeserializeOwned;
 use serde::Serialize;
+use sqlite_watcher::watcher::{DropRemoveTableObserverHandle, TableObserver, Watcher};
+use std::collections::BTreeSet;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Weak};
 use std::time::Duration;
+use tracing::error;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
@@ -181,6 +184,34 @@ impl Account {
     }
 }
 
+/// Trait that defines the behavior to be notified when the account list has changed/updated.
+pub trait AccountWatcher: Send + Sync {
+    /// Returns the new list of accounts.
+    fn on_accounts_updated(&self, accounts: Vec<Account>);
+}
+
+struct AccountsUpdatedTableObserver<T: AccountWatcher> {
+    state: Weak<State>,
+    action: T,
+}
+
+impl<T: AccountWatcher> TableObserver for AccountsUpdatedTableObserver<T> {
+    fn tables(&self) -> Vec<String> {
+        vec!["yhm_poll_event".to_owned(), "yhm".to_owned()]
+    }
+
+    fn on_tables_changed(&self, _: &BTreeSet<String>) {
+        if let Some(state) = self.state.upgrade() {
+            match state.accounts() {
+                Ok(accounts) => {
+                    self.action.on_accounts_updated(accounts);
+                }
+                Err(e) => error!("Failed to get accounts on table updated: {e}"),
+            }
+        }
+    }
+}
+
 /// Contains all state serialized in the database.
 pub struct State {
     pool: Arc<Pool>,
@@ -193,8 +224,12 @@ impl State {
     /// # Errors
     ///
     /// Returns errors if we failed to create the tables.
-    pub fn new(db_path: PathBuf, encryption_key: Secret<Key>) -> Result<Arc<Self>, Error> {
-        let pool = Pool::new(db_path);
+    pub fn new(
+        db_path: PathBuf,
+        encryption_key: Secret<Key>,
+        watcher: Arc<Watcher>,
+    ) -> Result<Arc<Self>, Error> {
+        let pool = Pool::new(db_path, watcher);
         let mut conn = pool.connection()?;
         conn.with_transaction(create_tables)?;
         Ok(Arc::new(Self {
@@ -210,8 +245,12 @@ impl State {
     ///
     /// Returns errors if we failed to create the tables.
     #[must_use]
-    pub fn without_init(db_path: PathBuf, encryption_key: Secret<Key>) -> Arc<Self> {
-        let pool = Pool::new(db_path);
+    pub fn without_init(
+        db_path: PathBuf,
+        encryption_key: Secret<Key>,
+        watcher: Arc<Watcher>,
+    ) -> Arc<Self> {
+        let pool = Pool::new(db_path, watcher);
         Arc::new(Self {
             pool,
             encryption_key,
@@ -222,6 +261,12 @@ impl State {
     #[must_use]
     pub fn encryption_key(&self) -> &Secret<Key> {
         &self.encryption_key
+    }
+
+    /// Get database watcher instance.
+    #[must_use]
+    pub fn watcher(&self) -> &Arc<Watcher> {
+        self.pool.watcher()
     }
 
     /// Get all accounts recorded in the database.
@@ -240,6 +285,24 @@ impl State {
             }
             Ok(result)
         })
+    }
+
+    /// Register a watcher for the accounts table.
+    ///
+    /// # Errors
+    ///
+    /// Return error if we fail to register the watcher.
+    pub fn watch_accounts<T: AccountWatcher + 'static>(
+        self: &Arc<Self>,
+        action: T,
+    ) -> Result<DropRemoveTableObserverHandle, Error> {
+        self.pool
+            .watcher()
+            .add_observer_with_drop_remove(Box::new(AccountsUpdatedTableObserver {
+                state: Arc::downgrade(self),
+                action,
+            }))
+            .map_err(|e| Error::Other(e.into()))
     }
 
     /// Get all accounts recorded in the database that are logged in.

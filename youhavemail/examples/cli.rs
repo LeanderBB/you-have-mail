@@ -1,5 +1,6 @@
 use proton_api::domain::SecretString;
 use secrecy::{ExposeSecret, Secret};
+use sqlite_watcher::watcher::Watcher;
 use std::io::{BufRead, Write};
 use std::path::PathBuf;
 use std::sync::atomic::{AtomicBool, Ordering};
@@ -71,7 +72,8 @@ fn main() {
 
     let encryption_key = get_or_create_encryption_key();
     let db_path = get_db_file_path();
-    let state = State::new(db_path, encryption_key).expect("Failed to create state");
+    let watcher = Watcher::new().unwrap();
+    let state = State::new(db_path, encryption_key, watcher).expect("Failed to create state");
     let yhm = Yhm::new(state);
 
     /*

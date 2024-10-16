@@ -21,7 +21,7 @@ base64 = "0.22.1"
 parking_lot = "0.12.3"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
 tracing-log = "0.2.0"
-rusqlite = { version = "0.31.0", features = ["chrono", "bundled"] }
-rusqlite-from-row = "0.2.4"
+rusqlite = { version = "0.32.1", features = ["chrono", "bundled"] }
 chrono = "0.4"
 mockito = "1.4.0"
+sqlite-watcher = { version = "0.2.0", features = ["rusqlite"] }

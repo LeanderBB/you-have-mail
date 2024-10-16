@@ -1,8 +1,9 @@
 use crate::backend::{Backend, NewEmail, Poller};
 use crate::events::Event;
-use crate::state::{Account, Error as StateError, State};
+use crate::state::{Account, AccountWatcher, Error as StateError, State};
 use http::Proxy;
 use secrecy::ExposeSecret;
+use sqlite_watcher::watcher::DropRemoveTableObserverHandle;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
@@ -327,6 +328,18 @@ impl Yhm {
         })?)
     }
 
+    /// Register a watcher for the accounts table.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if we fail to register the observer.
+    pub fn watch_accounts<T: AccountWatcher + 'static>(
+        &self,
+        action: T,
+    ) -> Result<DropRemoveTableObserverHandle, Error> {
+        Ok(self.state.watch_accounts(action)?)
+    }
+
     fn find_backend(&self, name: &str) -> Option<&Arc<dyn Backend>> {
         self.backends.iter().find(|backend| backend.name() == name)
     }
@@ -344,18 +357,15 @@ impl Yhm {
             ));
         };
 
-        let proxy = account.proxy().map_err(|e| {
-            error!("Failed to load proxy info from config");
-            e
+        let proxy = account.proxy().inspect_err(|e| {
+            error!("Failed to load proxy info from config: {e}");
         })?;
-        let client = backend.create_client(proxy).map_err(|e| {
+        let client = backend.create_client(proxy).inspect_err(|e| {
             error!("Failed to create client: {e}");
-            e
         })?;
 
-        backend.new_poller(client, account).map_err(|e| {
+        backend.new_poller(client, account).inspect_err(|e| {
             error!("Failed to create poller: {e}");
-            e
         })
     }
 }

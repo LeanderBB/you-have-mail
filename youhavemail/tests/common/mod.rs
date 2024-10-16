@@ -1,5 +1,6 @@
 use http::url;
 use proton_api::mocks::mockito;
+use sqlite_watcher::watcher::Watcher;
 use std::sync::Arc;
 use temp_dir::TempDir;
 use you_have_mail_common::backend::Backend;
@@ -22,7 +23,8 @@ impl TestCtx {
         let dir = TempDir::with_prefix("yhm_test").unwrap();
         let db_path = dir.path().join("sqlite.db");
         let server = proton_api::mocks::new_server();
-        let state = State::new(db_path, encryption_key).unwrap();
+        let watcher = Watcher::new().unwrap();
+        let state = State::new(db_path, encryption_key, watcher).unwrap();
 
         let url = url::Url::parse(&proton_api::mocks::server_url(&server)).unwrap();
         tracing::info!("Mock Server: {}", url.to_string());

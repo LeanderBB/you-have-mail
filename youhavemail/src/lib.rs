@@ -60,6 +60,7 @@
 //! # Example
 //!
 //! ```rust
+//! use sqlite_watcher::watcher::Watcher;
 //! use you_have_mail_common::backend;
 //! use you_have_mail_common::encryption::Key;
 //! use you_have_mail_common::events::Event;
@@ -68,8 +69,9 @@
 //!
 //! let db_path = "/tmp/state.db";
 //! let encryption_key = Key::new();
+//! let watcher = Watcher::new().unwrap();
 //! // Create new state
-//! let state = State::new(db_path.into(), encryption_key).unwrap();
+//! let state = State::new(db_path.into(), encryption_key, watcher).unwrap();
 //! let yhm = Yhm::new(state);
 //!
 //! // Add a new account.

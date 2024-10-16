@@ -1,14 +1,17 @@
 //! Database storage for applications state.
 use parking_lot::{Mutex, MutexGuard};
 use rusqlite::{Params, Result, Row, Statement};
+use sqlite_watcher::connection::Connection as WatchedConnection;
+use sqlite_watcher::watcher::Watcher;
 use std::path::PathBuf;
 use std::sync::Arc;
 
 /// Database pool which maintains a small amount of open connections.
 pub struct Pool {
-    connections: Mutex<Vec<rusqlite::Connection>>,
+    connections: Mutex<Vec<WatchedConnection<rusqlite::Connection>>>,
     writer_lock: Mutex<()>,
     path: PathBuf,
+    watcher: Arc<Watcher>,
 }
 
 const MAX_DB_CONNECTIONS: usize = 4;
@@ -16,12 +19,18 @@ const MAX_DB_CONNECTIONS: usize = 4;
 impl Pool {
     /// Create new instance for a database at `path`.
     #[must_use]
-    pub fn new(path: PathBuf) -> Arc<Self> {
+    pub fn new(path: PathBuf, watcher: Arc<Watcher>) -> Arc<Self> {
         Arc::new(Self {
             connections: Mutex::new(Vec::with_capacity(MAX_DB_CONNECTIONS)),
             writer_lock: Mutex::new(()),
             path,
+            watcher,
         })
+    }
+
+    /// Get database watcher instance.
+    pub fn watcher(&self) -> &Arc<Watcher> {
+        &self.watcher
     }
 
     /// Get a new connection from the pool.
@@ -82,7 +91,7 @@ impl Pool {
     }
 
     /// Return a `conn` back to the pool.
-    fn release(&self, conn: rusqlite::Connection) {
+    fn release(&self, conn: WatchedConnection<rusqlite::Connection>) {
         let mut guard = self.connections.lock();
         if guard.len() < MAX_DB_CONNECTIONS {
             guard.push(conn);
@@ -90,12 +99,12 @@ impl Pool {
     }
 
     /// Create a new connection.
-    fn new_connection(&self) -> Result<rusqlite::Connection> {
+    fn new_connection(&self) -> Result<WatchedConnection<rusqlite::Connection>> {
         let conn = rusqlite::Connection::open(&self.path)?;
         conn.pragma_update(None, "journal", "WAL")?;
         conn.pragma_update(None, "synchronous", "FULL")?;
         conn.pragma_update(None, "temp_store", "MEMORY")?;
-        Ok(conn)
+        WatchedConnection::new(conn, Arc::clone(&self.watcher))
     }
 }
 
@@ -105,7 +114,7 @@ impl Pool {
 /// conflicts in the sqlite database.
 pub struct Connection {
     pool: Arc<Pool>,
-    conn: Option<rusqlite::Connection>,
+    conn: Option<WatchedConnection<rusqlite::Connection>>,
 }
 
 impl Drop for Connection {
@@ -147,7 +156,7 @@ impl Connection {
     /// Returns error if we failed to create the transaction.
     #[inline]
     #[allow(clippy::missing_panics_doc)]
-    pub fn transaction(&mut self) -> Result<Transaction<'_, '_>> {
+    fn transaction(&mut self) -> Result<Transaction<'_, '_>> {
         let guard = self.pool.writer_lock.lock();
         let tx = self.conn.as_mut().unwrap().transaction()?;
         Ok(Transaction { tx, _guard: guard })
@@ -165,15 +174,23 @@ impl Connection {
         &mut self,
         closure: impl FnOnce(&mut Transaction) -> Result<T, E>,
     ) -> Result<T, E> {
+        self.conn_mut().sync_watcher_tables()?;
         let mut tx = self.transaction()?;
         let result = closure(&mut tx)?;
         tx.commit()?;
+        self.conn_mut().publish_watcher_changes()?;
         Ok(result)
     }
     #[inline]
-    fn conn(&self) -> &rusqlite::Connection {
+    fn conn(&self) -> &WatchedConnection<rusqlite::Connection> {
         // This is always valid while the type is alive.
         self.conn.as_ref().unwrap()
+    }
+
+    #[inline]
+    fn conn_mut(&mut self) -> &mut WatchedConnection<rusqlite::Connection> {
+        // This is always valid while the type is alive.
+        self.conn.as_mut().unwrap()
     }
 }
 
