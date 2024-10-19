@@ -221,7 +221,7 @@ class MainActivity : ComponentActivity() {
 
     override fun onDestroy() {
         if (mState != null) {
-            mState!!.close(this)
+            mState!!.close()
             mState = null
         }
 

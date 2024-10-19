@@ -1,16 +1,12 @@
 package dev.lbeernaert.youhavemail.app
 
-import android.content.BroadcastReceiver
 import android.content.Context
-import android.content.Intent
-import android.content.IntentFilter
 import android.content.SharedPreferences
 import android.util.Log
-import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.security.crypto.EncryptedSharedPreferences
 import androidx.security.crypto.MasterKey
 import dev.lbeernaert.youhavemail.Account
-import dev.lbeernaert.youhavemail.AccountsUpdated
+import dev.lbeernaert.youhavemail.AccountWatcher
 import dev.lbeernaert.youhavemail.Backend
 import dev.lbeernaert.youhavemail.Event
 import dev.lbeernaert.youhavemail.Proxy
@@ -45,7 +41,7 @@ const val STATE_LOG_TAG = "state"
 // changes.
 var NOTIFICATION_STATE = NotificationState()
 
-class State(context: Context) : AccountsUpdated {
+class State(context: Context) : AccountWatcher {
     private var mPollInterval = MutableStateFlow(15UL)
     private var mYhm: Yhm
     private var mAccounts: MutableStateFlow<List<Account>>
@@ -57,7 +53,7 @@ class State(context: Context) : AccountsUpdated {
         val key = getOrCreateEncryptionKey(context)
         val dbPath = getDatabasePath(context)
         mYhm = Yhm(dbPath, encryptionKey = key)
-        mWatchHandle = mYhm.addAccountObserver(this)
+        mWatchHandle = mYhm.watchAccounts(this)
         mAccounts = MutableStateFlow(mYhm.accounts())
         val pollInterval = mYhm.pollInterval()
         mPollInterval.value = pollInterval
@@ -161,7 +157,7 @@ class State(context: Context) : AccountsUpdated {
     /**
      * Unregister receiver and release resource.
      */
-    fun close(context: Context) {
+    fun close() {
         Log.i(STATE_LOG_TAG, "Closing")
         mAccounts.value = ArrayList()
         mLoginSequence = null
