@@ -28,7 +28,7 @@ private const val TAG_ONE_SHOT = "OneShotWorker"
 private const val POLL_WORKER_JOB_NAME = "PollWorker"
 private const val ONE_SHOT_WORKER_JOB_NAME = "OneShotWorker"
 const val POLL_INTENT = "POLL_INTENT"
-const val POLL_ERROR_KEY = "POLL_ERROR";
+const val POLL_ERROR_KEY = "POLL_ERROR"
 
 
 /**
@@ -71,7 +71,7 @@ class OneTimePollWorker(ctx: Context, params: WorkerParameters) :
                 registerWorker(applicationContext, interval, false)
             }
         } catch (e: Exception) {
-            yhmLogError("Failed to re-register one time poll worker: $e");
+            yhmLogError("Failed to re-register one time poll worker: $e")
             createServiceErrorNotification(applicationContext, "Failed to create worker: $e")
         }
 
@@ -90,7 +90,7 @@ private fun poll(context: Context) {
         yhm = Yhm.withoutDbInit(dbPath, encryptionKey = key)
     } catch (e: YhmException) {
         createServiceErrorNotification(context, "Failed to Create Yhm", e)
-        return;
+        return
     }
 
     var error: String? = null
@@ -161,7 +161,7 @@ private fun constraints(): Constraints {
 }
 
 fun registerWorker(ctx: Context, minutes: Long, cancel: Boolean) {
-    initLog(getLogPath(ctx).path);
+    initLog(getLogPath(ctx).path)
     val inputData = Data.Builder().putLong("INTERVAL", minutes).build()
     val constraints = constraints()
     val wm = WorkManager.getInstance(ctx)
@@ -179,8 +179,7 @@ fun registerWorker(ctx: Context, minutes: Long, cancel: Boolean) {
                 .setInputData(inputData)
                 .setConstraints(constraints)
                 .build()
-        wm
-            .enqueueUniquePeriodicWork(
+        wm.enqueueUniquePeriodicWork(
                 POLL_WORKER_JOB_NAME,
                 ExistingPeriodicWorkPolicy.KEEP,
                 work

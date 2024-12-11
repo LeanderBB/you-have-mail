@@ -75,7 +75,7 @@ class State(context: Context) : AccountWatcher {
             try {
                 createAndDisplayServiceErrorNotification(context, "Failed to migrate accounts: $e")
             } catch (e: Exception) {
-                Log.e(activityLogTag, "Failed to create exception");
+                Log.e(activityLogTag, "Failed to create exception")
             }
         } finally {
             try {
@@ -250,11 +250,11 @@ fun accountStatusString(account: Account): String {
     if (account.isLoggedOut()) {
         statusString = "Logged Out"
     } else {
-        val last_poll = account.lastPoll();
+        val last_poll = account.lastPoll()
         if (last_poll == null) {
             statusString = "Not Polled"
         } else {
-            val last_event = account.lastEvent();
+            val last_event = account.lastEvent()
             if (last_event != null) {
                 var result = "Polled"
                 when (last_event) {

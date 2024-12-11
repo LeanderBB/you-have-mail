@@ -23,7 +23,7 @@ class StartReceiver : BroadcastReceiver() {
                     "Failed to Create Yhm on boot and register work",
                     e
                 )
-                return;
+                return
             }
         }
     }

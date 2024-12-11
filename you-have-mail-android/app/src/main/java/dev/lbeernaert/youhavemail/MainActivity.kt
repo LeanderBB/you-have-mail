@@ -76,7 +76,7 @@ class MainActivity : ComponentActivity() {
 
         createNotificationChannels(notificationManager)
 
-        val log_init = initLog(getLogPath(this).path);
+        val log_init = initLog(getLogPath(this).path)
         if (log_init != null) {
             createServiceErrorNotification(this, "Failed to init log: ${log_init}")
         }
@@ -90,7 +90,7 @@ class MainActivity : ComponentActivity() {
                 try {
                     createAndDisplayServiceErrorNotification(this, "state init failed", e)
                 } catch (e: Exception) {
-                    Log.e(activityLogTag, "Failed to create exception");
+                    Log.e(activityLogTag, "Failed to create exception")
                 }
             }
         }
