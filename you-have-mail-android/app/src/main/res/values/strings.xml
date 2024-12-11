@@ -64,4 +64,5 @@
     <string name="export_logs">Export Logs</string>
     <string name="export_logs_success">Logs successfully exported</string>
     <string name="export_logs_failed">Failed to export logs: %1$s</string>
+    <string name="service_uninitialized">Service failed to initialize.</string>
 </resources>
