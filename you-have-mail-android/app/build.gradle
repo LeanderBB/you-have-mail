@@ -18,7 +18,7 @@ android {
 
     defaultConfig {
         applicationId "dev.lbeernaert.youhavemail"
-        minSdk 29
+        minSdk 26
         targetSdk 33
         versionCode 37
         versionName "0.17.0"
