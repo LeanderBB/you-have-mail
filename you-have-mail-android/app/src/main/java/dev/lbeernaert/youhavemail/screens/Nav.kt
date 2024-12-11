@@ -51,10 +51,25 @@ fun MainNavController(
                         navController.popBackStack()
                     },
                     onLoginClicked = { email, password ->
-                        withContext(Dispatchers.Default) {
-                            state.mLoginSequence!!.login(email, password)
+                        if(email.isBlank() or password.isEmpty()) {
+                            Toast.makeText(
+                                context,
+                                R.string.empty_email_or_password_info,
+                                Toast.LENGTH_SHORT
+                            ).show()
+                        } else if(!android.util.Patterns.EMAIL_ADDRESS.matcher(email).matches()) {
+                            Toast.makeText(
+                                context,
+                                R.string.invalid_email_address,
+                                Toast.LENGTH_SHORT
+                            ).show()
                         }
-                        state.mLoginSequence!!.next(navController)
+                        else {
+                            withContext(Dispatchers.Default) {
+                                state.mLoginSequence!!.login(email, password)
+                            }
+                            state.mLoginSequence!!.next(navController)
+                        }
                     }
                 )
             }
