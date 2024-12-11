@@ -39,7 +39,9 @@
     <string name="alert_error">%1$s encountered an error "%2$s"</string>
     <string name="settings">Settings</string>
     <string name="poll_interval">Poll Interval</string>
+    <string name="second">Second</string>
     <string name="seconds">Seconds</string>
+    <string name="minute">Minute</string>
     <string name="minutes">Minutes</string>
     <string name="update_poll_interval">Updating Poll Interval</string>
     <string name="poll_interval_desc">
