@@ -141,8 +141,11 @@ tasks.whenTaskAdded { task ->
     if (task.name == 'genBindings') {
         task.dependsOn 'cargoBuild'
     }
-}
 
+    if (task.name == 'compileDebugKotlin') {
+        task.dependsOn 'genBindings'
+    }
+}
 
 afterEvaluate {
 
