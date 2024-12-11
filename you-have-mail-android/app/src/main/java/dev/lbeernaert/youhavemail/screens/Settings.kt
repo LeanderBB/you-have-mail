@@ -18,6 +18,7 @@ import androidx.compose.material.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
@@ -39,8 +40,6 @@ fun Settings(
     onPollIntervalUpdate: (ULong) -> Unit,
     onExportLogsClicked: () -> Unit,
 ) {
-    val secondsStr = stringResource(id = R.string.seconds)
-    val minutesStr = stringResource(id = R.string.minutes)
     AsyncScreen(
         title = stringResource(id = R.string.settings),
         onBackClicked = onBackClicked
@@ -54,13 +53,14 @@ fun Settings(
                 .padding(20.dp)
                 .fillMaxSize()
         ) {
+            val timeIntervals =
+                listOf(30UL, 60UL, 120UL, 180UL, 300UL, 600UL, 900UL, 1200UL, 1800UL, 3600UL)
             var expanded by remember { mutableStateOf(false) }
-            val items = listOf(60UL, 150UL, 300UL, 600UL, 900UL, 1800UL, 3600UL)
-            var selectedIndex by remember { mutableStateOf(0) }
+            var selectedIndex by remember { mutableIntStateOf(0) }
 
             val onPollIntervalModified: () -> Unit = {
                 runTask(updatingPollIntervalLabel) {
-                    onPollIntervalUpdate(items[selectedIndex])
+                    onPollIntervalUpdate(timeIntervals[selectedIndex])
                 }
             }
 
@@ -118,26 +118,36 @@ fun Settings(
                     modifier = Modifier
                         .fillMaxWidth()
                 ) {
-                    items.forEachIndexed { index, s ->
+                    timeIntervals.forEachIndexed { index, seconds ->
                         DropdownMenuItem(onClick = {
                             expanded = false
                             selectedIndex = index
                             onPollIntervalModified()
                         }) {
-                            Text(text = secondsToText(s, secondsStr, minutesStr))
+                            Text(
+                                text = secondsToText(seconds),
+                            )
                         }
                     }
                 }
             }
-
         }
     }
 }
 
-fun secondsToText(seconds: ULong, sec: String, min: String): String {
-    return if (seconds < 60UL) {
-        "$seconds $sec"
+@Composable
+fun secondsToText(seconds: ULong): String {
+    val secondStr = stringResource(id = R.string.second)
+    val secondsStr = stringResource(id = R.string.seconds)
+    val minuteStr = stringResource(id = R.string.minute)
+    val minutesStr = stringResource(id = R.string.minutes)
+    return if(seconds == 1UL) {
+        "$seconds $secondStr"
+    } else if (seconds < 60UL) {
+        "$seconds $secondsStr"
+    } else if((seconds == 60UL) ) {
+        "${(seconds / 60UL)} $minuteStr"
     } else {
-        "${(seconds / 60UL)} $min"
+        "${(seconds / 60UL)} $minutesStr"
     }
 }
