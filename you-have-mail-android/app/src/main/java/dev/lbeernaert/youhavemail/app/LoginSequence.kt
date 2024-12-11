@@ -62,12 +62,12 @@ class ProtonLogin(state: State, proxy: Proxy?) : LoginSequence {
     private var mCaptchaHtml: String? = null
 
     override fun login(email: String, password: String) {
-        mEmail = email;
+        mEmail = email
         mPassword = password
         try {
             mSequence.login(email, password, mHumanVerificationData)
         } catch (e: ProtonLoginException) {
-            handelLoginException(e)
+            handleLoginException(e)
         }
     }
 
@@ -75,7 +75,7 @@ class ProtonLogin(state: State, proxy: Proxy?) : LoginSequence {
         try {
             mSequence.submitTotp(code)
         } catch (e: ProtonLoginException) {
-            handelLoginException(e)
+            handleLoginException(e)
         }
     }
 
@@ -104,7 +104,7 @@ class ProtonLogin(state: State, proxy: Proxy?) : LoginSequence {
         return PROTON_BACKEND_NAME
     }
 
-    private fun handelLoginException(e: ProtonLoginException) {
+    private fun handleLoginException(e: ProtonLoginException) {
         when (e) {
             is ProtonLoginException.HumanVerificationRequired -> {
                 // Avoid Loop
