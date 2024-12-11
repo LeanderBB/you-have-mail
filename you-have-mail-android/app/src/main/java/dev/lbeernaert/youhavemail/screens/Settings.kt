@@ -1,5 +1,7 @@
 package dev.lbeernaert.youhavemail.screens
 
+import androidx.compose.foundation.background
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Spacer
@@ -7,6 +9,7 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.wrapContentSize
+import androidx.compose.foundation.layout.wrapContentWidth
 import androidx.compose.material.Divider
 import androidx.compose.material.DropdownMenu
 import androidx.compose.material.DropdownMenuItem
@@ -15,6 +18,7 @@ import androidx.compose.material.ExposedDropdownMenuDefaults
 import androidx.compose.material.MaterialTheme
 import androidx.compose.material.Text
 import androidx.compose.material.TextField
+import androidx.compose.material.TextFieldDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -24,7 +28,11 @@ import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.res.colorResource
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.text.TextStyle
+import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.app.State
@@ -66,45 +74,46 @@ fun Settings(
 
             Text(
                 text = stringResource(id = R.string.poll_interval),
-                style = MaterialTheme.typography.caption
+                textAlign = TextAlign.Center,
+                style = MaterialTheme.typography.h6,
+                modifier = Modifier.fillMaxWidth()
             )
-            Spacer(modifier = Modifier.padding(10.dp))
+            Spacer(modifier = Modifier.padding(5.dp))
             Text(
                 text = stringResource(id = R.string.poll_interval_desc),
                 style = MaterialTheme.typography.subtitle1
             )
-            Spacer(modifier = Modifier.padding(10.dp))
+            Spacer(modifier = Modifier.padding(5.dp))
             TextField(
                 modifier = Modifier
-                    .fillMaxWidth(),
-                value = secondsToText(
-                    pollIntervalValue,
-                    secondsStr,
-                    minutesStr
-                ),
+                    .fillMaxWidth()
+                    .clickable { expanded = !expanded },
+                value = secondsToText(pollIntervalValue),
+                textStyle = TextStyle(color = Color.Black),
                 readOnly = true,
+                enabled = false,
                 singleLine = true,
                 onValueChange = {},
                 trailingIcon = {
                     ExposedDropdownMenuDefaults.TrailingIcon(
                         expanded = expanded,
-                        onIconClick = { expanded = true })
+                        onIconClick = { expanded = !expanded })
                 },
-                colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                colors = TextFieldDefaults.textFieldColors(backgroundColor = colorResource(id = R.color.gray_dropdownmenu)),
             )
 
-            Spacer(modifier = Modifier.padding(10.dp))
+            Spacer(modifier = Modifier.padding(5.dp))
 
             Divider()
 
-            Spacer(modifier = Modifier.padding(10.dp))
+            Spacer(modifier = Modifier.padding(5.dp))
 
             ActionButton(
                 text = stringResource(id = R.string.export_logs),
                 onClick = onExportLogsClicked
             )
 
-            Spacer(modifier = Modifier.padding(10.dp))
+            Spacer(modifier = Modifier.padding(5.dp))
 
             Box(
                 modifier = Modifier
@@ -116,7 +125,8 @@ fun Settings(
                     expanded = expanded,
                     onDismissRequest = { expanded = false },
                     modifier = Modifier
-                        .fillMaxWidth()
+                        .background(colorResource(id = R.color.gray_dropdownmenu))
+                        .wrapContentWidth()
                 ) {
                     timeIntervals.forEachIndexed { index, seconds ->
                         DropdownMenuItem(onClick = {
@@ -126,6 +136,7 @@ fun Settings(
                         }) {
                             Text(
                                 text = secondsToText(seconds),
+                                color = Color.Black
                             )
                         }
                     }
