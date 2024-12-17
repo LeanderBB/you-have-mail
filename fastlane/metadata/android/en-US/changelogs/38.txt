@@ -1,0 +1,6 @@
+# Changed
+
+* Remember UI state when switching between landscape and veritcal views (Thanks @pangratt12345)
+* Add more poll intervals (Thanks @pangratt12345)
+* Improve poll interval drop down menu (Thanks @pangratt12345)
+* Check email and password input before sending request to server (Thanks @pangratt12345)
