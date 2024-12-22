@@ -21,7 +21,7 @@ android {
         minSdk 26
         targetSdk 33
         versionCode 39
-        versionName "0.18.1"
+        versionName "0.18.2"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -60,6 +60,14 @@ android {
             //noinspection ChromeOsAbiSupport
             abiFilters 'arm64-v8a', 'x86_64', 'armeabi-v7a'
         }
+    }
+
+    // https://gitlab.com/fdroid/fdroiddata/-/issues/3330#note_2189915200
+    dependenciesInfo {
+        // Disables dependency metadata when building APKs.
+        includeInApk = false
+        // Disables dependency metadata when building Android App Bundles.
+        includeInBundle = false
     }
 }
 
