@@ -9,7 +9,7 @@ plugins {
     id 'com.android.application'
     id 'org.jetbrains.kotlin.android'
     id 'kotlin-parcelize'
-    id "org.mozilla.rust-android-gradle.rust-android" version "0.9.3"
+    id "org.mozilla.rust-android-gradle.rust-android" version "0.9.5"
 }
 
 android {
@@ -98,6 +98,9 @@ cargo {
     targetIncludes = ["libyouhavemail.so", "libgo-srp.so"]
     targetDirectory = "/tmp/build-yhm"
     profile = "release"
+    prebuiltToolchains = true
+    rustupChannel = "1.83.0"
+    apiLevel = 26
 
     // Ensure paths are consistent for reproducible builds.
     exec { spec, _ ->

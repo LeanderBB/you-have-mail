@@ -6,6 +6,7 @@ authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 license = "AGPL-3.0-only"
 categories = ["email", "api-bindings"]
 description = "You-Have-Mail mobile API bindings"
+rust-version= "1.83.0"
 
 [lib]
 crate-type = ["cdylib"]
