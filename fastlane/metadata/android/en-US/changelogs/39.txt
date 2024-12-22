@@ -1,0 +1,3 @@
+# Fix
+
+Reproducible builds for fdroid.
