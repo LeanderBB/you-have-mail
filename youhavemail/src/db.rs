@@ -203,7 +203,7 @@ pub struct Transaction<'c, 'l> {
     _guard: MutexGuard<'l, ()>,
 }
 
-impl<'c, 'l> Transaction<'c, 'l> {
+impl Transaction<'_, '_> {
     /// See [`rusqlite::Connection::query_row`].
     ///
     /// # Errors
