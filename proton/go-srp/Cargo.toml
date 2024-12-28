@@ -13,4 +13,4 @@ categories = ["api-bindings"]
 base64 = "0.22"
 
 [build-dependencies]
-bindgen = "0.64"
+bindgen = "0.71.1"
