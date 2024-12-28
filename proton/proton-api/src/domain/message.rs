@@ -1,11 +1,10 @@
 use crate::domain::label::Id as LabelId;
 use crate::domain::Boolean;
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
 /// Message API ID.
-#[derive(Debug, Deserialize, Eq, PartialEq, Hash, Clone)]
-#[cfg_attr(feature = "mocks", derive(serde::Serialize))]
+#[derive(Debug, Deserialize, Serialize, Eq, PartialEq, Hash, Clone)]
 pub struct Id(pub String);
 
 impl Display for Id {
@@ -16,7 +15,7 @@ impl Display for Id {
 
 /// Represents an email message.
 #[derive(Debug, Deserialize, Eq, PartialEq, Clone)]
-#[cfg_attr(feature = "mocks", derive(serde::Serialize))]
+#[cfg_attr(feature = "mocks", derive(Serialize))]
 #[serde(rename_all = "PascalCase")]
 pub struct Message {
     #[serde(rename = "ID")]
