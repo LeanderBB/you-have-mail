@@ -42,9 +42,7 @@ pub type Result<T> = std::result::Result<T, Error>;
 ///
 /// It's not recommended to share secret information in actions.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
-pub struct Action {
-    data: Vec<u8>,
-}
+pub struct Action(String);
 
 impl Action {
     /// Create a new action from the serializable `value`
@@ -53,9 +51,7 @@ impl Action {
     ///
     /// Return error if the type can't be encoded into JSON.
     pub fn new<T: Serialize>(value: &T) -> std::result::Result<Self, serde_json::Error> {
-        Ok(Self {
-            data: serde_json::to_vec(value)?,
-        })
+        Ok(Self(serde_json::to_string(value)?))
     }
 
     /// Convert the action data back into a usable type.
@@ -66,7 +62,19 @@ impl Action {
     pub fn to_value<'de, T: Deserialize<'de>>(
         &'de self,
     ) -> std::result::Result<T, serde_json::Error> {
-        serde_json::from_slice(&self.data)
+        serde_json::from_str(self.0.as_str())
+    }
+
+    /// Create a new action from encoded `data`.
+    #[must_use]
+    pub fn with(data: String) -> Self {
+        Self(data)
+    }
+
+    /// Consume this instance and retrieve the encoded data.
+    #[must_use]
+    pub fn take(self) -> String {
+        self.0
     }
 }
 
