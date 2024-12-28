@@ -36,7 +36,7 @@ impl<'a> GetEventRequest<'a> {
     }
 }
 
-impl<'a> http::Request for GetEventRequest<'a> {
+impl http::Request for GetEventRequest<'_> {
     type Response = http::JsonResponse<crate::domain::event::Event>;
     const METHOD: Method = Method::Get;
 

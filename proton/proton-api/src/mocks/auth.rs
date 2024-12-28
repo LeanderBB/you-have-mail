@@ -6,13 +6,16 @@ use crate::session::{DEFAULT_APP_VERSION, X_PM_APP_VERSION_HEADER, X_PM_UID_HEAD
 use mockito::{Mock, Server};
 
 pub trait MatchExtension {
-    /// Match against app_version version.
+    /// Match against `app_version` version.
+    #[must_use]
     fn match_version(self) -> Self;
 
     /// Match against authentication tokens.
+    #[must_use]
     fn match_auth(self) -> Self;
 
     /// Match against authentication after refresh.
+    #[must_use]
     fn match_auth_refreshed(self) -> Self;
 }
 
@@ -100,7 +103,7 @@ pub fn login_flow(server: &mut Server, tfa: bool) -> Vec<Mock> {
     mocks.push(auth_info(server));
     mocks.push(auth_response(server, tfa));
     if tfa {
-        mocks.push(auth_tfa(server))
+        mocks.push(auth_tfa(server));
     }
     mocks.push(user_info(server));
     mocks

@@ -6,11 +6,14 @@ use serde::Deserialize;
 use thiserror::Error;
 use tracing::error;
 
+pub const OPERATION_SUCCESS: u32 = 1000;
 const HUMAN_VERIFICATION_REQUESTED: u32 = 9001;
 
-#[derive(Deserialize)]
+/// Error status and details returned from proton server.
+#[derive(Debug, Deserialize)]
+#[cfg_attr(feature = "mocks", derive(serde::Serialize))]
 #[serde(rename_all = "PascalCase")]
-struct APIErrorDesc {
+pub struct APIErrorDesc {
     pub code: u32,
     pub error: Option<String>,
     pub details: Option<serde_json::Value>,

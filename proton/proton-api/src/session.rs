@@ -38,7 +38,7 @@ struct ProtonAuthRequest<'s, T: Request> {
     request: T,
 }
 
-impl<'s, T: Request> Request for ProtonAuthRequest<'s, T> {
+impl<T: Request> Request for ProtonAuthRequest<'_, T> {
     type Response = T::Response;
     const METHOD: Method = T::METHOD;
 

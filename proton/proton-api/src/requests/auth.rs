@@ -12,7 +12,7 @@ pub struct PostAuthInfoRequest<'a> {
     pub username: &'a str,
 }
 
-impl<'a> http::Request for PostAuthInfoRequest<'a> {
+impl http::Request for PostAuthInfoRequest<'_> {
     type Response = http::JsonResponse<PostAuthInfoResponse>;
     const METHOD: Method = Method::Post;
 
@@ -50,7 +50,7 @@ pub struct PostAuthRequest<'a> {
     pub human_verification: Option<&'a LoginData>,
 }
 
-impl<'a> http::Request for PostAuthRequest<'a> {
+impl http::Request for PostAuthRequest<'_> {
     type Response = http::JsonResponse<PostAuthResponse>;
     const METHOD: Method = Method::Post;
 
@@ -156,7 +156,7 @@ pub struct FIDO2AuthData<'a> {
     pub credential_id: &'a [i32],
 }
 
-impl<'a> FIDO2AuthData<'a> {
+impl FIDO2AuthData<'_> {
     #[must_use]
     pub fn empty() -> Self {
         FIDO2AuthData {
@@ -180,7 +180,7 @@ impl<'a> PostTOTPRequest<'a> {
     }
 }
 
-impl<'a> http::Request for PostTOTPRequest<'a> {
+impl http::Request for PostTOTPRequest<'_> {
     type Response = http::NoResponse;
     const METHOD: Method = Method::Post;
 
@@ -233,7 +233,7 @@ impl<'a> PostAuthRefreshRequest<'a> {
     }
 }
 
-impl<'a> http::Request for PostAuthRefreshRequest<'a> {
+impl http::Request for PostAuthRefreshRequest<'_> {
     type Response = http::JsonResponse<PostAuthRefreshResponse>;
     const METHOD: Method = Method::Post;
 
@@ -280,7 +280,7 @@ impl<'a> GetCaptchaRequest<'a> {
     }
 }
 
-impl<'a> http::Request for GetCaptchaRequest<'a> {
+impl http::Request for GetCaptchaRequest<'_> {
     type Response = http::StringResponse;
     const METHOD: Method = Method::Get;
 
