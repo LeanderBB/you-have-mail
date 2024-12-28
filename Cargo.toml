@@ -10,7 +10,7 @@ members = [
 [workspace.dependencies]
 ureq = { version = "2.9.7", features = ["socks-proxy"] }
 secrecy = { version = "0.10.3", features = ["serde"] }
-thiserror = "1.0.61"
+thiserror = "2"
 serde = { version = "1.0.204", features = ["derive"] }
 serde_repr = "0.1.19"
 serde_json = "1.0.120"
@@ -20,9 +20,7 @@ tracing = "0.1.40"
 base64 = "0.22.1"
 parking_lot = "0.12.3"
 tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }
-tracing-log = "0.2.0"
 rusqlite = { version = "0.32.1", features = ["chrono", "bundled"] }
 chrono = "0.4"
 mockito = "1.4.0"
-sqlite-watcher = { version = "0.2.0", features = ["rusqlite"] }
-zeroize = "1.8.1"
+sqlite-watcher = { version = "0.4.1", features = ["rusqlite"] }
