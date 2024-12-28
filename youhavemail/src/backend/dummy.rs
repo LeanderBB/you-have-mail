@@ -1,6 +1,6 @@
 //! Dummy backend which always produces an email notification. Is mostly used for testing.
 
-use crate::backend::NewEmail;
+use crate::backend::{Action, NewEmail};
 use crate::state::Account;
 use crate::yhm::Yhm;
 use http::{Client, Proxy};
@@ -69,7 +69,14 @@ impl crate::backend::Poller for Poller {
         Ok(vec![NewEmail {
             sender: DUMMY_EMAIL.to_owned(),
             subject: "You Have Mail".to_owned(),
+            mark_as_read_action: None,
+            move_to_trash_action: None,
+            move_to_spam_action: None,
         }])
+    }
+
+    fn apply(&mut self, _: &Action) -> crate::backend::Result<()> {
+        Err(crate::backend::Error::InvalidAction)
     }
 
     fn logout(&mut self) -> crate::backend::Result<()> {

@@ -1,6 +1,6 @@
 //! You have mail implementation for proton mail accounts.
 
-use crate::backend::{Error as BackendError, NewEmail, Result as BackendResult};
+use crate::backend::{Action, Error as BackendError, Error, NewEmail, Result as BackendResult};
 use crate::state::Account;
 use crate::yhm::{IntoAccount, Yhm};
 use http::{Client, Proxy};
@@ -10,7 +10,10 @@ use proton_api::client::ProtonExtension;
 use proton_api::domain::event::MoreEvents;
 use proton_api::domain::{event, label, message, Boolean};
 use proton_api::login::Sequence;
-use proton_api::requests::{GetEventRequest, GetLabelsRequest, GetLatestEventRequest};
+use proton_api::requests::{
+    GetEventRequest, GetLabelsRequest, GetLatestEventRequest, PutLabelMessageRequest,
+    PutMarkMessageReadRequest,
+};
 use proton_api::session::Session;
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
@@ -251,6 +254,43 @@ impl crate::backend::Poller for Poller {
         }
     }
 
+    #[tracing::instrument(level=Level::DEBUG,skip(self),fields(email=%self.account.email()))]
+    fn apply(&mut self, action: &Action) -> BackendResult<()> {
+        let action = action.to_value::<AccountAction>().map_err(|e| {
+            error!("Failed to deserialize action: {e}");
+            Error::InvalidAction
+        })?;
+
+        match action {
+            AccountAction::MarkMessageRead(id) => {
+                debug!("Marking {id} as read");
+                self.session
+                    .execute_with_auth(PutMarkMessageReadRequest::new([id]))
+                    .inspect_err(|e| {
+                        error!("Failed to mark message as read: {e}");
+                    })?;
+            }
+            AccountAction::MoveMessageToTrash(id) => {
+                debug!("Moving {id} to trash");
+                self.session
+                    .execute_with_auth(PutLabelMessageRequest::new(label::Id::trash(), [id]))
+                    .inspect_err(|e| {
+                        error!("Failed to move message to trash: {e}");
+                    })?;
+            }
+            AccountAction::MoveMessageToSpam(id) => {
+                debug!("Moving {id} to spam");
+                self.session
+                    .execute_with_auth(PutLabelMessageRequest::new(label::Id::spam(), [id]))
+                    .inspect_err(|e| {
+                        error!("Failed to move message to spam: {e}");
+                    })?;
+            }
+        }
+
+        Ok(())
+    }
+
     fn logout(&mut self) -> BackendResult<()> {
         debug!("Logging out of proton account {}", self.account.email());
         self.session.logout()?;
@@ -359,6 +399,30 @@ impl TaskState {
     }
 }
 
+/// Actions which can be executed by the account.
+#[derive(Debug, Serialize, Deserialize)]
+pub enum AccountAction {
+    /// Mark a message as read.
+    MarkMessageRead(message::Id),
+    /// Move a message to trash.
+    MoveMessageToTrash(message::Id),
+    /// Move a message to spm.
+    MoveMessageToSpam(message::Id),
+}
+
+impl AccountAction {
+    /// Convert into generic action.
+    ///
+    /// # Panics
+    ///
+    /// This function panics if the data can't be serialized to json. This should not
+    /// occur under normal circumstances.
+    #[must_use]
+    pub fn to_action(&self) -> Action {
+        Action::new(&self).expect("Serialization should never fail")
+    }
+}
+
 /// Track the state of a message in a certain event steam so that we can only display
 /// a notification if no other client has opened the message.
 struct EventState {
@@ -452,6 +516,15 @@ impl EventState {
                 result.push(NewEmail {
                     sender: msg.sender,
                     subject: msg.subject,
+                    move_to_trash_action: Some(
+                        AccountAction::MoveMessageToTrash(msg.id.clone()).to_action(),
+                    ),
+                    mark_as_read_action: Some(
+                        AccountAction::MarkMessageRead(msg.id.clone()).to_action(),
+                    ),
+                    move_to_spam_action: Some(
+                        AccountAction::MoveMessageToSpam(msg.id.clone()).to_action(),
+                    ),
                 });
             }
         }

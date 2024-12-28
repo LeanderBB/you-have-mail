@@ -4,8 +4,11 @@ use crate::common::TestCtx;
 use proton_api::auth::{Auth, RefreshToken, Token, Uid};
 use proton_api::domain::event::MoreEvents;
 use proton_api::domain::{event, label, message, Boolean, SecretString};
+use proton_api::requests::{
+    OperationResponse, PutLabelMessageResponse, PutMarkMessageReadResponse,
+};
 use secrecy::ExposeSecret;
-use you_have_mail_common::backend::proton::TaskState;
+use you_have_mail_common::backend::proton::{AccountAction, TaskState};
 use you_have_mail_common::events::Event;
 use you_have_mail_common::yhm::IntoAccount;
 
@@ -316,6 +319,19 @@ fn message_event_creates_notification() {
         assert!(!info.is_empty());
         assert_eq!(info[0].subject, subject);
         assert_eq!(info[0].sender, sender_address);
+        // check actions are correctly mapped.
+        assert_eq!(
+            info[0].move_to_spam_action,
+            Some(AccountAction::MoveMessageToSpam(message_id.clone()).to_action())
+        );
+        assert_eq!(
+            info[0].move_to_trash_action,
+            Some(AccountAction::MoveMessageToTrash(message_id.clone()).to_action())
+        );
+        assert_eq!(
+            info[0].mark_as_read_action,
+            Some(AccountAction::MarkMessageRead(message_id.clone()).to_action())
+        );
         assert_eq!(
             account_event(&ctx),
             Some(Event::NewEmail {
@@ -365,6 +381,71 @@ fn no_poll_after_delete() {
 
     assert!(ctx.yhm.poll().unwrap().is_empty());
     assert_eq!(ctx.yhm.account_count().unwrap(), 0);
+}
+
+#[test]
+fn mark_message_read_action() {
+    // check event loop logic,
+    let mut ctx = TestCtx::new();
+    create_authenticated_account(&ctx, Some(TaskState::new()));
+
+    let id = message::Id("message".to_owned());
+
+    let action = AccountAction::MarkMessageRead(id.clone()).to_action();
+
+    let _mock = proton_api::mocks::message::mark_message_read(
+        &mut ctx.server,
+        vec![id.clone()],
+        &PutMarkMessageReadResponse {
+            responses: vec![OperationResponse::ok(id.clone())],
+        },
+    );
+
+    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap()
+}
+
+#[test]
+fn move_to_trash_action() {
+    // check event loop logic,
+    let mut ctx = TestCtx::new();
+    create_authenticated_account(&ctx, Some(TaskState::new()));
+
+    let id = message::Id("message".to_owned());
+
+    let action = AccountAction::MoveMessageToTrash(id.clone()).to_action();
+
+    let _mock = proton_api::mocks::message::label_message(
+        &mut ctx.server,
+        label::Id::trash(),
+        vec![id.clone()],
+        &PutLabelMessageResponse {
+            responses: vec![OperationResponse::ok(id.clone())],
+        },
+    );
+
+    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap()
+}
+
+#[test]
+fn move_to_spam_action() {
+    // check event loop logic,
+    let mut ctx = TestCtx::new();
+    create_authenticated_account(&ctx, Some(TaskState::new()));
+
+    let id = message::Id("message".to_owned());
+
+    let action = AccountAction::MoveMessageToSpam(id.clone()).to_action();
+
+    let _mock = proton_api::mocks::message::label_message(
+        &mut ctx.server,
+        label::Id::spam(),
+        vec![id.clone()],
+        &PutLabelMessageResponse {
+            responses: vec![OperationResponse::ok(id.clone())],
+        },
+    );
+
+    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap()
 }
 
 fn create_authenticated_account(ctx: &TestCtx, state: Option<TaskState>) {

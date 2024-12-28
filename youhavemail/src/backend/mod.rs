@@ -24,9 +24,51 @@ pub enum Error {
     UnknownBackend(String),
     #[error("An unknown error occurred: {0}")]
     Unknown(#[source] anyhow::Error),
+    #[error("Action is not valid or not recognized")]
+    InvalidAction,
 }
 
 pub type Result<T> = std::result::Result<T, Error>;
+
+/// An action to be taken on an account.
+///
+/// Since this is specific to each backend implementation, we only
+/// store a serialized metadata required for the account to execute this
+/// action.
+///
+/// Note that this could have been implemented as a trait, but we require that
+/// this information can be transferred over an FFI boundary and potentially
+/// stored on disk.
+///
+/// It's not recommended to share secret information in actions.
+#[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
+pub struct Action {
+    data: Vec<u8>,
+}
+
+impl Action {
+    /// Create a new action from the serializable `value`
+    ///
+    /// # Errors
+    ///
+    /// Return error if the type can't be encoded into JSON.
+    pub fn new<T: Serialize>(value: &T) -> std::result::Result<Self, serde_json::Error> {
+        Ok(Self {
+            data: serde_json::to_vec(value)?,
+        })
+    }
+
+    /// Convert the action data back into a usable type.
+    ///
+    /// # Errors
+    ///
+    /// Return error if the type can't be decoded from JSON.
+    pub fn to_value<'de, T: Deserialize<'de>>(
+        &'de self,
+    ) -> std::result::Result<T, serde_json::Error> {
+        serde_json::from_slice(&self.data)
+    }
+}
 
 /// Data type returned when a new email has been received.
 #[derive(Debug, Clone, Eq, PartialEq, Serialize, Deserialize)]
@@ -35,6 +77,12 @@ pub struct NewEmail {
     pub sender: String,
     /// Subject of the email.
     pub subject: String,
+    /// Encoded data to move this message to trash
+    pub move_to_trash_action: Option<Action>,
+    /// Encoded data to mark this message as read.
+    pub mark_as_read_action: Option<Action>,
+    /// Encoded data to move this message to spam
+    pub move_to_spam_action: Option<Action>,
 }
 
 /// Implementation for the backends.
@@ -68,6 +116,13 @@ pub trait Poller {
     ///
     /// Return error if the operation failed.
     fn check(&mut self) -> Result<Vec<NewEmail>>;
+
+    /// Execute the given `action`
+    ///
+    /// # Errors
+    ///
+    /// Return error if the action could not be executed.
+    fn apply(&mut self, action: &Action) -> Result<()>;
 
     /// Logout the account.
     ///

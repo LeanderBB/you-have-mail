@@ -94,7 +94,7 @@ pub struct PutLabelMessageResponse {
 }
 impl http::Request for PutLabelMessageRequest {
     type Response = http::JsonResponse<PutLabelMessageResponse>;
-    const METHOD: Method = Method::Delete;
+    const METHOD: Method = Method::Put;
 
     fn url(&self) -> String {
         "mail/v4/messages/label".to_owned()

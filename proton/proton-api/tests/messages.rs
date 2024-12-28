@@ -5,7 +5,7 @@ use proton_api::domain::label;
 use proton_api::domain::message::Id;
 use proton_api::mocks::{DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD};
 use proton_api::requests::{
-    OperationResponse, PutLabelMessageResponse, PutMarkMessageReadRequest,
+    OperationResponse, PutLabelMessageRequest, PutLabelMessageResponse, PutMarkMessageReadRequest,
     PutMarkMessageReadResponse,
 };
 
@@ -19,7 +19,7 @@ fn mark_message_read() {
     let _mock_mark_read = proton_api::mocks::message::mark_message_read(
         &mut server,
         vec![id.clone()],
-        PutMarkMessageReadResponse {
+        &PutMarkMessageReadResponse {
             responses: vec![OperationResponse::ok(id.clone())],
         },
     );
@@ -39,16 +39,16 @@ fn label_message() {
     let id = Id("my_message".to_owned());
     let label_id = label::Id::trash();
 
-    let _mock_mark_read = proton_api::mocks::message::label_message(
+    let _mock = proton_api::mocks::message::label_message(
         &mut server,
-        label_id,
+        label_id.clone(),
         vec![id.clone()],
-        PutLabelMessageResponse {
+        &PutLabelMessageResponse {
             responses: vec![OperationResponse::ok(id.clone())],
         },
     );
     let response = session
-        .execute_with_auth(PutMarkMessageReadRequest::new([id.clone()]))
+        .execute_with_auth(PutLabelMessageRequest::new(label_id, [id.clone()]))
         .unwrap();
     assert_eq!(response.responses.len(), 1);
     assert_eq!(response.responses[0].id, id);

@@ -1,4 +1,4 @@
-use crate::backend::{Backend, NewEmail, Poller};
+use crate::backend::{Action, Backend, NewEmail, Poller};
 use crate::events::Event;
 use crate::state::{Account, AccountWatcher, Error as StateError, State};
 use http::Proxy;
@@ -266,6 +266,30 @@ impl Yhm {
             error!("Failed to logout account:{e}");
             e
         })?)
+    }
+
+    /// Apply the given `actions` on the account with `email`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the action failed to apply.
+    pub fn apply_actions(
+        &self,
+        email: &str,
+        actions: impl IntoIterator<Item = Action>,
+    ) -> Result<(), Error> {
+        let account = self
+            .state
+            .account(email)?
+            .ok_or(Error::AccountNotFound(email.to_owned()))?;
+
+        let mut account = self.build_account_poller(account)?;
+
+        for action in actions {
+            account.apply(&action)?;
+        }
+
+        Ok(())
     }
 
     /// Import V1 Configuration and extract all existing accounts.
