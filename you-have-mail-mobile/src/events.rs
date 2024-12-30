@@ -1,11 +1,30 @@
 use you_have_mail_common as yhm;
 
-/// Possible events
+/// Action that can be taken on message.
+pub struct Action(String);
 
+uniffi::custom_newtype!(Action, String);
+
+impl From<yhm::backend::Action> for Action {
+   fn from(action: yhm::backend::Action) -> Self {
+       Self(action.take())
+   }
+}
+
+impl From<Action>  for yhm::backend::Action {
+    fn from(action: Action) -> Self {
+        yhm::backend::Action::with(action.0)
+    }
+}
+
+/// Possible events
 #[derive(uniffi::Record)]
 pub struct NewEmail {
     pub sender: String,
     pub subject: String,
+    pub move_to_trash_action:Option<Action>,
+    pub move_to_spam_action:Option<Action>,
+    pub mark_as_read_action:Option<Action>,
 }
 #[derive(uniffi::Enum)]
 pub enum Event {
@@ -41,6 +60,9 @@ impl From<yhm::events::Event> for Event {
                     .map(|v| NewEmail {
                         sender: v.sender,
                         subject: v.subject,
+                        mark_as_read_action: v.mark_as_read_action.map(Into::into),
+                        move_to_trash_action: v.move_to_trash_action.map(Into::into),
+                        move_to_spam_action: v.move_to_spam_action.map(Into::into),
                     })
                     .collect(),
             },

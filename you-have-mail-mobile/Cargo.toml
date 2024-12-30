@@ -13,17 +13,16 @@ crate-type = ["cdylib"]
 name = "youhavemail"
 
 [dependencies]
-uniffi = { version = "0.28.2", features = ["cli"] }
+uniffi = { version = "0.28.3", features = ["cli"] }
 you-have-mail-common = { git = "https://github.com/LeanderBB/you-have-mail-common" }
 #you-have-mail-common = { path = "../../you-have-mail-common/youhavemail" }
-thiserror = "1"
+thiserror = "2"
 parking_lot = "0.12"
 tracing = "0.1"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 tracing-appender = "0.2.3"
 chrono = "0.4"
-anyhow = "1.0.86"
-sqlite-watcher = "0.2.0"
+sqlite-watcher = "0.4.1"
 
 [lints.clippy]
 pedantic = "deny"

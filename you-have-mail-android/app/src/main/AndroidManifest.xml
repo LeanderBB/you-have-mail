@@ -49,6 +49,13 @@
                 <action android:name="android.intent.action.QUICKBOOT_POWERON" />
             </intent-filter>
         </receiver>
+
+        <!-- used to handle notification actions -->
+        <receiver android:name=".app.MoveToSpamReceiver" />
+        <receiver android:name=".app.MoveToTrashReceiver" />
+        <receiver android:name=".app.MarkReadReceiver" />
+        <receiver android:name=".app.DismissGroupNotificationReceiver" />
+        <receiver android:name=".app.DismissMessageNotificationReceiver" />
     </application>
 
 </manifest>

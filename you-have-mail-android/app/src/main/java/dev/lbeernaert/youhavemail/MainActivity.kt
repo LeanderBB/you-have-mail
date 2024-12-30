@@ -2,7 +2,6 @@ package dev.lbeernaert.youhavemail
 
 import android.Manifest
 import android.app.Activity
-import android.app.NotificationManager
 import android.content.Context
 import android.content.Intent
 import android.content.pm.PackageManager
@@ -42,6 +41,7 @@ import androidx.compose.ui.res.stringResource
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import androidx.core.app.NotificationManagerCompat
 import androidx.core.content.ContextCompat
 import androidx.core.content.ContextCompat.startActivity
 import dev.lbeernaert.youhavemail.app.NotificationActionClicked
@@ -71,8 +71,7 @@ class MainActivity : ComponentActivity() {
         super.onCreate(savedInstanceState)
         onNewIntent(this.intent)
 
-        val notificationManager =
-            getSystemService(NOTIFICATION_SERVICE) as NotificationManager
+        val notificationManager = NotificationManagerCompat.from(this)
 
         createNotificationChannels(notificationManager)
 
@@ -195,7 +194,9 @@ class MainActivity : ComponentActivity() {
 
     override fun onNewIntent(intent: Intent) {
         super.onNewIntent(intent)
-
+        //TODO: Separat activity to launch other app
+        // https://stackoverflow.com/questions/11883534/how-to-dismiss-notification-after-action-has-been-clicked
+        // we can set it up to not show up in the history
         val action = intent.action ?: return
 
         if (action == NotificationActionClicked) {
@@ -342,7 +343,9 @@ private fun ShowErrorDialog() {
         },
         buttons = {
             Column(
-                modifier = Modifier.fillMaxWidth().padding(bottom = 20.dp),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(bottom = 20.dp),
                 verticalArrangement = Arrangement.Center,
                 horizontalAlignment = Alignment.CenterHorizontally
             ) {

@@ -15,9 +15,12 @@ import android.text.Html
 import android.text.Spanned
 import android.util.Log
 import androidx.core.app.NotificationCompat
+import androidx.core.app.NotificationManagerCompat
 import dev.lbeernaert.youhavemail.MainActivity
+import dev.lbeernaert.youhavemail.NewEmail
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.YhmException
+import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.Lock
 import java.util.concurrent.locks.ReentrantLock
 import kotlin.concurrent.withLock
@@ -27,6 +30,7 @@ const val NotificationActionClicked = "NotificationClicked"
 const val NotificationIntentEmailKey = "Email"
 const val NotificationIntentBackendKey = "Backend"
 const val NotificationIntentAppNameKey = "AppName"
+const val NotificationIntentActionKey = "Action"
 
 const val NotificationChannelService = "YOU_HAVE_MAIL_SERVICE"
 const val NotificationChannelNewMail = "YOU_HAVE_MAIL_NOTIFICATION"
@@ -43,10 +47,11 @@ const val NOTIFICATION_LOG_TAG = "notification"
 /**
  * Notification ids for an account.
  *
- * @param newMessages: For new unread messages.
+ * @param group: For group notification.
+ * @param statusUpdate: For status updates.
  * @param errors: For error notifications
  */
-data class NotificationIds(val newMessages: Int, val statusUpdate: Int, val errors: Int)
+data class NotificationIds(val group: Int, val statusUpdate: Int, val errors: Int)
 
 /**
  * Unread state for an account.
@@ -54,14 +59,17 @@ data class NotificationIds(val newMessages: Int, val statusUpdate: Int, val erro
  * If an account has multiple unread emails, each email will create an entry into the `lines`
  * parameter.
  */
-data class UnreadState(var unreadCount: UInt, var lines: ArrayList<Spanned>)
+data class UnreadState(var notificationIds: HashSet<Int>)
+
+private var RequestCodeCounter: AtomicInteger = AtomicInteger(0)
 
 class NotificationState {
     private var idCounter: Int = ServiceAccountNotificationsStartID
     private var accountToIds: HashMap<String, NotificationIds> = HashMap()
     private var unreadState: HashMap<String, UnreadState> = HashMap()
+    private var freeNotificationIds: ArrayList<Int> = ArrayList()
+    private var nextNotificationId: Int = 2000;
     private var lock: Lock = ReentrantLock()
-
 
     /**
      * Get or create notification ids for a given account.
@@ -74,7 +82,7 @@ class NotificationState {
             }
 
             val newIds = NotificationIds(
-                newMessages = idCounter++,
+                group = idCounter++,
                 statusUpdate = idCounter++,
                 errors = idCounter++
             )
@@ -85,28 +93,82 @@ class NotificationState {
     }
 
     /**
+     * Get the next free notification id or create one.
+     */
+    private fun getNextNotificationID(): Int {
+        this.lock.withLock {
+            if (this.freeNotificationIds.isNotEmpty()) {
+                return this.freeNotificationIds.removeAt(this.freeNotificationIds.lastIndex)
+            }
+
+            return this.nextNotificationId++
+        }
+    }
+
+    /**
+     * Mark this notification id as available.
+     */
+    private fun freeNotificationID(context: Context, email: String, backend: String, id: Int) {
+        this.lock.withLock {
+            val notificationIDs = getOrCreateNotificationIDs(email)
+            val state = unreadState[email]
+            if (state != null) {
+                state.notificationIds.remove(id)
+                NotificationManagerCompat.from(context).apply {
+                    if (state.notificationIds.isEmpty()) {
+                        // if no notification ids left cancel group
+                        cancel(notificationIDs.group)
+                    } else {
+                        // update group summary
+                        if (this.areNotificationsEnabled()) {
+                            val summaryNotification =
+                                createGroupNotification(context, email, backend, state)
+                            notify(notificationIDs.group, summaryNotification)
+                        }
+                    }
+                }
+            }
+            this.freeNotificationIds.add(id)
+        }
+    }
+
+    /**
+     * Dismiss a visible notification.
+     */
+    fun dismissNotification(context: Context, email: String, backend: String, id: Int) {
+        NotificationManagerCompat.from(context).apply {
+            cancel(id)
+        }
+        freeNotificationID(context, email, backend, id)
+    }
+
+    /**
+     * Dismiss group notification and all its children
+     */
+    fun dismissGroupNotification(context: Context, email: String) {
+        lock.withLock {
+            val notificationIds = getOrCreateNotificationIDs(email)
+            NotificationManagerCompat.from(context).apply {
+                cancel(notificationIds.group)
+            }
+        }
+    }
+
+    /**
      * Get an account's unread state or update the existing one if any is present.
      */
     private fun getAndUpdateUnreadMessageCount(
         email: String,
-        newMessageCount: UInt,
-        line: Spanned,
-        reset: Boolean
+        notificationID: Int,
     ): UnreadState {
         this.lock.withLock {
-            val result: UnreadState
-            if (reset) {
-                val state = UnreadState(newMessageCount, arrayListOf(line))
-                this.unreadState[email] = state
-                result = state
-            } else {
-                var state = this.unreadState.getOrDefault(email, UnreadState(0u, arrayListOf()))
-                state.unreadCount += newMessageCount
-                state.lines.add(line)
-                this.unreadState[email] = state
-                result = state
-            }
-            return result
+            var state = this.unreadState.getOrDefault(
+                email,
+                UnreadState(hashSetOf())
+            )
+            state.notificationIds.add(notificationID)
+            this.unreadState[email] = state
+            return state
         }
     }
 
@@ -114,7 +176,7 @@ class NotificationState {
      * Check whether a notification is currently visible.
      */
     private fun isNotificationVisible(context: Context, id: Int): Boolean {
-        with(context.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+        NotificationManagerCompat.from(context).apply {
             for (n in this.activeNotifications) {
                 if (n.id == id) {
                     return true
@@ -128,7 +190,7 @@ class NotificationState {
     /**
      * Create notification for new emails that opens a registered application when interacted with.
      */
-    private fun createAlertNotification(
+    private fun createGroupNotification(
         context: Context,
         email: String,
         backend: String,
@@ -155,7 +217,7 @@ class NotificationState {
                     intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
                     PendingIntent.getActivity(
                         context,
-                        0,
+                        newRequestCode(),
                         intent,
                         PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                     )
@@ -168,17 +230,91 @@ class NotificationState {
                 null
             }
 
-        val dismissIntent: PendingIntent =
-            Intent().let { intent ->
-                intent.action = NotificationActionDismissed
-                intent.putExtra(
-                    NotificationIntentEmailKey, email
+        val dismissIntent: PendingIntent = PendingIntent.getBroadcast(
+            context,
+            newRequestCode(),
+            DismissGroupNotificationReceiver.newIntent(context, email),
+            PendingIntent.FLAG_UPDATE_CURRENT
+        )
+
+        val builder: NotificationCompat.Builder = NotificationCompat.Builder(
+            context,
+            NotificationChannelNewMail
+        )
+
+        if (clickIntent != null) {
+            builder.setContentIntent(clickIntent)
+        }
+
+        return builder
+            .setContentTitle("$email has ${unreadState.notificationIds.size} new message(s)")
+            .setDeleteIntent(dismissIntent)
+            .setSubText(email)
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
+            .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
+            .setSmallIcon(R.drawable.ic_stat_alert)
+            .setTicker("You Have Mail Alert")
+            .setGroup(groupID(email))
+            .setGroupSummary(true)
+            .build()
+    }
+
+    /**
+     * Create notification for new emails that opens a registered application when interacted with.
+     */
+    private fun createNewEmailNotification(
+        context: Context,
+        email: String,
+        backend: String,
+        newEmail: NewEmail,
+        notificationID: Int,
+    ): Notification {
+
+        val appName = getAppNameForBackend(backend)
+
+        val clickIntent: PendingIntent? =
+            if (appName != null) {
+                Intent(context, MainActivity::class.java).let { intent ->
+                    intent.action = NotificationActionClicked
+                    intent.putExtra(
+                        NotificationIntentEmailKey, email
+                    )
+                    intent.putExtra(
+                        NotificationIntentBackendKey, backend
+                    )
+                    intent.putExtra(
+                        NotificationIntentAppNameKey,
+                        appName
+                    )
+                    intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
+                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
+                    PendingIntent.getActivity(
+                        context,
+                        newRequestCode(),
+                        intent,
+                        PendingIntent.FLAG_UPDATE_CURRENT
+                    )
+                }
+            } else {
+                Log.d(
+                    NOTIFICATION_LOG_TAG,
+                    "No app found for backed '$backend'. No notification action"
                 )
-                intent.putExtra(
-                    NotificationIntentBackendKey, backend
-                )
-                PendingIntent.getBroadcast(context, 0, intent, PendingIntent.FLAG_IMMUTABLE)
+                null
             }
+
+        val dismissIntent: PendingIntent =
+            PendingIntent.getBroadcast(
+                context,
+                newRequestCode(),
+                DismissMessageNotificationReceiver.newIntent(
+                    context,
+                    email,
+                    backend,
+                    notificationID
+                ),
+                PendingIntent.FLAG_UPDATE_CURRENT
+            )
 
 
         val builder: NotificationCompat.Builder = NotificationCompat.Builder(
@@ -190,32 +326,63 @@ class NotificationState {
             builder.setContentIntent(clickIntent)
         }
 
-        if (unreadState.lines.size == 1) {
-            return builder
-                .setContentTitle("$email has 1 new message")
-                .setContentText(unreadState.lines[0])
-                .setDeleteIntent(dismissIntent)
-                .setAutoCancel(true)
-                .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
-                .setSmallIcon(R.drawable.ic_stat_alert)
-                .setTicker("You Have Mail Alert")
-                .build()
+        if (newEmail.moveToTrashAction != null) {
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                newRequestCode(),
+                MoveToTrashReceiver.newIntent(
+                    context,
+                    notificationID,
+                    email,
+                    newEmail.moveToTrashAction!!
+                ), PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            builder.addAction(0, "Trash", pendingIntent)
         }
 
-        var style = NotificationCompat.InboxStyle()
+        if (newEmail.moveToSpamAction != null) {
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                newRequestCode(),
+                MoveToSpamReceiver.newIntent(
+                    context,
+                    notificationID,
+                    email,
+                    newEmail.moveToSpamAction!!
+                ),
+                PendingIntent.FLAG_UPDATE_CURRENT
+            )
 
-        for (line in unreadState.lines.reversed()) {
-            style = style.addLine(line)
+            builder.addAction(0, "Spam", pendingIntent)
+        }
+
+        if (newEmail.markAsReadAction != null) {
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                newRequestCode(),
+                MarkReadReceiver.newIntent(
+                    context,
+                    notificationID,
+                    email,
+                    newEmail.markAsReadAction!!
+                ),
+                PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            builder.addAction(0, "Mark Read", pendingIntent)
         }
 
         return builder
-            .setContentTitle("$email has ${unreadState.unreadCount} new message(s)")
+            .setContentTitle(newEmail.sender)
+            .setContentText(newEmail.subject)
+            .setSubText(email)
             .setDeleteIntent(dismissIntent)
-            .setStyle(style)
-            .setAutoCancel(true)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setSmallIcon(R.drawable.ic_stat_alert)
             .setTicker("You Have Mail Alert")
+            .setGroup(groupID(email))
+            .setGroupAlertBehavior(NotificationCompat.GROUP_ALERT_CHILDREN)
             .build()
     }
 
@@ -226,21 +393,33 @@ class NotificationState {
         context: Context,
         account: String,
         backend: String,
-        sender: String,
-        subject: String
+        newEmail: NewEmail,
     ) {
         try {
-            val ids = getOrCreateNotificationIDs(account)
-            val isNotificationActive = isNotificationVisible(context, ids.newMessages)
-            val styleText: Spanned =
-                Html.fromHtml("<b>$sender:</b> $subject", Html.FROM_HTML_MODE_LEGACY)
+            val accountIDs = getOrCreateNotificationIDs(account)
+            val messageNotificationID = getNextNotificationID()
             val unreadState =
-                getAndUpdateUnreadMessageCount(account, 1u, styleText, !isNotificationActive)
-            val notification =
-                createAlertNotification(context, account, backend, unreadState)
-            with(context.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+                getAndUpdateUnreadMessageCount(
+                    account,
+                    messageNotificationID,
+                )
+            val groupNotification = createGroupNotification(context, account, backend, unreadState)
+            val newEmailNotification =
+                createNewEmailNotification(
+                    context,
+                    account,
+                    backend,
+                    newEmail,
+                    messageNotificationID,
+                )
+            NotificationManagerCompat.from(context).apply {
                 if (this.areNotificationsEnabled()) {
-                    notify(ids.newMessages, notification)
+                    notify(messageNotificationID, newEmailNotification)
+                    if (unreadState.notificationIds.size > 1) {
+                        notify(accountIDs.group, groupNotification)
+                    } else {
+                        cancel(accountIDs.group)
+                    }
                 }
             }
         } catch (e: Exception) {
@@ -256,7 +435,7 @@ class NotificationState {
             val notification =
                 createAccountStatusNotification(context, "Account $email session expired")
             val ids = getOrCreateNotificationIDs(email)
-            with(context.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+            NotificationManagerCompat.from(context).apply {
                 if (this.areNotificationsEnabled()) {
                     notify(ids.statusUpdate, notification)
                 }
@@ -273,7 +452,7 @@ class NotificationState {
         try {
             val notification = createAccountErrorNotification(context, email, error)
             val ids = getOrCreateNotificationIDs(email)
-            with(context.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+            NotificationManagerCompat.from(context).apply {
                 if (this.areNotificationsEnabled()) {
                     notify(ids.errors, notification)
                 }
@@ -282,11 +461,18 @@ class NotificationState {
             Log.e(NOTIFICATION_LOG_TAG, "Failed to display notification: $e")
         }
     }
+
+    /**
+     * Create notification group id for a an email
+     */
+    private fun groupID(email: String): String {
+        return "dev.lbeernaert.youhavemail.$email"
+    }
 }
 
 fun updateServiceNotificationStatus(context: Context, newState: String) {
     val notification = createServiceNotification(context, newState)
-    with(context.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+    NotificationManagerCompat.from(context).apply {
         if (this.areNotificationsEnabled()) {
             notify(ServiceNotificationID, notification)
         }
@@ -299,7 +485,7 @@ fun createAndDisplayServiceErrorNotification(
     exception: YhmException
 ) {
     val notification = createServiceErrorNotification(context, text, exception)
-    with(context.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+    NotificationManagerCompat.from(context).apply {
         if (this.areNotificationsEnabled()) {
             notify(ServiceErrorNotificationID, notification)
         }
@@ -311,7 +497,7 @@ fun createAndDisplayServiceErrorNotification(
     text: String,
 ) {
     val notification = createServiceErrorNotification(context, text)
-    with(context.getSystemService(Activity.NOTIFICATION_SERVICE) as NotificationManager) {
+    NotificationManagerCompat.from(context).apply {
         if (this.areNotificationsEnabled()) {
             notify(ServiceErrorNotificationID, notification)
         }
@@ -343,7 +529,12 @@ private fun createAccountErrorNotification(
 ): Notification {
     val pendingIntent: PendingIntent =
         Intent(context, MainActivity::class.java).let { notificationIntent ->
-            PendingIntent.getActivity(context, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
+            PendingIntent.getActivity(
+                context,
+                newRequestCode(),
+                notificationIntent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
     val builder: NotificationCompat.Builder = NotificationCompat.Builder(
@@ -369,7 +560,12 @@ fun createServiceErrorNotification(
 ): Notification {
     val pendingIntent: PendingIntent =
         Intent(context, MainActivity::class.java).let { notificationIntent ->
-            PendingIntent.getActivity(context, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
+            PendingIntent.getActivity(
+                context,
+                newRequestCode(),
+                notificationIntent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
     val builder: NotificationCompat.Builder = NotificationCompat.Builder(
@@ -396,7 +592,12 @@ fun createServiceErrorNotification(
 ): Notification {
     val pendingIntent: PendingIntent =
         Intent(context, MainActivity::class.java).let { notificationIntent ->
-            PendingIntent.getActivity(context, 0, notificationIntent, PendingIntent.FLAG_IMMUTABLE)
+            PendingIntent.getActivity(
+                context,
+                newRequestCode(),
+                notificationIntent,
+                PendingIntent.FLAG_IMMUTABLE
+            )
         }
 
     val builder: NotificationCompat.Builder = NotificationCompat.Builder(
@@ -420,7 +621,7 @@ fun createAccountStatusNotification(context: Context, text: String): Notificatio
         Intent(context, MainActivity::class.java).let { notificationIntent ->
             PendingIntent.getActivity(
                 context,
-                0,
+                newRequestCode(),
                 notificationIntent,
                 PendingIntent.FLAG_MUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
@@ -442,7 +643,7 @@ fun createAccountStatusNotification(context: Context, text: String): Notificatio
         .build()
 }
 
-fun createNotificationChannels(notificationManager: NotificationManager) {
+fun createNotificationChannels(notificationManager: NotificationManagerCompat) {
     notificationManager.createNotificationChannelGroup(
         NotificationChannelGroup(
             NotificationGroupNewEmails,
@@ -501,4 +702,8 @@ fun createNotificationChannels(notificationManager: NotificationManager) {
         it
     }
     notificationManager.createNotificationChannel(channelErrors)
+}
+
+fun newRequestCode(): Int {
+    return RequestCodeCounter.incrementAndGet()
 }

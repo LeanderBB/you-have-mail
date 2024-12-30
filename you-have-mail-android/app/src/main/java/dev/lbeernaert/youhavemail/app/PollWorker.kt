@@ -106,8 +106,7 @@ private fun poll(context: Context) {
                                 context,
                                 event.email,
                                 event.backend,
-                                email.sender,
-                                email.subject
+                                email,
                             )
                         }
                     }
@@ -180,10 +179,10 @@ fun registerWorker(ctx: Context, minutes: Long, cancel: Boolean) {
                 .setConstraints(constraints)
                 .build()
         wm.enqueueUniquePeriodicWork(
-                POLL_WORKER_JOB_NAME,
-                ExistingPeriodicWorkPolicy.KEEP,
-                work
-            )
+            POLL_WORKER_JOB_NAME,
+            ExistingPeriodicWorkPolicy.KEEP,
+            work
+        )
     } else {
         Log.d(TAG, "Registering One Time work with $minutes minutes interval")
         val work = OneTimeWorkRequest.Builder(OneTimePollWorker::class.java).addTag(TAG)

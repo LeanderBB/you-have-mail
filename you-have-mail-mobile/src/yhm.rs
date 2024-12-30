@@ -1,6 +1,6 @@
 use crate::account::{Account, AccountWatcher, FFIAccountTableObserver};
 use crate::backend::Backend;
-use crate::events::Event;
+use crate::events::{Action, Event};
 use crate::proxy::Proxy;
 use crate::watcher::WatchHandle;
 use sqlite_watcher::watcher::Watcher;
@@ -227,6 +227,17 @@ impl Yhm {
             .yhm
             .watch_accounts(FFIAccountTableObserver(observer))?
             .into())
+    }
+
+
+    /// Apply the `action` to the account with `email`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the action failed.
+    pub fn apply_action(&self, email:&str, action:Action) -> Result<(), YhmError> {
+       let action = action.into();
+        Ok(self.yhm.apply_actions(email,[action])?)
     }
 }
 
