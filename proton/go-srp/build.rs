@@ -136,7 +136,6 @@ fn generate_bindings_go_for_lib(lib_dir: &Path) {
 
     let bindings = bindgen::Builder::default()
         .header(header.to_str().unwrap())
-        .parse_callbacks(Box::new(bindgen::CargoCallbacks::new()))
         .derive_debug(false)
         .impl_debug(false)
         .default_enum_style(EnumVariation::Rust {
