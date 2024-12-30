@@ -254,7 +254,7 @@ impl crate::backend::Poller for Poller {
         }
     }
 
-    #[tracing::instrument(level=Level::DEBUG,skip(self),fields(email=%self.account.email()))]
+    #[tracing::instrument(level=Level::DEBUG,skip(self, action),fields(email=%self.account.email()))]
     fn apply(&mut self, action: &Action) -> BackendResult<()> {
         let action = action.to_value::<AccountAction>().map_err(|e| {
             error!("Failed to deserialize action: {e}");
