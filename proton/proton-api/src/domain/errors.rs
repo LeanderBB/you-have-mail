@@ -127,6 +127,7 @@ impl APIError {
             }
         }
     }
+
     /// Create a new instance with an `http_status` code.
     #[must_use]
     pub fn new(http_status: u16) -> Self {
@@ -135,6 +136,17 @@ impl APIError {
             api_code: 0,
             message: None,
             details: None,
+        }
+    }
+
+    /// Create a new instance with an `http_status` code and `description`.
+    #[must_use]
+    pub fn with_desc(http_status: u16, description: APIErrorDesc) -> Self {
+        Self {
+            http_code: http_status,
+            api_code: description.code,
+            message: description.error,
+            details: description.details,
         }
     }
 }

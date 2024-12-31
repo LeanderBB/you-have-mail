@@ -1,4 +1,4 @@
-use crate::domain::errors::{APIErrorDesc, OPERATION_SUCCESS};
+use crate::domain::errors::{APIError, APIErrorDesc, OPERATION_SUCCESS};
 use crate::domain::label;
 use crate::domain::message::Id;
 use http::{Method, RequestBuilder};
@@ -32,6 +32,19 @@ impl OperationResponse {
     #[must_use]
     pub fn is_success(&self) -> bool {
         self.response.code == OPERATION_SUCCESS
+    }
+
+    /// Convert the current response into a result type.
+    ///
+    /// # Errors
+    ///
+    /// Converts into an `APIError` if the operation did not succeed.
+    pub fn into_result(self) -> Result<(), APIError> {
+        if self.is_success() {
+            Ok(())
+        } else {
+            Err(APIError::with_desc(200, self.response))
+        }
     }
 }
 

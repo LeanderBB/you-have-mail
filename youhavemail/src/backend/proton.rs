@@ -3,6 +3,7 @@
 use crate::backend::{Action, Error as BackendError, Error, NewEmail, Result as BackendResult};
 use crate::state::Account;
 use crate::yhm::{IntoAccount, Yhm};
+use anyhow::anyhow;
 use http::{Client, Proxy};
 use parking_lot::Mutex;
 use proton_api::auth::{new_thread_safe_store, Auth as ProtonAuth, InMemoryStore, StoreError};
@@ -264,27 +265,48 @@ impl crate::backend::Poller for Poller {
         match action {
             AccountAction::MarkMessageRead(id) => {
                 debug!("Marking {id} as read");
-                self.session
+                let response = self
+                    .session
                     .execute_with_auth(PutMarkMessageReadRequest::new([id]))
                     .inspect_err(|e| {
                         error!("Failed to mark message as read: {e}");
                     })?;
+                for response in response.responses {
+                    response.into_result().map_err(|e| {
+                        error!("Failed to mark message as read: {}", e);
+                        Error::Unknown(anyhow!("Failed to mark message as read"))
+                    })?;
+                }
             }
             AccountAction::MoveMessageToTrash(id) => {
                 debug!("Moving {id} to trash");
-                self.session
+                let response = self
+                    .session
                     .execute_with_auth(PutLabelMessageRequest::new(label::Id::trash(), [id]))
                     .inspect_err(|e| {
                         error!("Failed to move message to trash: {e}");
                     })?;
+                for response in response.responses {
+                    response.into_result().map_err(|e| {
+                        error!("Failed to move message to trash: {}", e);
+                        Error::Unknown(anyhow!("Failed to move message to trash"))
+                    })?;
+                }
             }
             AccountAction::MoveMessageToSpam(id) => {
                 debug!("Moving {id} to spam");
-                self.session
+                let response = self
+                    .session
                     .execute_with_auth(PutLabelMessageRequest::new(label::Id::spam(), [id]))
                     .inspect_err(|e| {
                         error!("Failed to move message to spam: {e}");
                     })?;
+                for response in response.responses {
+                    response.into_result().map_err(|e| {
+                        error!("Failed to move message to spam: {}", e);
+                        Error::Unknown(anyhow!("Failed to move message to spam"))
+                    })?;
+                }
             }
         }
 
