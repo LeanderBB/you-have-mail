@@ -1,6 +1,5 @@
 package dev.lbeernaert.youhavemail.app
 
-import android.app.Activity
 import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationChannelGroup
@@ -11,8 +10,6 @@ import android.content.Intent
 import android.graphics.Color
 import android.media.AudioAttributes
 import android.media.RingtoneManager
-import android.text.Html
-import android.text.Spanned
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
@@ -146,11 +143,21 @@ class NotificationState {
     /**
      * Dismiss group notification and all its children
      */
-    fun dismissGroupNotification(context: Context, email: String) {
+    fun dismissGroupNotification(context: Context, email: String, clearChildren: Boolean) {
         lock.withLock {
             val notificationIds = getOrCreateNotificationIDs(email)
             NotificationManagerCompat.from(context).apply {
                 cancel(notificationIds.group)
+
+                if (clearChildren) {
+                    val state = unreadState[email]
+                    if (state != null) {
+                        for (id in state.notificationIds) {
+                            cancel(id)
+                        }
+                        state.notificationIds.clear()
+                    }
+                }
             }
         }
     }
@@ -203,7 +210,7 @@ class NotificationState {
             context,
             newRequestCode(),
             DismissGroupNotificationReceiver.newIntent(context, email),
-            PendingIntent.FLAG_UPDATE_CURRENT
+            PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
         )
 
         val builder: NotificationCompat.Builder = NotificationCompat.Builder(
@@ -251,7 +258,7 @@ class NotificationState {
                     backend,
                     notificationID
                 ),
-                PendingIntent.FLAG_UPDATE_CURRENT
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
 
@@ -273,7 +280,8 @@ class NotificationState {
                     notificationID,
                     email,
                     newEmail.moveToTrashAction!!
-                ), PendingIntent.FLAG_UPDATE_CURRENT
+                ),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
             builder.addAction(0, "Trash", pendingIntent)
@@ -289,7 +297,7 @@ class NotificationState {
                     email,
                     newEmail.moveToSpamAction!!
                 ),
-                PendingIntent.FLAG_UPDATE_CURRENT
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
             builder.addAction(0, "Spam", pendingIntent)
@@ -305,7 +313,7 @@ class NotificationState {
                     email,
                     newEmail.markAsReadAction!!
                 ),
-                PendingIntent.FLAG_UPDATE_CURRENT
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
             builder.addAction(0, "Mark Read", pendingIntent)

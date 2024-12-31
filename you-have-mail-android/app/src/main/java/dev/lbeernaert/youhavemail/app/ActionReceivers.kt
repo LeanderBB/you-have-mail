@@ -111,7 +111,8 @@ class DismissGroupNotificationReceiver : BroadcastReceiver() {
         val email = intent.getStringExtra(NotificationIntentEmailKey)
         if (email != null) {
             Log.i(TAG, "Dismissing Group Notification for $email")
-            NOTIFICATION_STATE.dismissGroupNotification(context, email)
+            // When dismissing a group, all children are also dismissed.
+            NOTIFICATION_STATE.dismissGroupNotification(context, email, false)
         }
     }
 

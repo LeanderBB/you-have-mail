@@ -30,8 +30,9 @@ class OpenAppActivity : Activity() {
             // Launch the app for this backend
             Log.d(activityLogTag, "Receive click request for '$email' backend='$backend'")
             try {
-                // Dismiss group notifications
-                NOTIFICATION_STATE.dismissGroupNotification(this, email)
+                // Dismiss group notifications and children as they are not auto cleared
+                // in this case.
+                NOTIFICATION_STATE.dismissGroupNotification(this, email, true)
 
                 Log.d(activityLogTag, "Attempting to launch $appName")
                 val appIntent =
@@ -88,7 +89,7 @@ class OpenAppActivity : Activity() {
                         context,
                         newRequestCode(),
                         intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT
+                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
                     )
                 }
             } else {
