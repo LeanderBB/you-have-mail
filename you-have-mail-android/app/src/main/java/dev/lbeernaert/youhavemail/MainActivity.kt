@@ -69,7 +69,6 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.i("BOOT", "OnCreate")
         super.onCreate(savedInstanceState)
-        onNewIntent(this.intent)
 
         val notificationManager = NotificationManagerCompat.from(this)
 
@@ -187,41 +186,6 @@ class MainActivity : ComponentActivity() {
                         )
                     }
                 }
-            }
-        }
-    }
-
-
-    override fun onNewIntent(intent: Intent) {
-        super.onNewIntent(intent)
-        //TODO: Separat activity to launch other app
-        // https://stackoverflow.com/questions/11883534/how-to-dismiss-notification-after-action-has-been-clicked
-        // we can set it up to not show up in the history
-        val action = intent.action ?: return
-
-        if (action == NotificationActionClicked) {
-            val backend = intent.getStringExtra(NotificationIntentBackendKey)!!
-            val email = intent.getStringExtra(NotificationIntentEmailKey)!!
-            val appName = intent.getStringExtra(NotificationIntentAppNameKey)!!
-
-            // Launch the app for this backend
-            Log.d(activityLogTag, "Receive click request for '$email' backend='$backend'")
-            try {
-                Log.d(activityLogTag, "Attempting to launch $appName")
-                val appIntent =
-                    packageManager.getLaunchIntentForPackage(appName)
-                if (appIntent != null) {
-                    appIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
-                    appIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    appIntent.addFlags(Intent.FLAG_ACTIVITY_TASK_ON_HOME)
-                    appIntent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
-                    appIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
-                    startActivity(appIntent)
-                } else {
-                    Log.e(activityLogTag, "Could not find package $appName")
-                }
-            } catch (e: Exception) {
-                Log.e(activityLogTag, "Failed to launch $appName for backend $backend: $e")
             }
         }
     }

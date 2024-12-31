@@ -18,6 +18,7 @@ import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
 import dev.lbeernaert.youhavemail.MainActivity
 import dev.lbeernaert.youhavemail.NewEmail
+import dev.lbeernaert.youhavemail.OpenAppActivity
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.YhmException
 import java.util.concurrent.atomic.AtomicInteger
@@ -196,39 +197,7 @@ class NotificationState {
         backend: String,
         unreadState: UnreadState,
     ): Notification {
-
-        val appName = getAppNameForBackend(backend)
-
-        val clickIntent: PendingIntent? =
-            if (appName != null) {
-                Intent(context, MainActivity::class.java).let { intent ->
-                    intent.action = NotificationActionClicked
-                    intent.putExtra(
-                        NotificationIntentEmailKey, email
-                    )
-                    intent.putExtra(
-                        NotificationIntentBackendKey, backend
-                    )
-                    intent.putExtra(
-                        NotificationIntentAppNameKey,
-                        appName
-                    )
-                    intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    PendingIntent.getActivity(
-                        context,
-                        newRequestCode(),
-                        intent,
-                        PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
-                    )
-                }
-            } else {
-                Log.d(
-                    NOTIFICATION_LOG_TAG,
-                    "No app found for backed '$backend'. No notification action"
-                )
-                null
-            }
+        val clickIntent: PendingIntent? = OpenAppActivity.newIntent(context, email, backend)
 
         val dismissIntent: PendingIntent = PendingIntent.getBroadcast(
             context,
@@ -270,38 +239,7 @@ class NotificationState {
         notificationID: Int,
     ): Notification {
 
-        val appName = getAppNameForBackend(backend)
-
-        val clickIntent: PendingIntent? =
-            if (appName != null) {
-                Intent(context, MainActivity::class.java).let { intent ->
-                    intent.action = NotificationActionClicked
-                    intent.putExtra(
-                        NotificationIntentEmailKey, email
-                    )
-                    intent.putExtra(
-                        NotificationIntentBackendKey, backend
-                    )
-                    intent.putExtra(
-                        NotificationIntentAppNameKey,
-                        appName
-                    )
-                    intent.addFlags(Intent.FLAG_ACTIVITY_SINGLE_TOP)
-                    intent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    PendingIntent.getActivity(
-                        context,
-                        newRequestCode(),
-                        intent,
-                        PendingIntent.FLAG_UPDATE_CURRENT
-                    )
-                }
-            } else {
-                Log.d(
-                    NOTIFICATION_LOG_TAG,
-                    "No app found for backed '$backend'. No notification action"
-                )
-                null
-            }
+        val clickIntent: PendingIntent? = OpenAppActivity.newIntent(context, email, backend)
 
         val dismissIntent: PendingIntent =
             PendingIntent.getBroadcast(

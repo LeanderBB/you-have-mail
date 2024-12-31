@@ -39,6 +39,13 @@
             </intent-filter>
         </activity>
 
+        <!-- dedicated activity to launch the mail apps -->
+        <activity
+            android:name=".OpenAppActivity"
+            android:taskAffinity=""
+            android:excludeFromRecents="true"
+            android:noHistory="true" />
+
         <receiver
             android:name=".app.StartReceiver"
             android:enabled="true"
