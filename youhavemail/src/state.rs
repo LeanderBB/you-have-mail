@@ -612,8 +612,16 @@ INSERT OR IGNORE INTO yhm (email, backend) VALUES (
         let time = Utc::now();
         self.pool.with_transaction(|tx| {
             tx.execute("DELETE FROM yhm_poll_event", ())?;
-            let mut event_stmt =
-                tx.prepare("INSERT OR REPLACE INTO yhm_poll_event VALUES (?,?)")?;
+            let mut event_stmt = tx.prepare(
+                r"
+WITH cte(email, event) AS (
+    VALUES (?,?)
+)
+INSERT OR REPLACE INTO yhm_poll_event (email, event)
+SELECT c.email,c.event FROM cte AS C
+WHERE EXISTS (SELECT 1 FROM yhm WHERE email=c.email)
+",
+            )?;
             let mut update_account_stmt = tx.prepare("UPDATE yhm SET last_poll=? WHERE email=?")?;
 
             for event in events {
