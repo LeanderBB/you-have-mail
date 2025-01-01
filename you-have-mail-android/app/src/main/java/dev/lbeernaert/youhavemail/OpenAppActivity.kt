@@ -21,6 +21,8 @@ class OpenAppActivity : Activity() {
         super.onCreate(savedInstanceState)
         val action = intent.action ?: return
 
+        finish()
+
         if (action == NotificationActionClicked) {
             val backend = intent.getStringExtra(NotificationIntentBackendKey)!!
             val email = intent.getStringExtra(NotificationIntentEmailKey)!!
@@ -40,7 +42,6 @@ class OpenAppActivity : Activity() {
                 if (appIntent != null) {
                     appIntent.addFlags(Intent.FLAG_ACTIVITY_NEW_TASK)
                     appIntent.addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP)
-                    appIntent.addFlags(Intent.FLAG_ACTIVITY_TASK_ON_HOME)
                     appIntent.addFlags(Intent.FLAG_ACTIVITY_RESET_TASK_IF_NEEDED)
                     appIntent.addFlags(Intent.FLAG_ACTIVITY_REORDER_TO_FRONT)
                     startActivity(appIntent)
@@ -59,7 +60,6 @@ class OpenAppActivity : Activity() {
                 )
                     .show()
             }
-            finish()
         }
     }
 
