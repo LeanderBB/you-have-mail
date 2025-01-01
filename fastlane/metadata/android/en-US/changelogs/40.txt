@@ -1,0 +1,12 @@
+# Added
+
+* Received messages can now be marked read, moved to trash or spam from the notification
+
+# Changed
+
+* Create individual notifications for each message and group them by account email.
+
+# Fixed
+
+* Going back in the activity history should now correctly return to the last place before opening
+  the mail application.
