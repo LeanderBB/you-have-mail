@@ -69,4 +69,15 @@
     <string name="empty_email_or_password_info">Email and password fields cannot be empty</string>
     <string name="invalid_email_address">E-mail address seems to be invalid. Verify if it is correctly typed.</string>
     <string name="service_uninitialized">Service failed to initialize.</string>
+    <string name="msg_mark_read_success">Message marked as read</string>
+    <string name="msg_mark_read_fail">Failed to mark message as read</string>
+    <string name="msg_trash_success">Message moved to Trash</string>
+    <string name="msg_trash_fail">Failed to move message to Trash</string>
+    <string name="msg_spam_success">Message moved to Spam</string>
+    <string name="msg_spam_fail">Failed to move message to Spam</string>
+    <string name="msg_action_success">Action Succeeded</string>
+    <string name="msg_action_fail">Action Failed</string>
+    <string name="action_mark_read">Mark Read</string>
+    <string name="action_trash">Trash</string>
+    <string name="action_spam">Spam</string>
 </resources>

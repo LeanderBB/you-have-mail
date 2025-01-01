@@ -11,12 +11,14 @@ import androidx.work.OneTimeWorkRequest
 import androidx.work.WorkManager
 import androidx.work.Worker
 import androidx.work.WorkerParameters
+import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.Yhm
 
 private const val TAG = "ActionWorker"
 private const val EmailKey = "Email"
 private const val ActionKey = "Key"
-private const val ActionDescKey = "ActionDesc"
+private const val ActionDescSuccessKey = "ActionDescSuccess"
+private const val ActionDescFailKey = "ActionDescFailure"
 
 /**
  * Worker which execute an action
@@ -30,7 +32,10 @@ class ActionWorker(ctx: Context, params: WorkerParameters) :
         if (email == null || action == null) {
             return Result.failure()
         }
-        val actionDesc = this.inputData.getString(ActionDescKey)
+        val actionDescSuccess =
+            this.inputData.getInt(ActionDescSuccessKey, R.string.msg_action_success)
+        val actionDescFail =
+            this.inputData.getInt(ActionDescFailKey, R.string.msg_action_fail)
         Log.i(TAG, "email=$email action=$action")
         val handler = Handler(applicationContext.mainLooper);
         return try {
@@ -38,7 +43,7 @@ class ActionWorker(ctx: Context, params: WorkerParameters) :
             handler.postDelayed({
                 Toast.makeText(
                     applicationContext,
-                    "$actionDesc success",
+                    actionDescSuccess,
                     Toast.LENGTH_LONG
                 )
                     .show()
@@ -49,7 +54,7 @@ class ActionWorker(ctx: Context, params: WorkerParameters) :
             handler.postDelayed({
                 Toast.makeText(
                     applicationContext,
-                    "$actionDesc failed: $e",
+                    actionDescFail,
                     Toast.LENGTH_LONG
                 )
                     .show()
@@ -59,15 +64,22 @@ class ActionWorker(ctx: Context, params: WorkerParameters) :
     }
 
     companion object {
-        fun queue(context: Context, email: String, action: String, description: String) {
+        fun queue(
+            context: Context,
+            email: String,
+            action: String,
+            successString: Int,
+            failureString: Int
+        ) {
             val constraint =
                 Constraints.Builder().setRequiredNetworkType(NetworkType.CONNECTED).build()
             val wm = WorkManager.getInstance(context)
 
             val inputData =
-                Data.Builder().putString(EmailKey, email).putString(ActionKey, action).putString(
-                    ActionDescKey, description
-                ).build()
+                Data.Builder().putString(EmailKey, email)
+                    .putString(ActionKey, action)
+                    .putInt(ActionDescSuccessKey, successString)
+                    .putInt(ActionDescFailKey, failureString).build()
 
             val work = OneTimeWorkRequest.Builder(ActionWorker::class.java)
                 .setInputData(inputData).setConstraints(constraint)

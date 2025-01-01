@@ -4,6 +4,7 @@ import android.content.BroadcastReceiver
 import android.content.Context
 import android.content.Intent
 import android.util.Log
+import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.yhmLogError
 import dev.lbeernaert.youhavemail.yhmLogInfo
 
@@ -14,7 +15,11 @@ private const val TAG = "Receivers"
 /**
  * Base class receiver for actions which can be taken on a notification.
  */
-open class ActionReceiver(private val name: String, private val description: String) :
+open class ActionReceiver(
+    private val name: String,
+    private val descriptionSuccess: Int,
+    private val descriptionFail: Int
+) :
     BroadcastReceiver() {
 
     override fun onReceive(context: Context, intent: Intent) {
@@ -33,7 +38,7 @@ open class ActionReceiver(private val name: String, private val description: Str
         yhmLogInfo("Received $name broadcast for $email")
 
         try {
-            ActionWorker.queue(context, email, action, description)
+            ActionWorker.queue(context, email, action, descriptionSuccess, descriptionFail)
         } catch (e: Exception) {
             yhmLogError("Failed to queue action for $email: $e")
             createAndDisplayServiceErrorNotification(
@@ -62,7 +67,11 @@ open class ActionReceiver(private val name: String, private val description: Str
 /**
  * Broadcast when the user clicks the `Mark Read` notification action.
  */
-class MarkReadReceiver : ActionReceiver(name = "MarkRead", "Mark message read") {
+class MarkReadReceiver : ActionReceiver(
+    name = "MarkRead",
+    R.string.msg_mark_read_success,
+    R.string.msg_mark_read_fail
+) {
     companion object {
         fun newIntent(
             context: Context,
@@ -83,7 +92,11 @@ class MarkReadReceiver : ActionReceiver(name = "MarkRead", "Mark message read") 
 /**
  * Broadcast when the user clicks the `Trash` notification action.
  */
-class MoveToTrashReceiver : ActionReceiver(name = "MoveToTrash", "Move message to trash") {
+class MoveToTrashReceiver : ActionReceiver(
+    name = "MoveToTrash",
+    R.string.msg_trash_success,
+    R.string.msg_trash_fail
+) {
     companion object {
         fun newIntent(
             context: Context,
@@ -104,7 +117,11 @@ class MoveToTrashReceiver : ActionReceiver(name = "MoveToTrash", "Move message t
 /**
  * Broadcast when the user clicks the `Spam` notification action.
  */
-class MoveToSpamReceiver : ActionReceiver("MoveToSpam", "Move message to spam") {
+class MoveToSpamReceiver : ActionReceiver(
+    "MoveToSpam",
+    R.string.msg_spam_success,
+    R.string.msg_spam_fail
+) {
     companion object {
         fun newIntent(
             context: Context,

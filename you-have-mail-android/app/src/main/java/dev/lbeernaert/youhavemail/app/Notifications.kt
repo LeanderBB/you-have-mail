@@ -13,6 +13,7 @@ import android.media.RingtoneManager
 import android.util.Log
 import androidx.core.app.NotificationCompat
 import androidx.core.app.NotificationManagerCompat
+import androidx.core.content.ContextCompat.getString
 import dev.lbeernaert.youhavemail.MainActivity
 import dev.lbeernaert.youhavemail.NewEmail
 import dev.lbeernaert.youhavemail.OpenAppActivity
@@ -285,7 +286,7 @@ class NotificationState {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            builder.addAction(0, "Trash", pendingIntent)
+            builder.addAction(0, getString(context, R.string.action_trash), pendingIntent)
         }
 
         if (newEmail.moveToSpamAction != null) {
@@ -302,7 +303,7 @@ class NotificationState {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            builder.addAction(0, "Spam", pendingIntent)
+            builder.addAction(0, getString(context, R.string.action_spam), pendingIntent)
         }
 
         if (newEmail.markAsReadAction != null) {
@@ -319,7 +320,7 @@ class NotificationState {
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
             )
 
-            builder.addAction(0, "Mark Read", pendingIntent)
+            builder.addAction(0, getString(context, R.string.action_mark_read), pendingIntent)
         }
 
         return builder
