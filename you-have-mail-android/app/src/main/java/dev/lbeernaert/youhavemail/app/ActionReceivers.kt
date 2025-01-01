@@ -22,7 +22,8 @@ open class ActionReceiver(private val name: String, private val description: Str
         val action = intent.getStringExtra(NotificationIntentActionKey)
         val backend = intent.getStringExtra(NotificationIntentBackendKey)
         if (email == null || action == null || backend == null) {
-            yhmLogError("Received $name broadcast, but email or action was not set")
+            yhmLogError("Received $name broadcast, but email, backend or action was not set")
+            Log.e(TAG, "Received $name broadcast, but email, backend or action was not set")
             return
         }
         val notificationID = intent.getIntExtra(NotificationIDKey, 0)
@@ -41,6 +42,21 @@ open class ActionReceiver(private val name: String, private val description: Str
             )
         }
     }
+
+    companion object {
+        fun fillIntentArgs(
+            intent: Intent,
+            notificationID: Int,
+            email: String,
+            backend: String,
+            action: String,
+        ): Intent {
+            return intent.putExtra(NotificationIntentEmailKey, email)
+                .putExtra(NotificationIntentActionKey, action)
+                .putExtra(NotificationIDKey, notificationID)
+                .putExtra(NotificationIntentBackendKey, backend)
+        }
+    }
 }
 
 /**
@@ -52,12 +68,13 @@ class MarkReadReceiver : ActionReceiver(name = "MarkRead", "Mark message read") 
             context: Context,
             notificationID: Int,
             email: String,
-            action: String
+            backend: String,
+            action: String,
         ): Intent {
             return Intent(context, MarkReadReceiver::class.java).let {
-                it.putExtra(NotificationIntentEmailKey, email)
-                it.putExtra(NotificationIntentActionKey, action)
-                it.putExtra(NotificationIDKey, notificationID)
+                fillIntentArgs(it, notificationID, email, backend, action)
+                    // Need to set unique action to prevent caching
+                    .setAction("MarkRead-$notificationID-${System.currentTimeMillis()}")
             }
         }
     }
@@ -72,12 +89,13 @@ class MoveToTrashReceiver : ActionReceiver(name = "MoveToTrash", "Move message t
             context: Context,
             notificationID: Int,
             email: String,
+            backend: String,
             action: String
         ): Intent {
             return Intent(context, MoveToTrashReceiver::class.java).let {
-                it.putExtra(NotificationIntentEmailKey, email)
-                it.putExtra(NotificationIntentActionKey, action)
-                it.putExtra(NotificationIDKey, notificationID)
+                fillIntentArgs(it, notificationID, email, backend, action)
+                    // Need to set unique action to prevent caching
+                    .setAction("MoveToTrash-$notificationID-${System.currentTimeMillis()}")
             }
         }
     }
@@ -92,12 +110,13 @@ class MoveToSpamReceiver : ActionReceiver("MoveToSpam", "Move message to spam") 
             context: Context,
             notificationID: Int,
             email: String,
+            backend: String,
             action: String
         ): Intent {
             return Intent(context, MoveToSpamReceiver::class.java).let {
-                it.putExtra(NotificationIntentEmailKey, email)
-                it.putExtra(NotificationIntentActionKey, action)
-                it.putExtra(NotificationIDKey, notificationID)
+                fillIntentArgs(it, notificationID, email, backend, action)
+                    // Need to set unique action to prevent caching
+                    .setAction("MoveToSpam-$notificationID-${System.currentTimeMillis()}")
             }
         }
     }
@@ -125,6 +144,8 @@ class DismissGroupNotificationReceiver : BroadcastReceiver() {
                 NotificationIntentEmailKey,
                 email
             )
+                // Need to set unique action to prevent caching
+                .setAction("DismissGroupNotification-${System.currentTimeMillis()}")
         }
     }
 }
@@ -155,6 +176,8 @@ class DismissMessageNotificationReceiver : BroadcastReceiver() {
                 email
             ).putExtra(NotificationIDKey, notificationID)
                 .putExtra(NotificationIntentBackendKey, backend)
+                // Need to set unique action to prevent caching
+                .setAction("DismissMessageNotification-$notificationID-${System.currentTimeMillis()}")
         }
     }
 }

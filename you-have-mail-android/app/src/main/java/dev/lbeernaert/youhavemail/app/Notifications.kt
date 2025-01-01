@@ -279,6 +279,7 @@ class NotificationState {
                     context,
                     notificationID,
                     email,
+                    backend,
                     newEmail.moveToTrashAction!!
                 ),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -295,6 +296,7 @@ class NotificationState {
                     context,
                     notificationID,
                     email,
+                    backend,
                     newEmail.moveToSpamAction!!
                 ),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
@@ -311,6 +313,7 @@ class NotificationState {
                     context,
                     notificationID,
                     email,
+                    backend,
                     newEmail.markAsReadAction!!
                 ),
                 PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
