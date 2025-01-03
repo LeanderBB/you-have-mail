@@ -6,12 +6,12 @@ pub struct Action(String);
 uniffi::custom_newtype!(Action, String);
 
 impl From<yhm::backend::Action> for Action {
-   fn from(action: yhm::backend::Action) -> Self {
-       Self(action.take())
-   }
+    fn from(action: yhm::backend::Action) -> Self {
+        Self(action.take())
+    }
 }
 
-impl From<Action>  for yhm::backend::Action {
+impl From<Action> for yhm::backend::Action {
     fn from(action: Action) -> Self {
         yhm::backend::Action::with(action.0)
     }
@@ -22,9 +22,9 @@ impl From<Action>  for yhm::backend::Action {
 pub struct NewEmail {
     pub sender: String,
     pub subject: String,
-    pub move_to_trash_action:Option<Action>,
-    pub move_to_spam_action:Option<Action>,
-    pub mark_as_read_action:Option<Action>,
+    pub move_to_trash_action: Option<Action>,
+    pub move_to_spam_action: Option<Action>,
+    pub mark_as_read_action: Option<Action>,
 }
 #[derive(uniffi::Enum)]
 pub enum Event {

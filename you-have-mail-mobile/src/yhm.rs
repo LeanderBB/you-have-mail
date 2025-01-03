@@ -229,15 +229,14 @@ impl Yhm {
             .into())
     }
 
-
     /// Apply the `action` to the account with `email`.
     ///
     /// # Errors
     ///
     /// Returns error if the action failed.
-    pub fn apply_action(&self, email:&str, action:Action) -> Result<(), YhmError> {
-       let action = action.into();
-        Ok(self.yhm.apply_actions(email,[action])?)
+    pub fn apply_action(&self, email: &str, action: Action) -> Result<(), YhmError> {
+        let action = action.into();
+        Ok(self.yhm.apply_actions(email, [action])?)
     }
 }
 
