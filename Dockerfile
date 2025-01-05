@@ -37,6 +37,9 @@ RUN yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME && \
 # Install rust
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain "$RUST_VERSION"
 
+# Install git
+RUN apt-get install -y git
+
 # Cleanup
 RUN rm -rf /var/lib/apt/lists/* /tmp/* /var/tmp/* && \
     apt-get autoremove -y && \
