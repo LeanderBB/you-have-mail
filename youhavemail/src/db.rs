@@ -1,6 +1,6 @@
 //! Database storage for applications state.
 use parking_lot::{Mutex, MutexGuard};
-use rusqlite::{Params, Result, Row, Statement};
+use rusqlite::{Params, Result, Row, Statement, TransactionBehavior};
 use sqlite_watcher::connection::Connection as WatchedConnection;
 use sqlite_watcher::watcher::Watcher;
 use std::path::PathBuf;
@@ -158,7 +158,11 @@ impl Connection {
     #[allow(clippy::missing_panics_doc)]
     fn transaction(&mut self) -> Result<Transaction<'_, '_>> {
         let guard = self.pool.writer_lock.lock();
-        let tx = self.conn.as_mut().unwrap().transaction()?;
+        let tx = self
+            .conn
+            .as_mut()
+            .unwrap()
+            .transaction_with_behavior(TransactionBehavior::Immediate)?;
         Ok(Transaction { tx, _guard: guard })
     }
 
