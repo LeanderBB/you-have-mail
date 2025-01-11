@@ -104,3 +104,7 @@ pub mod events;
 
 pub use http;
 mod v1;
+
+pub mod exports {
+    pub use rusqlite;
+}
