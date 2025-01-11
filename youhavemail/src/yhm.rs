@@ -392,4 +392,10 @@ impl Yhm {
             error!("Failed to create poller: {e}");
         })
     }
+
+    /// Access the underlying [`State`] object.
+    #[must_use]
+    pub fn state(&self) -> &State {
+        self.state.as_ref()
+    }
 }

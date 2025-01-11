@@ -1,5 +1,6 @@
 //! State management of accounts in the database.
 
+use crate::db;
 use crate::db::{Pool, Transaction};
 use crate::encryption::Key;
 use crate::events::Event;
@@ -666,6 +667,33 @@ WHERE EXISTS (SELECT 1 FROM yhm WHERE email=c.email)
                 )
                 .optional()?)
         })
+    }
+
+    /// Run a read only `closure` on the database.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the connection could not be acquired.
+    pub fn db_read<T, E, F>(&self, closure: F) -> Result<T, E>
+    where
+        E: From<rusqlite::Error>,
+        F: FnOnce(&mut db::Connection) -> Result<T, E>,
+    {
+        self.pool.with_connection(closure)
+    }
+
+    /// Create a transaction and run the  `closure` on it.
+    ///
+    /// # Errors
+    ///
+    /// Returns error if the connection could not be acquired or the transaction could not be
+    /// started.
+    pub fn db_write<T, E, F>(&self, closure: F) -> Result<T, E>
+    where
+        E: From<rusqlite::Error>,
+        F: FnOnce(&mut db::Transaction) -> Result<T, E>,
+    {
+        self.pool.with_transaction(closure)
     }
 }
 
