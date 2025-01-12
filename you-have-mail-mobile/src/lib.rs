@@ -4,6 +4,7 @@
 pub mod proxy;
 
 mod account;
+pub mod android;
 pub mod backend;
 mod events;
 mod logging;

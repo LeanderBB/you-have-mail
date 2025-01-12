@@ -90,8 +90,5 @@ class ActionWorker(ctx: Context, params: WorkerParameters) :
 }
 
 private fun executeAction(context: Context, email: String, action: String) {
-    val key = getOrCreateEncryptionKey(context)
-    val dbPath = getDatabasePath(context)
-    val yhm = Yhm.withoutDbInit(dbPath, encryptionKey = key)
-    yhm.applyAction(email, action)
+    YhmInstance.get(context).yhm.applyAction(email, action)
 }

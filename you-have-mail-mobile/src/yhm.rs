@@ -1,4 +1,5 @@
 use crate::account::{Account, AccountWatcher, FFIAccountTableObserver};
+use crate::android::{AccountNotificationIds, StateExtension};
 use crate::backend::Backend;
 use crate::events::{Action, Event};
 use crate::proxy::Proxy;
@@ -7,6 +8,7 @@ use sqlite_watcher::watcher::Watcher;
 use std::path::PathBuf;
 use std::sync::{Arc, OnceLock};
 use std::time::Duration;
+use tracing::error;
 use you_have_mail_common as yhm;
 use you_have_mail_common::secrecy::ExposeSecret;
 
@@ -65,6 +67,12 @@ impl Yhm {
             .map_err(|e| yhm::yhm::Error::from(yhm::state::Error::from(e)))?;
         let state = yhm::state::State::new(PathBuf::from(db_path), key, Arc::clone(watcher()))
             .map_err(yhm::yhm::Error::from)?;
+
+        state.android_init_tables().map_err(|e| {
+            error!("Failed to init adroid tables: {e}");
+            YhmError::State(e.to_string())
+        })?;
+
         Ok(Self {
             yhm: yhm::yhm::Yhm::new(state),
         })
@@ -237,6 +245,42 @@ impl Yhm {
     pub fn apply_action(&self, email: &str, action: Action) -> Result<(), YhmError> {
         let action = action.into();
         Ok(self.yhm.apply_actions(email, [action])?)
+    }
+}
+
+#[uniffi::export]
+impl Yhm {
+    /// Get or create the stable notificaiton ids for account with `email`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error on failure.
+    pub fn android_get_or_create_notification_ids(
+        &self,
+        email: &str,
+    ) -> Result<AccountNotificationIds, YhmError> {
+        self.yhm
+            .state()
+            .android_get_or_create_notification_ids(email)
+            .map_err(|e| {
+                error!("Failed to create notification ids for {email}: {e}");
+                YhmError::State(e.to_string())
+            })
+    }
+
+    /// Get the next email notification id for account with `email`.
+    ///
+    /// # Errors
+    ///
+    /// Returns error on failure.
+    pub fn android_next_mail_notification_id(&self, email: &str) -> Result<i32, YhmError> {
+        self.yhm
+            .state()
+            .android_next_mail_notification_id(email)
+            .map_err(|e| {
+                error!("Failed to get next mail notification id for {email}: {e}");
+                YhmError::State(e.to_string())
+            })
     }
 }
 

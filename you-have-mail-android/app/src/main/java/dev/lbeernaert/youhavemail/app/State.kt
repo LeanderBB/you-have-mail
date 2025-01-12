@@ -43,16 +43,13 @@ var NOTIFICATION_STATE = NotificationState()
 
 class State(context: Context) : AccountWatcher {
     private var mPollInterval = MutableStateFlow(15UL)
-    private var mYhm: Yhm
+    private var mYhm: Yhm = YhmInstance.get(context).yhm
     private var mAccounts: MutableStateFlow<List<Account>>
     private var mOpenAccount: MutableStateFlow<Account?> = MutableStateFlow(null)
     var mLoginSequence: LoginSequence? = null
     private var mWatchHandle: WatchHandle? = null
 
     init {
-        val key = getOrCreateEncryptionKey(context)
-        val dbPath = getDatabasePath(context)
-        mYhm = Yhm(dbPath, encryptionKey = key)
         mWatchHandle = mYhm.watchAccounts(this)
         mAccounts = MutableStateFlow(mYhm.accounts())
         val pollInterval = mYhm.pollInterval()
@@ -162,7 +159,6 @@ class State(context: Context) : AccountWatcher {
         mAccounts.value = ArrayList()
         mLoginSequence = null
         mWatchHandle = null
-        mYhm.close()
     }
 
     override fun onAccountsUpdated(accounts: List<Account>) {

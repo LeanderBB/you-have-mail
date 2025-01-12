@@ -83,11 +83,9 @@ class OneTimePollWorker(ctx: Context, params: WorkerParameters) :
  * Poll all accounts.
  */
 private fun poll(context: Context) {
-    val key = getOrCreateEncryptionKey(context)
-    val dbPath = getDatabasePath(context)
     val yhm: Yhm
     try {
-        yhm = Yhm.withoutDbInit(dbPath, encryptionKey = key)
+        yhm = YhmInstance.get(context).yhm
     } catch (e: YhmException) {
         createServiceErrorNotification(context, "Failed to Create Yhm", e)
         return
@@ -133,8 +131,6 @@ private fun poll(context: Context) {
     } catch (e: YhmException) {
         error = e.toString()
         createServiceErrorNotification(context, error)
-    } finally {
-        yhm.close()
     }
 
 

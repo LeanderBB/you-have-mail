@@ -14,6 +14,7 @@ import dev.lbeernaert.youhavemail.app.NotificationIntentAppNameKey
 import dev.lbeernaert.youhavemail.app.NotificationIntentBackendKey
 import dev.lbeernaert.youhavemail.app.NotificationIntentEmailKey
 import dev.lbeernaert.youhavemail.app.getAppNameForBackend
+import dev.lbeernaert.youhavemail.app.getOrCreateEncryptionKey
 import dev.lbeernaert.youhavemail.app.newRequestCode
 
 class OpenAppActivity : Activity() {

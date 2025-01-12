@@ -18,6 +18,7 @@ import dev.lbeernaert.youhavemail.MainActivity
 import dev.lbeernaert.youhavemail.NewEmail
 import dev.lbeernaert.youhavemail.OpenAppActivity
 import dev.lbeernaert.youhavemail.R
+import dev.lbeernaert.youhavemail.Yhm
 import dev.lbeernaert.youhavemail.YhmException
 import java.util.concurrent.atomic.AtomicInteger
 import java.util.concurrent.locks.Lock
@@ -40,6 +41,8 @@ const val NotificationGroupNewEmails = "YOU_HAVE_MAIL_NEW_EMAILS"
 const val ServiceNotificationID = 1
 const val ServiceErrorNotificationID = 2
 const val ServiceAccountNotificationsStartID = 3
+const val MailNotificationIDMin = 2000;
+const val MailNotificationIDMax = Int.MAX_VALUE - MailNotificationIDMin;
 
 const val NOTIFICATION_LOG_TAG = "notification"
 
@@ -63,27 +66,26 @@ data class UnreadState(var notificationIds: HashSet<Int>)
 private var RequestCodeCounter: AtomicInteger = AtomicInteger(0)
 
 class NotificationState {
-    private var idCounter: Int = ServiceAccountNotificationsStartID
     private var accountToIds: HashMap<String, NotificationIds> = HashMap()
     private var unreadState: HashMap<String, UnreadState> = HashMap()
-    private var freeNotificationIds: ArrayList<Int> = ArrayList()
-    private var nextNotificationId: Int = 2000;
     private var lock: Lock = ReentrantLock()
 
     /**
      * Get or create notification ids for a given account.
      */
-    private fun getOrCreateNotificationIDs(email: String): NotificationIds {
+    private fun getOrCreateNotificationIDs(context: Context, email: String): NotificationIds {
         this.lock.withLock {
             val ids = this.accountToIds[email]
             if (ids != null) {
                 return ids
             }
 
+            val accountIds = YhmInstance.get(context).yhm.androidGetOrCreateNotificationIds(email)
+
             val newIds = NotificationIds(
-                group = idCounter++,
-                statusUpdate = idCounter++,
-                errors = idCounter++
+                group = accountIds.group,
+                statusUpdate = accountIds.status,
+                errors = accountIds.error,
             )
 
             this.accountToIds[email] = newIds
@@ -94,22 +96,23 @@ class NotificationState {
     /**
      * Get the next free notification id or create one.
      */
-    private fun getNextNotificationID(): Int {
-        this.lock.withLock {
-            if (this.freeNotificationIds.isNotEmpty()) {
-                return this.freeNotificationIds.removeAt(this.freeNotificationIds.lastIndex)
-            }
+    private fun getNextNotificationID(context: Context, email: String): Int {
+        val id = YhmInstance.get(context).yhm.androidNextMailNotificationId(email)
 
-            return this.nextNotificationId++
-        }
+        return MailNotificationIDMin + (id % MailNotificationIDMax)
     }
 
     /**
      * Mark this notification id as available.
      */
-    private fun freeNotificationID(context: Context, email: String, backend: String, id: Int) {
+    private fun freeNotificationID(
+        context: Context,
+        email: String,
+        backend: String,
+        id: Int
+    ) {
         this.lock.withLock {
-            val notificationIDs = getOrCreateNotificationIDs(email)
+            val notificationIDs = getOrCreateNotificationIDs(context, email)
             val state = unreadState[email]
             if (state != null) {
                 state.notificationIds.remove(id)
@@ -127,7 +130,6 @@ class NotificationState {
                     }
                 }
             }
-            this.freeNotificationIds.add(id)
         }
     }
 
@@ -144,9 +146,13 @@ class NotificationState {
     /**
      * Dismiss group notification and all its children
      */
-    fun dismissGroupNotification(context: Context, email: String, clearChildren: Boolean) {
+    fun dismissGroupNotification(
+        context: Context,
+        email: String,
+        clearChildren: Boolean
+    ) {
         lock.withLock {
-            val notificationIds = getOrCreateNotificationIDs(email)
+            val notificationIds = getOrCreateNotificationIDs(context, email)
             NotificationManagerCompat.from(context).apply {
                 cancel(notificationIds.group)
 
@@ -346,8 +352,8 @@ class NotificationState {
         newEmail: NewEmail,
     ) {
         try {
-            val accountIDs = getOrCreateNotificationIDs(account)
-            val messageNotificationID = getNextNotificationID()
+            val accountIDs = getOrCreateNotificationIDs(context, account)
+            val messageNotificationID = getNextNotificationID(context, account)
             val unreadState =
                 getAndUpdateUnreadMessageCount(
                     account,
@@ -384,7 +390,7 @@ class NotificationState {
         try {
             val notification =
                 createAccountStatusNotification(context, "Account $email session expired")
-            val ids = getOrCreateNotificationIDs(email)
+            val ids = getOrCreateNotificationIDs(context, email)
             NotificationManagerCompat.from(context).apply {
                 if (this.areNotificationsEnabled()) {
                     notify(ids.statusUpdate, notification)
@@ -401,7 +407,7 @@ class NotificationState {
     fun onError(context: Context, email: String, error: String) {
         try {
             val notification = createAccountErrorNotification(context, email, error)
-            val ids = getOrCreateNotificationIDs(email)
+            val ids = getOrCreateNotificationIDs(context, email)
             NotificationManagerCompat.from(context).apply {
                 if (this.areNotificationsEnabled()) {
                     notify(ids.errors, notification)

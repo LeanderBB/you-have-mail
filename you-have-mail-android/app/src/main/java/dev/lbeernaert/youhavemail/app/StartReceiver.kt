@@ -13,10 +13,11 @@ class StartReceiver : BroadcastReceiver() {
             Log.i("BOOT", "Received boot notification")
 
             try {
-                val key = getOrCreateEncryptionKey(context)
-                val dbPath = getDatabasePath(context)
-                val yhm = Yhm.withoutDbInit(dbPath, encryptionKey = key)
-                registerWorker(context, yhm.pollInterval().toLong() / 60, false)
+                registerWorker(
+                    context,
+                    YhmInstance.get(context).yhm.pollInterval().toLong() / 60,
+                    false
+                )
             } catch (e: YhmException) {
                 createServiceErrorNotification(
                     context,
@@ -28,4 +29,3 @@ class StartReceiver : BroadcastReceiver() {
         }
     }
 }
-
