@@ -12,7 +12,7 @@ If you want these features in CLI package, please see [You Have Mail CLI](https:
 The application structure has been made backend agnostics, so it should be possible to add different providers in the
 future. Currently, the following email providers are supported:
 
-* [Proton Mail](https://mail.proton.me) - This backend only reports new messages in the INBOX mailbox
+* [Proton Mail](https://mail.proton.me)
 
 ## Structure
 
