@@ -1,0 +1,4 @@
+# Fix
+
+- Persist notification ids to avoid notification mix up.
+- Reduce number of database connections.
