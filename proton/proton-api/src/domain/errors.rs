@@ -1,7 +1,7 @@
 use crate::domain::human_verification::{HumanVerification, VerificationType};
 use anyhow::anyhow;
-use http::ureq::Response;
 use http::ExtSafeResponse;
+use http::ureq::Response;
 use serde::Deserialize;
 use thiserror::Error;
 use tracing::error;
@@ -86,7 +86,7 @@ impl APIError {
                 _ => {
                     return Err(GetHumanVerificationError::UnknownVerificationType(
                         t.clone(),
-                    ))
+                    ));
                 }
             };
             hv_types.push(hv_type);

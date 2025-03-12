@@ -1,6 +1,6 @@
 use crate::domain::SecretString;
 use parking_lot::RwLock;
-use secrecy::{zeroize, ExposeSecret};
+use secrecy::{ExposeSecret, zeroize};
 use serde::ser::SerializeStruct;
 use serde::{Deserialize, Deserializer, Serialize, Serializer};
 use std::fmt::{Display, Formatter};

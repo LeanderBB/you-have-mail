@@ -1,5 +1,5 @@
 use http::Client;
-use proton_api::auth::{new_thread_safe_store, InMemoryStore};
+use proton_api::auth::{InMemoryStore, new_thread_safe_store};
 use proton_api::domain::user::User;
 use proton_api::login::Sequence;
 use proton_api::mocks::auth::TFA_CODE;

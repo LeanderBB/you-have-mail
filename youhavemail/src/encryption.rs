@@ -3,7 +3,7 @@ use base64::Engine;
 use chacha20poly1305::aead::{Aead, OsRng};
 use chacha20poly1305::{AeadCore, ChaCha20Poly1305, Key as CryptoKey, KeyInit, Nonce};
 use secrecy::zeroize::Zeroize;
-use secrecy::{zeroize, SecretBox};
+use secrecy::{SecretBox, zeroize};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

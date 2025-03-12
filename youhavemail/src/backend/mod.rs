@@ -96,7 +96,7 @@ pub struct NewEmail {
 /// Implementation for the backends.
 pub trait Backend: Send + Sync {
     /// Return the backend's name.
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     /// Return the backend's description
     fn description(&self) -> &str;

@@ -1,12 +1,12 @@
 use crate::auth::{Auth, StoreError};
+use crate::domain::TwoFactorAuth;
 use crate::domain::errors::APIError;
 use crate::domain::human_verification::{HumanVerification, LoginData, VerificationType};
 use crate::domain::user::User;
-use crate::domain::TwoFactorAuth;
 use crate::requests::{PostAuthInfoRequest, PostAuthRequest, PostTOTPRequest, TFAStatus};
 use crate::session::Session;
 use proton_srp::{SRPAuth, SRPError, SRPProofB64};
-use tracing::{error, Level};
+use tracing::{Level, error};
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

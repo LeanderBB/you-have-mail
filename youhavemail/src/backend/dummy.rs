@@ -33,11 +33,11 @@ impl Backend {
 }
 
 impl crate::backend::Backend for Backend {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         NAME
     }
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Testing Backed"
     }
 

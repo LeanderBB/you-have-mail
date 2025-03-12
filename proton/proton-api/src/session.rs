@@ -1,4 +1,4 @@
-use crate::auth::{new_thread_safe_store, Auth, InMemoryStore, ThreadSafeStore};
+use crate::auth::{Auth, InMemoryStore, ThreadSafeStore, new_thread_safe_store};
 use crate::domain::user::User;
 use crate::requests::{GetUserInfoRequest, LogoutRequest, PostAuthRefreshRequest};
 use anyhow::anyhow;

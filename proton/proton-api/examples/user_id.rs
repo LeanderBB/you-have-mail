@@ -1,4 +1,4 @@
-use proton_api::auth::{new_thread_safe_store, InMemoryStore};
+use proton_api::auth::{InMemoryStore, new_thread_safe_store};
 use proton_api::client::ProtonExtension;
 use proton_api::domain::SecretString;
 use proton_api::login::Sequence;

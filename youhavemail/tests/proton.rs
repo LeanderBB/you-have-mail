@@ -3,7 +3,7 @@ mod common;
 use crate::common::TestCtx;
 use proton_api::auth::{Auth, RefreshToken, Token, Uid};
 use proton_api::domain::event::MoreEvents;
-use proton_api::domain::{event, label, message, Boolean, SecretString};
+use proton_api::domain::{Boolean, SecretString, event, label, message};
 use proton_api::requests::{
     OperationResponse, PutLabelMessageResponse, PutMarkMessageReadResponse,
 };
@@ -171,9 +171,11 @@ fn poll_sequence() {
         let state = account_state(&ctx).expect("account should have state");
         assert_eq!(state.last_event_id, Some(event_id.clone()));
         assert_eq!(state.active_folder_ids.len(), 2);
-        assert!(state
-            .active_folder_ids
-            .contains(&label_id_with_notification));
+        assert!(
+            state
+                .active_folder_ids
+                .contains(&label_id_with_notification)
+        );
         assert!(state.active_folder_ids.contains(&label::Id::inbox()));
     }
 
@@ -202,9 +204,11 @@ fn poll_sequence() {
         let state = account_state(&ctx).expect("account should have state");
         assert_eq!(state.last_event_id, Some(event_id));
         assert_eq!(state.active_folder_ids.len(), 2);
-        assert!(state
-            .active_folder_ids
-            .contains(&label_id_with_notification));
+        assert!(
+            state
+                .active_folder_ids
+                .contains(&label_id_with_notification)
+        );
         assert!(state.active_folder_ids.contains(&label::Id::inbox()));
     }
 

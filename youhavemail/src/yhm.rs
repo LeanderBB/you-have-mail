@@ -7,7 +7,7 @@ use sqlite_watcher::watcher::DropRemoveTableObserverHandle;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, Level};
+use tracing::{Level, debug, error};
 
 /// Conversion trait for new accounts.
 pub trait IntoAccount {

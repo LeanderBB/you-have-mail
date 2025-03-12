@@ -2,7 +2,7 @@
 name = "proton-api"
 authors = ["Leander Beernaert <lbb-dev@pm.me>"]
 version = "0.16.0"
-edition = "2021"
+edition = "2024"
 license = "AGPL-3.0-only"
 
 [dependencies]

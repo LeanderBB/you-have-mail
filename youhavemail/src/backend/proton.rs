@@ -6,10 +6,10 @@ use crate::yhm::{IntoAccount, Yhm};
 use anyhow::anyhow;
 use http::{Client, Proxy};
 use parking_lot::Mutex;
-use proton_api::auth::{new_thread_safe_store, Auth as ProtonAuth, InMemoryStore, StoreError};
+use proton_api::auth::{Auth as ProtonAuth, InMemoryStore, StoreError, new_thread_safe_store};
 use proton_api::client::ProtonExtension;
 use proton_api::domain::event::MoreEvents;
-use proton_api::domain::{event, label, message, Boolean};
+use proton_api::domain::{Boolean, event, label, message};
 use proton_api::login::Sequence;
 use proton_api::requests::{
     GetEventRequest, GetLabelsRequest, GetLatestEventRequest, PutLabelMessageRequest,
@@ -21,7 +21,7 @@ use std::collections::HashSet;
 use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
-use tracing::{debug, error, warn, Level};
+use tracing::{Level, debug, error, warn};
 
 #[allow(clippy::module_name_repetitions)]
 pub use proton_api;
@@ -65,11 +65,11 @@ impl Backend {
 pub const NAME: &str = "Proton Mail";
 
 impl crate::backend::Backend for Backend {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         NAME
     }
 
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "For Proton Mail accounts (proton.me)"
     }
 

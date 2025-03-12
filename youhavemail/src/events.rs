@@ -1,7 +1,7 @@
 use crate::backend::{Error, NewEmail};
 use crate::yhm::PollOutput;
-use rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, Value, ValueRef};
 use rusqlite::ToSql;
+use rusqlite::types::{FromSql, FromSqlResult, ToSqlOutput, Value, ValueRef};
 use serde::{Deserialize, Serialize};
 use tracing::error;
 

@@ -1,5 +1,5 @@
-use crate::domain::label::Id as LabelId;
 use crate::domain::Boolean;
+use crate::domain::label::Id as LabelId;
 use serde::{Deserialize, Serialize};
 use std::fmt::{Display, Formatter};
 
