@@ -83,8 +83,8 @@ pub enum ProtonLoginError {
     InvalidState,
     #[error("Server SRP proof verification failed: {0}")]
     SRPServerProof(String),
-    #[error("Failed to calculate SRP Proof: {0}")]
-    SRPProof(String),
+    #[error("SRP: {0}")]
+    SRP(String),
     #[error("Account 2FA method ({0}) is not supported")]
     Unsupported2FA(String),
     #[error("Invalid Human Verification Data ")]
@@ -109,7 +109,7 @@ impl From<proton_api::login::Error> for ProtonLoginError {
             Error::Http(e) => Self::Http(e.to_string()),
             Error::InvalidState => Self::InvalidState,
             Error::SRPServerProof(e) => Self::SRPServerProof(e),
-            Error::SRPProof(e) => Self::SRPProof(e),
+            Error::SRP(e) => Self::SRP(e.to_string()),
             Error::Unsupported2FA(e) => Self::Unsupported2FA(e.to_string()),
             Error::HumanVerificationRequired(hv) => Self::HumanVerificationRequired(hv.into()),
             Error::HumanVerificationTypeNotSupported(hv) => {

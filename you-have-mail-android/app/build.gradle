@@ -20,8 +20,8 @@ android {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 26
         targetSdk 33
-        versionCode 41
-        versionName "0.19.1"
+        versionCode 42
+        versionName "0.20.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -90,7 +90,7 @@ dependencies {
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_ui_version"
     debugImplementation "androidx.compose.ui:ui-tooling:$compose_ui_version"
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_ui_version"
-    implementation 'androidx.navigation:navigation-compose:2.7.7'
+    implementation 'androidx.navigation:navigation-compose:2.8.9'
     implementation "androidx.compose.material:material-icons-extended:$compose_ui_version"
 
     // Required for JNI
@@ -103,11 +103,11 @@ cargo {
     module = "../../you-have-mail-mobile"
     libname = "youhavemail"
     targets = ["x86_64", "arm64", "arm"]
-    targetIncludes = ["libyouhavemail.so", "libgo-srp.so"]
+    targetIncludes = ["libyouhavemail.so"]
     targetDirectory = "/tmp/build-yhm"
     profile = "release"
     prebuiltToolchains = true
-    rustupChannel = "1.83.0"
+    rustupChannel = "1.85.0"
     apiLevel = 26
 
     // Ensure paths are consistent for reproducible builds.

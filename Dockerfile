@@ -7,11 +7,7 @@ ENV ANDROID_NDK_HOME $ANDROID_HOME/ndk
 ENV ANDROID_VERSION 34
 ENV PATH $PATH:$ANDROID_HOME/tools:$ANDROID_HOME/tools/bin:$ANDROID_HOME/platform-tools:$ANDROID_HOME/cmdline-tools/bin
 ENV ANDROID_NDK_VERSION "25.2.9519653"
-ENV RUST_VERSION="1.83.0"
-
-
-# Enable backports
-RUN echo "deb http://deb.debian.org/debian bookworm-backports main" > /etc/apt/sources.list
+ENV RUST_VERSION="1.85.0"
 
 
 RUN apt-get update && \
@@ -22,9 +18,6 @@ RUN apt-get update && \
 RUN apt-get install -y automake clang gcc-multilib libclang-dev \
     libtool make pkg-config python-is-python3 \
     openjdk-17-jdk-headless
-
-# Install go
-RUN apt-get install -y -t bookworm-backports golang-go
 
 # Install SDK
 RUN yes | sdkmanager --licenses --sdk_root=$ANDROID_HOME && \
