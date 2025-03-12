@@ -1,4 +1,4 @@
-use you_have_mail_common::exports::rusqlite::{params, Error as DBError};
+use you_have_mail_common::exports::rusqlite::{Error as DBError, params};
 
 /// Notification ids associated with a given account.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, uniffi::Record)]
