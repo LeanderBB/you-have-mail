@@ -4,7 +4,6 @@ members = [
     "http",
     "youhavemail",
     "proton/proton-api",
-    "proton/go-srp",
 ]
 
 [workspace.dependencies]

@@ -5,7 +5,7 @@ use crate::domain::user::User;
 use crate::domain::TwoFactorAuth;
 use crate::requests::{PostAuthInfoRequest, PostAuthRequest, PostTOTPRequest, TFAStatus};
 use crate::session::Session;
-use go_srp::SRPAuth;
+use proton_srp::{SRPAuth, SRPError, SRPProofB64};
 use tracing::{error, Level};
 
 #[derive(Debug, thiserror::Error)]
@@ -18,8 +18,8 @@ pub enum Error {
     InvalidState,
     #[error("Server SRP proof verification failed: {0}")]
     SRPServerProof(String),
-    #[error("Failed to calculate SRP Proof: {0}")]
-    SRPProof(String),
+    #[error("SRP: {0}")]
+    SRP(#[from] SRPError),
     #[error("Account 2FA method ({0}) is not supported")]
     Unsupported2FA(TwoFactorAuth),
     #[error("Human Verification Required'")]
@@ -142,22 +142,28 @@ impl Sequence {
                     e
                 })?;
 
-            let srp_auth = SRPAuth::generate(
-                email,
+            let verifier = proton_srp::RPGPVerifier::default();
+            let srp_auth = SRPAuth::new(
+                &verifier,
                 password,
-                auth_info_response.version,
+                auth_info_response.version.try_into().unwrap_or(0),
                 &auth_info_response.salt,
                 &auth_info_response.modulus,
                 &auth_info_response.server_ephemeral,
             )
-            .map_err(Error::SRPServerProof)?;
+            .inspect_err(|e| error!("Failed to generate srp: {e}"))?;
+
+            let proofs = srp_auth
+                .generate_proofs()
+                .inspect_err(|e| error!("Failed to generate proofs: {e}"))?;
+            let proofs_b64 = SRPProofB64::from(proofs);
 
             let auth_response = this
                 .session
                 .execute(PostAuthRequest {
                     username: email,
-                    client_ephemeral: &srp_auth.client_ephemeral,
-                    client_proof: &srp_auth.client_proof,
+                    client_ephemeral: &proofs_b64.client_ephemeral,
+                    client_proof: &proofs_b64.client_proof,
                     srp_session: &auth_info_response.srp_session,
                     human_verification: human_verification_login_data,
                 })
@@ -167,7 +173,7 @@ impl Sequence {
                 })?;
 
             if !this.skip_server_proof
-                && srp_auth.expected_server_proof != auth_response.server_proof
+                && proofs_b64.expected_server_proof != auth_response.server_proof
             {
                 return Err(Error::SRPServerProof(
                     "Server Proof does not match".to_string(),

@@ -147,9 +147,9 @@ const AUTHORIZATION_HEADER_POST_REFRESH_VALUE: &str = "Bearer 562f7ab5-d487-4b50
 const AUTH_INFO_RESPONSE: &str = r#"
 {
   "Version": 4,
-  "Modulus": "-----BEGIN PGP SIGNED MESSAGE-----\r\nHash: SHA512\r\n\r\n+88jb48lF5TyDBveyHZ7QhSvtc4V3pN8/eQW6kk6ok2egy4lr5Wz9h8iZP3erN9lReSx1Lk+WsLu1b3soDhXX/twTCUhxYwjS8r983aEshZJJq7p5tNroQ5pzrZMbK8Oszjajgdg2YzcMcaJqb9+Doi7egj/esUQ+Q7BWdxeK77Wafj9v7PiW6Ozx6ulppu1mZ+YGnXSXJsl1Cl4nPm7PNkgj4BQT3HLrxakh7Xc3agmepRKO/1jLaOBU/oO17URbA5rwh/ZlAOqEAKH5vJ+hA2acM3Bwsa/K8I/jWicxOoaLZ4RZFpLYvOxGbb4DggR2Ri/C6tNyeEQQKAtxpeV5g==\r\n-----BEGIN PGP SIGNATURE-----\nVersion: GopenPGP 2.7.1\nComment: https://gopenpgp.org\n\nwl4EARYIABAFAlwB1j0JEDUFhcTpUY8mAAD61gEAo0Uds/t3Fqwq55nOTHlCQxj5\nQ4Ff30YooWIBzvRFtMcA/1LrPUlo++7235+G4JBFJlCw4X4dyTEvhvy7DLwA/YAJ\n=j5fA\n-----END PGP SIGNATURE-----",
-  "ServerEphemeral": "Qs2uxScUg4YF/Ri8uHQqPwEAicaXjSNyJQ64XX9HdsaOQCQ3HzfRsI2hI13WHwroPQsEIxJleHzm4vPl9fVU8vkPvTkx8Sy4biL68+lewItaVSo7bXyNXIK8MXA7LjgKxORr77HORtpPTfWvThG7ILAwr/dUDM2lymXHOEnNg82PcRTA6ZSdPtbRPqtrhYvHLeI50AFGIZ0C4o1wZGhVpiyQ/UyOZubI8RRnpErIMB3oZOax1lL7heM4rf7wk3G1x1rkVaXPnSVl5BLCSqtRSpSDXMIeQIALnr9Wn7TLAYQh1KaYHd96fVhQl8zjWTIFfdbppH+nbz3aH/nYEVigSA==",
-  "Salt": "9/HTvPnHq7p3YQ3GOLcnxw==",
+  "Modulus": "-----BEGIN PGP SIGNED MESSAGE-----\nHash: SHA256\n\nQ3NxPi4INEbFseW0eDrslZF2cEMkc/o5wcUVj/8MVgkdl8CeY4UyKhM/nnQYI+i5Gns5aYmk8zjHnToMTLTJpyeNz/2y05/oBatemFu9O0f3dmaQOWXnlk5bO2qq3XsQ/SD3erUU02BbnmtTxK95IMN1koAo1ZEYjQmtO+h/IsiHIP19y4X0hv9Uvi8S+TpJmaW0VYGxVsTUSCQx1AYA1EsLAyL8NVtsQYe2anpcItKi5Bdfs2gjvwhrEW/PpmF9TXeQM03y4024ZMxUaOTSrw2vLUAXAQIwAfRE2jVq98FaOLpxgb3oPmeMJQIPZCkvxzlFjlE30omCF8WtgbDZ3A==\n-----BEGIN PGP SIGNATURE-----\nVersion: ProtonMail\nComment: https://protonmail.com\n\nwl4EARYIABAFAlwB1jwJEDUFhcTpUY8mAAA6VwD/b1iK0ms9/ZizYyg62BY8\nS50BeVWKg84mms6iaXgHoisA/RgYjg03+lzfRvSErTjxVnvT07n0xshk923p\nRJaEQP4O\n=BB/U\n-----END PGP SIGNATURE-----\n",
+  "ServerEphemeral": "jCQxLsoUjR5xD8t6N19EEpz+Btabx9I1J+Ct2uoaDvalkWhDRbp/XRHuW9EM45alNzPwNJg8PCRGWampERAYd9WQr6XjgAmuRj3siWxb1yhxdUE672G/HzuXf/ade8h6PggdSHPkTLV9zsDZ6S9gtsFGv0+jnHUQU8BzSY0hH4NKRP481kBJg2Xx7VgcTzRGMdgTwVVYX26Em1jsIqbCj1kKrO/nGSOyg61YmZW6U/8TO3mwRZT0r/IPohNkD4p2+4oUFFy57Co+9GqR4C7nLW3WLBz++mMWyUr3gFnEcheFP+ahUvEbsjkf6bONKLRcL57iiil7hDfZYitxURZDgA==",
+  "Salt": "O9DCAzWVvMRTlQ==",
   "SRPSession": "3fdf84cb-6230-47d1-9668-626b09c4e21c",
   "2FA": {
     "Enabled": 0,
