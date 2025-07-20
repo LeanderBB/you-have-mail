@@ -59,11 +59,14 @@ fun Settings(
                 .fillMaxSize()
         ) {
             val timeIntervals =
-                listOf(30UL, 60UL, 120UL, 180UL, 300UL, 600UL, 900UL, 1200UL, 1800UL, 3600UL)
+                listOf(
+                    30UL, 60UL, 120UL, 180UL, 300UL, 600UL, 900UL, 1200UL, 1800UL, 3600UL,
+                    7200UL, 14400UL, 28800UL, 43200UL, 57600UL, 86400UL
+                )
             var expanded by remember { mutableStateOf(false) }
             var selectedIndex by remember { mutableIntStateOf(0) }
             // textFieldWidth is used to assign to DropDownMenu the same width as TextField
-            var textFieldWidth by remember { mutableStateOf(Size.Zero)}
+            var textFieldWidth by remember { mutableStateOf(Size.Zero) }
 
             val onPollIntervalModified: () -> Unit = {
                 runTask(updatingPollIntervalLabel) {
@@ -129,7 +132,7 @@ fun Settings(
                                 selectedIndex = index
                                 onPollIntervalModified()
                             },
-                            ) {
+                        ) {
                             Text(text = secondsToText(seconds))
                         }
                     }
@@ -158,13 +161,19 @@ fun secondsToText(seconds: ULong): String {
     val secondsStr = stringResource(id = R.string.seconds)
     val minuteStr = stringResource(id = R.string.minute)
     val minutesStr = stringResource(id = R.string.minutes)
-    return if(seconds == 1UL) {
-        "$seconds $secondStr"
+    val hourStr = stringResource(id = R.string.hour)
+    val hoursStr = stringResource(id = R.string.hours)
+    return if (seconds == 1UL) {
+        "1 $secondStr"
     } else if (seconds < 60UL) {
         "$seconds $secondsStr"
-    } else if((seconds == 60UL) ) {
-        "${(seconds / 60UL)} $minuteStr"
-    } else {
+    } else if ((seconds == 60UL)) {
+        "1 $minuteStr"
+    } else if (seconds < 3600UL) {
         "${(seconds / 60UL)} $minutesStr"
+    } else if (seconds == 3600UL) {
+        "1 $hourStr"
+    } else {
+        "${(seconds / 3600UL)} $hoursStr"
     }
 }

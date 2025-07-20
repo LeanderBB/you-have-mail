@@ -43,6 +43,8 @@
     <string name="seconds">Seconds</string>
     <string name="minute">Minute</string>
     <string name="minutes">Minutes</string>
+    <string name="hour">Hour</string>
+    <string name="hours">Hours</string>
     <string name="update_poll_interval">Updating Poll Interval</string>
     <string name="poll_interval_desc">
         Frequency at which the observer should poll the accounts. A higher poll interval can help

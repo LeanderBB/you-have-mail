@@ -1,0 +1,3 @@
+# Features
+
+- Longer polling period options
