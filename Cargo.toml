@@ -7,7 +7,8 @@ members = [
 ]
 
 [workspace.dependencies]
-ureq = { version = "2.9.7", features = ["socks-proxy"] }
+ureq = { version = "3.1.2", features = ["socks-proxy"] }
+http ={version = "1.3.1"}
 secrecy = { version = "0.10.3", features = ["serde"] }
 thiserror = "2"
 serde = { version = "1.0.204", features = ["derive"] }

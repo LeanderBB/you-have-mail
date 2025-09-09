@@ -2,6 +2,8 @@
 //! Convenience HTTP request handlers that use ureq underneath in order to ensure safe usage
 //! when reading the body and reducing boilerplate.
 
+use anyhow::anyhow;
+pub use http;
 use secrecy::{ExposeSecret, SecretString};
 use serde::de::DeserializeOwned;
 use serde::ser::SerializeStruct;
@@ -13,19 +15,19 @@ use std::marker::PhantomData;
 use std::sync::Arc;
 use std::time::Duration;
 pub use ureq;
-use ureq::{ErrorKind, Response};
+use ureq::Body;
+use ureq::typestate::{WithBody, WithoutBody};
 pub use url;
 use url::Url;
 
 /// Errors that may arrise during an you-have-mail-http request.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
-    /// HTTP status error.
     #[error("Http: {0}")]
-    Http(u16, Response),
+    Http(u16, http::Response<ureq::Body>),
     /// HTTP Transport error.
-    #[error("Transport: {0}")]
-    Transport(ureq::Transport),
+    #[error("Ureq: {0}")]
+    Ureq(#[from] ureq::Error),
     /// Json serialization or deserialization error.
     #[error("Json Serialization: {0}")]
     Json(#[from] serde_json::Error),
@@ -40,30 +42,21 @@ pub enum Error {
     Unexpected(anyhow::Error),
 }
 
-impl From<ureq::Error> for Error {
-    fn from(value: ureq::Error) -> Self {
-        match value {
-            ureq::Error::Status(code, response) => Self::Http(code, response),
-            ureq::Error::Transport(t) => Self::Transport(t),
-        }
-    }
-}
-
 impl Error {
     /// Whether the current error is a connection error that may indicate there are issues
     /// connecting to the server.
     #[must_use]
     pub fn is_connection_error(&self) -> bool {
-        let Self::Transport(err) = self else {
+        let Self::Ureq(err) = self else {
             return false;
         };
         matches!(
-            err.kind(),
-            ErrorKind::Dns
-                | ErrorKind::ConnectionFailed
-                | ErrorKind::TooManyRedirects
-                | ErrorKind::InvalidProxyUrl
-                | ErrorKind::ProxyConnect
+            err,
+            ureq::Error::Io(_)
+                | ureq::Error::Timeout(_)
+                | ureq::Error::ConnectionFailed
+                | ureq::Error::TooManyRedirects
+                | ureq::Error::ConnectProxyFailed(_)
         )
     }
 }
@@ -80,7 +73,7 @@ pub trait FromResponse {
     ///
     /// # Errors
     /// Should return error if the operation failed.
-    fn from_response(response: ureq::Response) -> Result<Self::Output>;
+    fn from_response(response: http::Response<ureq::Body>) -> Result<Self::Output>;
 }
 
 /// This response handler does not preform any processing on the response from the server
@@ -89,7 +82,7 @@ pub struct NoResponse {}
 
 impl FromResponse for NoResponse {
     type Output = ();
-    fn from_response(_: ureq::Response) -> Result<Self::Output> {
+    fn from_response(_: http::Response<ureq::Body>) -> Result<Self::Output> {
         Ok(())
     }
 }
@@ -99,9 +92,8 @@ pub struct JsonResponse<T: DeserializeOwned>(PhantomData<T>);
 
 impl<T: DeserializeOwned> FromResponse for JsonResponse<T> {
     type Output = T;
-    fn from_response(response: ureq::Response) -> Result<Self::Output> {
-        let body = response.into_safe_reader();
-        Ok(serde_json::from_reader(body)?)
+    fn from_response(mut response: http::Response<ureq::Body>) -> Result<Self::Output> {
+        Ok(serde_json::from_reader(response.safe_reader())?)
     }
 }
 
@@ -111,9 +103,9 @@ pub struct StringResponse {}
 impl FromResponse for StringResponse {
     type Output = String;
 
-    fn from_response(response: Response) -> Result<Self::Output> {
+    fn from_response(mut response: http::Response<ureq::Body>) -> Result<Self::Output> {
         let mut result = String::new();
-        response.into_safe_reader().read_to_string(&mut result)?;
+        response.safe_reader().read_to_string(&mut result)?;
         Ok(result)
     }
 }
@@ -150,22 +142,46 @@ pub trait Request {
     }
 }
 
+enum RequestWrapper {
+    WithBody(ureq::RequestBuilder<WithBody>),
+    WithOutBody(ureq::RequestBuilder<WithoutBody>),
+}
+
 pub struct RequestBuilder {
-    request: ureq::Request,
+    request: RequestWrapper,
     body: Option<Vec<u8>>,
 }
 
-impl RequestBuilder {
-    fn new(request: ureq::Request) -> Self {
+impl From<ureq::RequestBuilder<WithBody>> for RequestBuilder {
+    fn from(request: ureq::RequestBuilder<WithBody>) -> Self {
         Self {
-            request,
+            request: RequestWrapper::WithBody(request),
             body: None,
         }
     }
+}
+
+impl From<ureq::RequestBuilder<WithoutBody>> for RequestBuilder {
+    fn from(request: ureq::RequestBuilder<WithoutBody>) -> Self {
+        Self {
+            request: RequestWrapper::WithOutBody(request),
+            body: None,
+        }
+    }
+}
+
+impl RequestBuilder {
     /// Set a header with `key` and `value`.
     #[must_use]
     pub fn header(mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Self {
-        self.request = self.request.set(key.as_ref(), value.as_ref());
+        self.request = match self.request {
+            RequestWrapper::WithBody(r) => {
+                RequestWrapper::WithBody(r.header(key.as_ref(), value.as_ref()))
+            }
+            RequestWrapper::WithOutBody(r) => {
+                RequestWrapper::WithOutBody(r.header(key.as_ref(), value.as_ref()))
+            }
+        };
         self
     }
 
@@ -201,7 +217,14 @@ impl RequestBuilder {
     /// Set a query parameter with `key` and `value`.
     #[must_use]
     pub fn query(mut self, key: impl AsRef<str>, value: impl AsRef<str>) -> Self {
-        self.request = self.request.query(key.as_ref(), value.as_ref());
+        self.request = match self.request {
+            RequestWrapper::WithBody(r) => {
+                RequestWrapper::WithBody(r.query(key.as_ref(), value.as_ref()))
+            }
+            RequestWrapper::WithOutBody(r) => {
+                RequestWrapper::WithOutBody(r.query(key.as_ref(), value.as_ref()))
+            }
+        };
         self
     }
 }
@@ -361,19 +384,19 @@ impl ClientBuilder {
     /// # Errors
     /// Returns error if the construction failed.
     pub fn build(self) -> Result<Arc<Client>> {
-        let mut builder = ureq::AgentBuilder::new();
+        let mut builder = ureq::Agent::config_builder();
 
         if let Some(d) = self.request_timeout {
-            builder = builder.timeout(d);
+            builder = builder.timeout_global(Some(d));
         }
 
         if let Some(d) = self.connect_timeout {
-            builder = builder.timeout_connect(d);
+            builder = builder.timeout_connect(Some(d));
         }
 
         if let Some(proxy) = &self.proxy {
             let proxy = ureq::Proxy::new(proxy.to_url()?.as_str())?;
-            builder = builder.proxy(proxy);
+            builder = builder.proxy(Some(proxy));
         }
 
         if !self.allow_http {
@@ -384,7 +407,10 @@ impl ClientBuilder {
             .user_agent(&self.user_agent)
             .max_idle_connections(0)
             .max_idle_connections_per_host(0)
-            .build();
+            // manually handle this to match ureq v2 behavior.
+            .http_status_as_error(false)
+            .build()
+            .into();
 
         Ok(Arc::new(Client {
             agent,
@@ -436,15 +462,13 @@ impl Client {
         request: &R,
     ) -> Result<<R::Response as FromResponse>::Output> {
         let url = self.base_url.join(&request.url())?;
-        let ureq_request = match R::METHOD {
-            Method::Get => self.agent.get(url.as_str()),
-            Method::Put => self.agent.put(url.as_str()),
-            Method::Post => self.agent.post(url.as_str()),
-            Method::Delete => self.agent.delete(url.as_str()),
-            Method::Patch => self.agent.patch(url.as_str()),
+        let mut builder: RequestBuilder = match R::METHOD {
+            Method::Get => self.agent.get(url.as_str()).into(),
+            Method::Put => self.agent.put(url.as_str()).into(),
+            Method::Post => self.agent.post(url.as_str()).into(),
+            Method::Delete => self.agent.delete(url.as_str()).into(),
+            Method::Patch => self.agent.patch(url.as_str()).into(),
         };
-
-        let mut builder = RequestBuilder::new(ureq_request);
 
         for (key, value) in &self.default_headers {
             builder = builder.header(key, value);
@@ -452,11 +476,21 @@ impl Client {
 
         let builder = request.build(builder)?;
 
-        let ureq_response = if let Some(body) = builder.body {
-            builder.request.send_bytes(body.as_ref())?
-        } else {
-            builder.request.call()?
+        let ureq_response = match builder.request {
+            RequestWrapper::WithBody(r) => {
+                let body = builder
+                    .body
+                    .ok_or(Error::Unexpected(anyhow!("Body request without body")))?;
+                r.send(body)?
+            }
+            RequestWrapper::WithOutBody(r) => r.call()?,
         };
+
+        let response_status = ureq_response.status();
+
+        if response_status.is_client_error() || response_status.is_server_error() {
+            return Err(Error::Http(response_status.as_u16(), ureq_response));
+        }
 
         R::Response::from_response(ureq_response)
     }
@@ -465,14 +499,17 @@ impl Client {
 /// Extension trait to read the body with safe upper limit.
 pub trait ExtSafeResponse {
     /// Create a safe reader that reads up to a maximum number of bytes from the server.
-    fn into_safe_reader(self) -> impl Read;
+    fn safe_reader(&mut self) -> impl Read;
 }
 
 const MAX_BYTES_FROM_RESPONSE: u64 = 10_000_000;
 
-impl ExtSafeResponse for ureq::Response {
-    fn into_safe_reader(self) -> impl Read {
-        self.into_reader().take(MAX_BYTES_FROM_RESPONSE)
+impl ExtSafeResponse for http::Response<Body> {
+    fn safe_reader(&mut self) -> impl Read {
+        self.body_mut()
+            .with_config()
+            .limit(MAX_BYTES_FROM_RESPONSE)
+            .reader()
     }
 }
 

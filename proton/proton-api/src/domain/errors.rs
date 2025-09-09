@@ -3,8 +3,8 @@ use anyhow::anyhow;
 use serde::Deserialize;
 use thiserror::Error;
 use tracing::error;
-use you_have_mail_http::ExtSafeResponse;
-use you_have_mail_http::ureq::Response;
+use you_have_mail_http::http::Response;
+use you_have_mail_http::{ExtSafeResponse, ureq};
 
 pub const OPERATION_SUCCESS: u32 = 1000;
 const HUMAN_VERIFICATION_REQUESTED: u32 = 9001;
@@ -117,8 +117,8 @@ impl APIError {
     /// Create a new instance based of status code and response body.
     ///
     /// Note that if we fail to parse the response json only the you-have-mail-http status code is returned.
-    pub fn with_status_and_response(status: u16, response: Response) -> Self {
-        match serde_json::from_reader::<_, APIErrorDesc>(response.into_safe_reader()) {
+    pub fn with_status_and_response(status: u16, mut response: Response<ureq::Body>) -> Self {
+        match serde_json::from_reader::<_, APIErrorDesc>(response.safe_reader()) {
             Ok(desc) => Self {
                 http_code: status,
                 api_code: desc.code,
