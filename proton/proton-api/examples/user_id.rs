@@ -16,7 +16,10 @@ fn main() {
     let user_email = std::env::var("USER_EMAIL").unwrap();
     let user_password = SecretString::new(std::env::var("USER_PASSWORD").unwrap().into());
 
-    let client = http::Client::proton_client().debug().build().unwrap();
+    let client = you_have_mail_http::Client::proton_client()
+        .debug()
+        .build()
+        .unwrap();
 
     let session = Session::new(client, new_thread_safe_store(InMemoryStore::default()));
 

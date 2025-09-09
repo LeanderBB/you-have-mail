@@ -1,8 +1,8 @@
 use crate::domain::event;
 use crate::mocks::auth::MatchExtension;
 use crate::requests::{GetEventRequest, GetLatestEventResponse};
-use http::Request;
 use mockito::{Mock, Server};
+use you_have_mail_http::Request;
 
 /// Mock get latest event request.
 pub fn get_latest_event_id(server: &mut Server, event_id: event::Id) -> Mock {

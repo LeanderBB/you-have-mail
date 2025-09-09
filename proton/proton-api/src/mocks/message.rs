@@ -4,8 +4,8 @@ use crate::requests::{
     PutLabelMessageRequest, PutLabelMessageResponse, PutMarkMessageReadRequest,
     PutMarkMessageReadResponse,
 };
-use http::Request;
 use mockito::{Mock, Server};
+use you_have_mail_http::Request;
 
 /// Mock marking message as read with the given `ids` returning the given `response`.
 pub fn mark_message_read(

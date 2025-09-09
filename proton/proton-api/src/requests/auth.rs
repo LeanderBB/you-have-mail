@@ -1,9 +1,9 @@
 use crate::auth::{RefreshToken, Token, Uid};
 use crate::domain::human_verification::LoginData;
-use http::{Method, RequestBuilder};
 use serde::{Deserialize, Serialize};
 use serde_repr::Deserialize_repr;
 use std::borrow::Cow;
+use you_have_mail_http::{Method, RequestBuilder};
 
 #[doc(hidden)]
 #[derive(Serialize)]
@@ -12,15 +12,15 @@ pub struct PostAuthInfoRequest<'a> {
     pub username: &'a str,
 }
 
-impl http::Request for PostAuthInfoRequest<'_> {
-    type Response = http::JsonResponse<PostAuthInfoResponse>;
+impl you_have_mail_http::Request for PostAuthInfoRequest<'_> {
+    type Response = you_have_mail_http::JsonResponse<PostAuthInfoResponse>;
     const METHOD: Method = Method::Post;
 
     fn url(&self) -> String {
         "auth/v4/info".to_owned()
     }
 
-    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         Ok(builder.json(self))
     }
 }
@@ -50,15 +50,15 @@ pub struct PostAuthRequest<'a> {
     pub human_verification: Option<&'a LoginData>,
 }
 
-impl http::Request for PostAuthRequest<'_> {
-    type Response = http::JsonResponse<PostAuthResponse>;
+impl you_have_mail_http::Request for PostAuthRequest<'_> {
+    type Response = you_have_mail_http::JsonResponse<PostAuthResponse>;
     const METHOD: Method = Method::Post;
 
     fn url(&self) -> String {
         "auth/v4".to_owned()
     }
 
-    fn build(&self, mut builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, mut builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         builder = builder.json(self);
 
         if let Some(hv) = &self.human_verification {
@@ -180,15 +180,15 @@ impl<'a> PostTOTPRequest<'a> {
     }
 }
 
-impl http::Request for PostTOTPRequest<'_> {
-    type Response = http::NoResponse;
+impl you_have_mail_http::Request for PostTOTPRequest<'_> {
+    type Response = you_have_mail_http::NoResponse;
     const METHOD: Method = Method::Post;
 
     fn url(&self) -> String {
         "auth/v4/2fa".to_owned()
     }
 
-    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         Ok(builder.json(TFAAuthData {
             two_factor_code: self.code,
             fido2: FIDO2AuthData::empty(),
@@ -233,15 +233,15 @@ impl<'a> PostAuthRefreshRequest<'a> {
     }
 }
 
-impl http::Request for PostAuthRefreshRequest<'_> {
-    type Response = http::JsonResponse<PostAuthRefreshResponse>;
+impl you_have_mail_http::Request for PostAuthRefreshRequest<'_> {
+    type Response = you_have_mail_http::JsonResponse<PostAuthRefreshResponse>;
     const METHOD: Method = Method::Post;
 
     fn url(&self) -> String {
         "auth/v4/refresh".to_owned()
     }
 
-    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         Ok(builder.json(PostAuthRefresh {
             uid: &self.uid.0,
             refresh_token: self.token,
@@ -255,15 +255,15 @@ impl http::Request for PostAuthRefreshRequest<'_> {
 #[derive(Copy, Clone)]
 pub(crate) struct LogoutRequest {}
 
-impl http::Request for LogoutRequest {
-    type Response = http::NoResponse;
+impl you_have_mail_http::Request for LogoutRequest {
+    type Response = you_have_mail_http::NoResponse;
     const METHOD: Method = Method::Delete;
 
     fn url(&self) -> String {
         "auth/v4".to_owned()
     }
 
-    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         Ok(builder)
     }
 }
@@ -280,15 +280,15 @@ impl<'a> GetCaptchaRequest<'a> {
     }
 }
 
-impl http::Request for GetCaptchaRequest<'_> {
-    type Response = http::StringResponse;
+impl you_have_mail_http::Request for GetCaptchaRequest<'_> {
+    type Response = you_have_mail_http::StringResponse;
     const METHOD: Method = Method::Get;
 
     fn url(&self) -> String {
         "core/v4/captcha".to_owned()
     }
 
-    fn build(&self, mut builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, mut builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         if self.force_web {
             builder = builder.query("ForceWebMessaging", "1");
         }

@@ -4,7 +4,6 @@ use crate::backend::{Action, Error as BackendError, Error, NewEmail, Result as B
 use crate::state::Account;
 use crate::yhm::{IntoAccount, Yhm};
 use anyhow::anyhow;
-use http::{Client, Proxy};
 use parking_lot::Mutex;
 use proton_api::auth::{Auth as ProtonAuth, InMemoryStore, StoreError, new_thread_safe_store};
 use proton_api::client::ProtonExtension;
@@ -22,13 +21,14 @@ use std::fmt::Debug;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{Level, debug, error, warn};
+use you_have_mail_http::{Client, Proxy};
 
 #[allow(clippy::module_name_repetitions)]
 pub use proton_api;
 
 /// Proton Mail backend.
 pub struct Backend {
-    base_url: Option<http::url::Url>,
+    base_url: Option<you_have_mail_http::url::Url>,
     // The default client for proton servers can be shared between multiple accounts as long as
     // the process is still alive. Authentication is always read from the database, so there is no
     // risk of the clients interfering with one another.
@@ -41,7 +41,7 @@ impl Backend {
     /// The `base_url` can be optionally overridden. If no value is specified, the default
     /// url will be used.
     #[must_use]
-    pub fn new(base_url: Option<http::url::Url>) -> Arc<Self> {
+    pub fn new(base_url: Option<you_have_mail_http::url::Url>) -> Arc<Self> {
         Arc::new(Backend {
             base_url,
             default_client: Mutex::new(None),
@@ -52,8 +52,8 @@ impl Backend {
     ///
     /// # Errors
     ///
-    /// Returns error  if the http client could not be constructed.
-    pub fn login_sequence(proxy: Option<Proxy>) -> http::Result<Sequence> {
+    /// Returns error  if the you-have-mail-http client could not be constructed.
+    pub fn login_sequence(proxy: Option<Proxy>) -> you_have_mail_http::Result<Sequence> {
         let client = new_client(proxy, None)?;
         let store = new_thread_safe_store(InMemoryStore::default());
         let session = Session::new(client, store);
@@ -244,11 +244,11 @@ impl crate::backend::Poller for Poller {
         match check_fn() {
             Ok(v) => Ok(v),
             Err(e) => match e {
-                BackendError::Http(http::Error::Http(code, response)) => {
+                BackendError::Http(you_have_mail_http::Error::Http(code, response)) => {
                     if code == 401 {
                         return Err(BackendError::SessionExpired);
                     }
-                    Err(http::Error::Http(code, response).into())
+                    Err(you_have_mail_http::Error::Http(code, response).into())
                 }
                 e => Err(e),
             },
@@ -323,8 +323,8 @@ impl crate::backend::Poller for Poller {
 /// Create a new client configured for proton.
 fn new_client(
     proxy: Option<Proxy>,
-    base_url: Option<&http::url::Url>,
-) -> http::Result<Arc<Client>> {
+    base_url: Option<&you_have_mail_http::url::Url>,
+) -> you_have_mail_http::Result<Arc<Client>> {
     let mut builder = if let Some(base_url) = base_url {
         Client::builder(base_url.clone()).allow_http()
     } else {

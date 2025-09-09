@@ -2,10 +2,10 @@ use crate::auth::{Auth, InMemoryStore, ThreadSafeStore, new_thread_safe_store};
 use crate::domain::user::User;
 use crate::requests::{GetUserInfoRequest, LogoutRequest, PostAuthRefreshRequest};
 use anyhow::anyhow;
-use http::{Client, FromResponse, Method, Request, RequestBuilder};
 use secrecy::ExposeSecret;
 use std::sync::Arc;
 use tracing::{error, warn};
+use you_have_mail_http::{Client, FromResponse, Method, Request, RequestBuilder};
 
 /// Authenticated Session from which one can access data/functionality restricted to authenticated
 /// users.
@@ -27,7 +27,7 @@ impl<T: Request> Request for ProtonRequest<T> {
         self.request.url()
     }
 
-    fn build(&self, mut builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, mut builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         builder = builder.header(X_PM_APP_VERSION_HEADER, DEFAULT_APP_VERSION);
         self.request.build(builder)
     }
@@ -46,9 +46,11 @@ impl<T: Request> Request for ProtonAuthRequest<'_, T> {
         self.request.url()
     }
 
-    fn build(&self, mut builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, mut builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         if let Some(auth) = self.session.auth_store.read().get().map_err(|e| {
-            http::Error::Unexpected(anyhow::anyhow!("Failed to read authentication data: {e}"))
+            you_have_mail_http::Error::Unexpected(anyhow::anyhow!(
+                "Failed to read authentication data: {e}"
+            ))
         })? {
             builder = builder.bearer_token(auth.auth_token.0.expose_secret());
             builder = builder.header(X_PM_UID_HEADER, auth.uid.as_ref());
@@ -75,7 +77,7 @@ impl Session {
         }
     }
 
-    /// Get http client.
+    /// Get you-have-mail-http client.
     #[must_use]
     pub fn client(&self) -> &Arc<Client> {
         &self.client
@@ -91,7 +93,7 @@ impl Session {
     ///
     /// # Errors
     /// Returns error if the request failed.
-    pub fn user_info(&self) -> http::Result<User> {
+    pub fn user_info(&self) -> you_have_mail_http::Result<User> {
         Ok(self.execute_with_auth(GetUserInfoRequest {})?.user)
     }
 
@@ -99,10 +101,12 @@ impl Session {
     ///
     /// # Errors
     /// Returns error if the request failed.
-    pub fn logout(&self) -> http::Result<()> {
+    pub fn logout(&self) -> you_have_mail_http::Result<()> {
         self.execute_with_auth(LogoutRequest {})?;
         self.auth_store.write().delete().map_err(|e| {
-            http::Error::Unexpected(anyhow!("Failed to delete authentication data: {e}"))
+            you_have_mail_http::Error::Unexpected(anyhow!(
+                "Failed to delete authentication data: {e}"
+            ))
         })
     }
 
@@ -113,7 +117,7 @@ impl Session {
     pub fn execute<T: Request>(
         &self,
         request: T,
-    ) -> http::Result<<T::Response as FromResponse>::Output> {
+    ) -> you_have_mail_http::Result<<T::Response as FromResponse>::Output> {
         let request = ProtonRequest { request };
 
         match self.client.execute(&request) {
@@ -132,7 +136,7 @@ impl Session {
     pub fn execute_with_auth<T: Request>(
         &self,
         request: T,
-    ) -> http::Result<<T::Response as FromResponse>::Output> {
+    ) -> you_have_mail_http::Result<<T::Response as FromResponse>::Output> {
         let request = ProtonAuthRequest {
             session: self,
             request,
@@ -148,9 +152,9 @@ impl Session {
     fn handle_error<T: Request>(
         &self,
         request: &T,
-        error: http::Error,
-    ) -> http::Result<<T::Response as FromResponse>::Output> {
-        let http::Error::Http(401, _) = &error else {
+        error: you_have_mail_http::Error,
+    ) -> you_have_mail_http::Result<<T::Response as FromResponse>::Output> {
+        let you_have_mail_http::Error::Http(401, _) = &error else {
             return Err(error);
         };
 

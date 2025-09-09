@@ -3,7 +3,7 @@
 
 use crate::backend::EmailInfo;
 use crate::{AccountError, ConfigError};
-use http::Proxy;
+use you-have-mail-http::Proxy;
 
 #[cfg(test)]
 use mockall::automock;

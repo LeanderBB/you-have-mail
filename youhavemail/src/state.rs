@@ -5,7 +5,6 @@ use crate::db::{Pool, Transaction};
 use crate::encryption::Key;
 use crate::events::Event;
 use chrono::{DateTime, Utc};
-use http::Proxy;
 use rusqlite::{OptionalExtension, Row};
 use secrecy::{ExposeSecret, SecretBox, SecretSlice};
 use serde::Serialize;
@@ -16,6 +15,7 @@ use std::path::PathBuf;
 use std::sync::{Arc, Weak};
 use std::time::Duration;
 use tracing::error;
+use you_have_mail_http::Proxy;
 
 #[derive(Debug, thiserror::Error)]
 pub enum Error {

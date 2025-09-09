@@ -1,4 +1,3 @@
-use http::url;
 use proton_api::mocks::mockito;
 use sqlite_watcher::watcher::Watcher;
 use std::sync::Arc;
@@ -7,6 +6,7 @@ use you_have_mail_common::backend::Backend;
 use you_have_mail_common::encryption::Key;
 use you_have_mail_common::state::State;
 use you_have_mail_common::yhm::Yhm;
+use you_have_mail_http::url;
 
 /// Test context to keep track of resources.
 pub struct TestCtx {

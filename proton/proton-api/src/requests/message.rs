@@ -1,8 +1,8 @@
 use crate::domain::errors::{APIError, APIErrorDesc, OPERATION_SUCCESS};
 use crate::domain::label;
 use crate::domain::message::Id;
-use http::{Method, RequestBuilder};
 use serde::{Deserialize, Serialize};
+use you_have_mail_http::{Method, RequestBuilder};
 
 /// Response items returned for message operations.
 #[derive(Debug, Deserialize)]
@@ -69,14 +69,14 @@ impl PutMarkMessageReadRequest {
     }
 }
 
-impl http::Request for PutMarkMessageReadRequest {
-    type Response = http::JsonResponse<PutMarkMessageReadResponse>;
+impl you_have_mail_http::Request for PutMarkMessageReadRequest {
+    type Response = you_have_mail_http::JsonResponse<PutMarkMessageReadResponse>;
     const METHOD: Method = Method::Put;
 
     fn url(&self) -> String {
         "mail/v4/messages/read".to_owned()
     }
-    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         Ok(builder.json(self))
     }
 }
@@ -105,15 +105,15 @@ impl PutLabelMessageRequest {
 pub struct PutLabelMessageResponse {
     pub responses: Vec<OperationResponse>,
 }
-impl http::Request for PutLabelMessageRequest {
-    type Response = http::JsonResponse<PutLabelMessageResponse>;
+impl you_have_mail_http::Request for PutLabelMessageRequest {
+    type Response = you_have_mail_http::JsonResponse<PutLabelMessageResponse>;
     const METHOD: Method = Method::Put;
 
     fn url(&self) -> String {
         "mail/v4/messages/label".to_owned()
     }
 
-    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         Ok(builder.json(self))
     }
 }

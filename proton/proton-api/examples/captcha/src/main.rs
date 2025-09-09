@@ -10,7 +10,7 @@ fn main() {
     let user_password = std::env::var("PAPI_USER_PASSWORD").unwrap();
     let app_version = std::env::var("PAPI_APP_VERSION").unwrap();
 
-    let client = http::ClientBuilder::new()
+    let client = you_have_mail_http::ClientBuilder::new()
         .app_version(&app_version)
         .build::<http::ureq_client::UReqClient>()
         .unwrap();
@@ -57,7 +57,7 @@ fn run_captcha(html: String, app_version: String, user: String, password: String
             Ok(m) => {
                 println!("Got message {:?}", m);
                 if let Some(token) = m.get_token() {
-                    let client = http::ClientBuilder::new()
+                    let client = you_have_mail_http::ClientBuilder::new()
                         .app_version(&app_version)
                         .build::<http::ureq_client::UReqClient>()
                         .unwrap();

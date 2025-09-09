@@ -1,6 +1,6 @@
 use crate::domain::label::{Label, Type};
-use http::{Method, RequestBuilder};
 use serde::Deserialize;
+use you_have_mail_http::{Method, RequestBuilder};
 
 #[derive(Copy, Clone)]
 pub struct GetLabelsRequest {
@@ -22,15 +22,15 @@ impl GetLabelsRequest {
     }
 }
 
-impl http::Request for GetLabelsRequest {
-    type Response = http::JsonResponse<GetLabelsResponse>;
+impl you_have_mail_http::Request for GetLabelsRequest {
+    type Response = you_have_mail_http::JsonResponse<GetLabelsResponse>;
     const METHOD: Method = Method::Get;
 
     fn url(&self) -> String {
         "core/v4/labels".to_owned()
     }
 
-    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         Ok(builder.query("Type", (self.label_type as u8).to_string()))
     }
 }

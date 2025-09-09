@@ -1,7 +1,7 @@
 [workspace]
 resolver = "2"
 members = [
-    "http",
+    "you-have-mail-http",
     "youhavemail",
     "proton/proton-api",
 ]

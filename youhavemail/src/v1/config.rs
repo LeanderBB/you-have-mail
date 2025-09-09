@@ -29,7 +29,7 @@ struct Account {
 pub struct Converted {
     pub email: String,
     pub backend: String,
-    pub proxy: Option<http::Proxy>,
+    pub proxy: Option<you_have_mail_http::Proxy>,
 }
 
 #[derive(Debug, Serialize, Deserialize, Eq, PartialEq)]
@@ -43,12 +43,12 @@ impl Config {
     pub fn to_v2_accounts(&self) -> Vec<Converted> {
         let mut result = Vec::with_capacity(self.accounts.len());
         for account in &self.accounts {
-            let proxy = account.proxy.clone().map(|v| http::Proxy {
+            let proxy = account.proxy.clone().map(|v| you_have_mail_http::Proxy {
                 protocol: match v.protocol {
-                    ProxyProtocol::Https => http::ProxyProtocol::Http,
-                    ProxyProtocol::Socks5 => http::ProxyProtocol::Socks5,
+                    ProxyProtocol::Https => you_have_mail_http::ProxyProtocol::Http,
+                    ProxyProtocol::Socks5 => you_have_mail_http::ProxyProtocol::Socks5,
                 },
-                auth: v.auth.map(|auth| http::ProxyAuth {
+                auth: v.auth.map(|auth| you_have_mail_http::ProxyAuth {
                     username: auth.username,
                     password: SecretString::new(auth.password.into()),
                 }),

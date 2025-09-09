@@ -17,7 +17,7 @@ use ureq::{ErrorKind, Response};
 pub use url;
 use url::Url;
 
-/// Errors that may arrise during an http request.
+/// Errors that may arrise during an you-have-mail-http request.
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     /// HTTP status error.
@@ -262,7 +262,7 @@ impl Proxy {
     /// Returns error if the generated url is not valid.
     pub fn to_url(&self) -> Result<Url> {
         let protocol = match self.protocol {
-            ProxyProtocol::Http => "http",
+            ProxyProtocol::Http => "you-have-mail-http",
             ProxyProtocol::Socks5 => "socks5",
         };
 
@@ -335,7 +335,7 @@ impl ClientBuilder {
         self
     }
 
-    /// Allow http request
+    /// Allow you-have-mail-http request
     #[must_use]
     pub fn allow_http(mut self) -> Self {
         self.allow_http = true;
@@ -489,7 +489,7 @@ fn proxy_config_generates_valid_url() {
     };
 
     let url = proxy.to_url().unwrap();
-    assert_eq!(url.scheme(), "http");
+    assert_eq!(url.scheme(), "you-have-mail-http");
     assert_eq!(url.host_str().unwrap(), host);
     assert_eq!(url.port().unwrap(), port);
 

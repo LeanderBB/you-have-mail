@@ -3,9 +3,9 @@
 use crate::backend::{Action, NewEmail};
 use crate::state::Account;
 use crate::yhm::Yhm;
-use http::{Client, Proxy};
 use serde::{Deserialize, Serialize};
 use std::sync::Arc;
+use you_have_mail_http::{Client, Proxy};
 
 pub const NAME: &str = "Dummy";
 
@@ -43,7 +43,8 @@ impl crate::backend::Backend for Backend {
 
     fn create_client(&self, proxy: Option<Proxy>) -> crate::backend::Result<Arc<Client>> {
         let mut builder =
-            Client::builder(http::url::Url::parse("127.0.0.1:8080").unwrap()).allow_http();
+            Client::builder(you_have_mail_http::url::Url::parse("127.0.0.1:8080").unwrap())
+                .allow_http();
         if let Some(proxy) = proxy {
             builder = builder.with_proxy(proxy);
         }

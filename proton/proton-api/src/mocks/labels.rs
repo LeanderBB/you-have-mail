@@ -1,8 +1,8 @@
 use crate::domain::label;
 use crate::mocks::auth::MatchExtension;
 use crate::requests::{GetLabelsRequest, GetLabelsResponse};
-use http::Request;
 use mockito::{Mock, Server};
+use you_have_mail_http::Request;
 
 pub fn get_labels(server: &mut Server, label_type: label::Type, labels: &[label::Label]) -> Mock {
     let url = GetLabelsRequest::new(label_type).url();

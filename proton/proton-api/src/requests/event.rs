@@ -1,5 +1,5 @@
-use http::{Method, RequestBuilder};
 use serde::Deserialize;
+use you_have_mail_http::{Method, RequestBuilder};
 
 #[doc(hidden)]
 #[derive(Deserialize)]
@@ -12,15 +12,15 @@ pub struct GetLatestEventResponse {
 #[derive(Copy, Clone)]
 pub struct GetLatestEventRequest;
 
-impl http::Request for GetLatestEventRequest {
-    type Response = http::JsonResponse<GetLatestEventResponse>;
+impl you_have_mail_http::Request for GetLatestEventRequest {
+    type Response = you_have_mail_http::JsonResponse<GetLatestEventResponse>;
     const METHOD: Method = Method::Get;
 
     fn url(&self) -> String {
         "core/v4/events/latest".to_owned()
     }
 
-    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         Ok(builder)
     }
 }
@@ -36,14 +36,14 @@ impl<'a> GetEventRequest<'a> {
     }
 }
 
-impl http::Request for GetEventRequest<'_> {
-    type Response = http::JsonResponse<crate::domain::event::Event>;
+impl you_have_mail_http::Request for GetEventRequest<'_> {
+    type Response = you_have_mail_http::JsonResponse<crate::domain::event::Event>;
     const METHOD: Method = Method::Get;
 
     fn url(&self) -> String {
         format!("core/v4/events/{}", self.event_id)
     }
-    fn build(&self, builder: RequestBuilder) -> http::Result<RequestBuilder> {
+    fn build(&self, builder: RequestBuilder) -> you_have_mail_http::Result<RequestBuilder> {
         Ok(builder)
     }
 }

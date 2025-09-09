@@ -1,13 +1,13 @@
 use crate::backend::{Action, Backend, NewEmail, Poller};
 use crate::events::Event;
 use crate::state::{Account, AccountWatcher, Error as StateError, State};
-use http::Proxy;
 use secrecy::ExposeSecret;
 use sqlite_watcher::watcher::DropRemoveTableObserverHandle;
 use std::path::Path;
 use std::sync::Arc;
 use std::time::Duration;
 use tracing::{Level, debug, error};
+use you_have_mail_http::Proxy;
 
 /// Conversion trait for new accounts.
 pub trait IntoAccount {

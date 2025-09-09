@@ -102,7 +102,7 @@ pub use secrecy;
 
 pub mod events;
 
-pub use http;
+pub use you_have_mail_http;
 mod v1;
 
 pub mod exports {

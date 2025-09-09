@@ -3,10 +3,10 @@
 
 use crate::state;
 use crate::state::Account;
-use http::{Client, Proxy};
 use serde::{Deserialize, Serialize};
 use std::fmt::Debug;
 use std::sync::Arc;
+use you_have_mail_http::{Client, Proxy};
 
 pub mod dummy;
 pub mod proton;
@@ -15,7 +15,7 @@ pub mod proton;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Http: {0}")]
-    Http(#[from] http::Error),
+    Http(#[from] you_have_mail_http::Error),
     #[error("Account session has expired")]
     SessionExpired,
     #[error("Db: {0}")]
@@ -101,7 +101,7 @@ pub trait Backend: Send + Sync {
     /// Return the backend's description
     fn description(&self) -> &str;
 
-    /// Create a new http client with the given `proxy` configuration.
+    /// Create a new you-have-mail-http client with the given `proxy` configuration.
     ///
     /// # Errors
     ///

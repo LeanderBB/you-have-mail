@@ -1,10 +1,10 @@
-use http::Method;
+use you_have_mail_http::Method;
 
 #[derive(Copy, Clone)]
 pub struct Ping;
 
-impl http::Request for Ping {
-    type Response = http::NoResponse;
+impl you_have_mail_http::Request for Ping {
+    type Response = you_have_mail_http::NoResponse;
     const METHOD: Method = Method::Get;
 
     fn url(&self) -> String {

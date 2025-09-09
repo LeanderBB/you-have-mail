@@ -13,7 +13,7 @@ pub enum Error {
     #[error("API: {0}")]
     Api(APIError),
     #[error("Http: {0}")]
-    Http(http::Error),
+    Http(you_have_mail_http::Error),
     #[error("Can not perform operation in the current state")]
     InvalidState,
     #[error("Server SRP proof verification failed: {0}")]
@@ -32,10 +32,10 @@ pub enum Error {
 
 pub type Result<T> = std::result::Result<T, Error>;
 
-impl From<http::Error> for Error {
-    fn from(value: http::Error) -> Self {
+impl From<you_have_mail_http::Error> for Error {
+    fn from(value: you_have_mail_http::Error) -> Self {
         match value {
-            http::Error::Http(code, response) => {
+            you_have_mail_http::Error::Http(code, response) => {
                 let api_err = APIError::with_status_and_response(code, response);
                 if let Ok(hv) = api_err.try_get_human_verification_details() {
                     Self::HumanVerificationRequired(hv)

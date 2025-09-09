@@ -1,10 +1,10 @@
 use crate::domain::human_verification::{HumanVerification, VerificationType};
 use anyhow::anyhow;
-use http::ExtSafeResponse;
-use http::ureq::Response;
 use serde::Deserialize;
 use thiserror::Error;
 use tracing::error;
+use you_have_mail_http::ExtSafeResponse;
+use you_have_mail_http::ureq::Response;
 
 pub const OPERATION_SUCCESS: u32 = 1000;
 const HUMAN_VERIFICATION_REQUESTED: u32 = 9001;
@@ -104,7 +104,11 @@ impl std::fmt::Display for APIError {
         if let Some(m) = &self.message {
             m.fmt(f)
         } else {
-            write!(f, "APIError code={} http={}", self.api_code, self.http_code)
+            write!(
+                f,
+                "APIError code={} you-have-mail-http={}",
+                self.api_code, self.http_code
+            )
         }
     }
 }
@@ -112,7 +116,7 @@ impl std::fmt::Display for APIError {
 impl APIError {
     /// Create a new instance based of status code and response body.
     ///
-    /// Note that if we fail to parse the response json only the http status code is returned.
+    /// Note that if we fail to parse the response json only the you-have-mail-http status code is returned.
     pub fn with_status_and_response(status: u16, response: Response) -> Self {
         match serde_json::from_reader::<_, APIErrorDesc>(response.into_safe_reader()) {
             Ok(desc) => Self {

@@ -18,7 +18,7 @@ base64.workspace = true
 tracing.workspace = true
 rusqlite.workspace = true
 chacha20poly1305 = "0.10"
-http = { path = "../http" }
+you-have-mail-http = { path = "../you-have-mail-http" }
 chrono.workspace = true
 sqlite-watcher.workspace = true
 

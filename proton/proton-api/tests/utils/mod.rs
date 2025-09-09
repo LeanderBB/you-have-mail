@@ -1,10 +1,10 @@
-use http::Client;
 use proton_api::auth::{InMemoryStore, new_thread_safe_store};
 use proton_api::domain::user::User;
 use proton_api::login::Sequence;
 use proton_api::mocks::auth::TFA_CODE;
 use proton_api::session::Session;
 use std::sync::Arc;
+use you_have_mail_http::Client;
 
 /// Perform login with `email` and `password`.
 ///
