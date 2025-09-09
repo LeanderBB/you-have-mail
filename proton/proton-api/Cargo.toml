@@ -16,7 +16,7 @@ tracing.workspace = true
 anyhow.workspace = true
 proton-srp = {git = "https://github.com/ProtonMail/proton-crypto-rs.git", rev="c3ccaf2c928c7a09deb7b009773056022cb9ea26"}
 you-have-mail-http = { path = "../../you-have-mail-http" }
-mockito = { version = "1.4.0", optional = true }
+mockito = { version = "1.7.0", optional = true }
 
 
 [features]
@@ -24,7 +24,6 @@ default = []
 mocks = ["mockito"]
 
 [dev-dependencies]
-env_logger = "0.11"
 url.workspace = true
 tracing-subscriber.workspace = true
 proton-api = { path = ".", features = ["mocks"] }

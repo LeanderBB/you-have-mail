@@ -30,7 +30,7 @@ path = "../proton/proton-api"
 features = ["mocks"]
 
 [dev-dependencies]
-dirs = "5.0.0"
+dirs = "6.0.0"
 keyring = { version = "3.0.3", features = ["linux-native"] }
 temp-dir = "0.1"
 ctrlc = "3"
