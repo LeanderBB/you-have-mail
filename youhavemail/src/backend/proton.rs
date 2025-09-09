@@ -335,8 +335,8 @@ fn new_client(
     }
 
     builder
-        .connect_timeout(Duration::from_secs(60))
-        .request_timeout(Duration::from_secs(3 * 60))
+        .connect_timeout(Duration::from_secs(2 * 60))
+        .request_timeout(Duration::from_secs(5 * 60))
         .build()
 }
 
