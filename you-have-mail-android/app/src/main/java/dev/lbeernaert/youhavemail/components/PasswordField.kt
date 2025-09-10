@@ -16,14 +16,14 @@ import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.autofill.AutofillType
+import androidx.compose.ui.autofill.ContentType
+import androidx.compose.ui.semantics.semantics
+import androidx.compose.ui.semantics.contentType
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.PasswordVisualTransformation
 import androidx.compose.ui.text.input.TextFieldValue
 import androidx.compose.ui.text.input.VisualTransformation
-import dev.lbeernaert.youhavemail.ui.AutoFillRequestHandler
-import dev.lbeernaert.youhavemail.ui.autofill
 
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -36,15 +36,12 @@ fun PasswordField(
     val showPassword = remember {
         mutableStateOf(false)
     }
-    val autoFillHandler = AutoFillRequestHandler(
-        autofillTypes = listOf(AutofillType.Password),
-        onFill = { state.value = TextFieldValue(it) }
-    )
-
     TextField(
         modifier = Modifier
             .fillMaxWidth()
-            .autofill(handler = autoFillHandler),
+            .semantics {
+                contentType = ContentType.Password
+            },
         label = { Text(text = placeHolder) },
         value = state.value,
         singleLine = true,

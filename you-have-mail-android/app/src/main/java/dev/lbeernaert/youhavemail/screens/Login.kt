@@ -17,8 +17,10 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.autofill.AutofillType
+import androidx.compose.ui.autofill.ContentType
 import androidx.compose.ui.res.stringResource
+import androidx.compose.ui.semantics.contentType
+import androidx.compose.ui.semantics.semantics
 import androidx.compose.ui.text.input.ImeAction
 import androidx.compose.ui.text.input.KeyboardType
 import androidx.compose.ui.text.input.TextFieldValue
@@ -27,8 +29,6 @@ import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
 import dev.lbeernaert.youhavemail.components.PasswordField
-import dev.lbeernaert.youhavemail.ui.AutoFillRequestHandler
-import dev.lbeernaert.youhavemail.ui.autofill
 
 
 @OptIn(ExperimentalComposeUiApi::class)
@@ -58,10 +58,6 @@ fun Login(
                 onLoginClicked(email.value.text, password.value.text)
             }
         }
-        val autoFillHandler = AutoFillRequestHandler(
-            autofillTypes = listOf(AutofillType.EmailAddress),
-            onFill = { email.value = TextFieldValue(it) }
-        )
 
         Column(
             modifier = Modifier
@@ -77,8 +73,9 @@ fun Login(
             Spacer(modifier = Modifier.height(20.dp))
 
             TextField(
-                modifier = Modifier.fillMaxWidth()
-                    .autofill(handler = autoFillHandler),
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .semantics { contentType = ContentType.EmailAddress },
                 label = { Text(text = "Email") },
                 singleLine = true,
                 value = email.value,
