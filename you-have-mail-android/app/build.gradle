@@ -107,7 +107,7 @@ cargo {
     targetDirectory = "/tmp/build-yhm"
     profile = "release"
     prebuiltToolchains = true
-    rustupChannel = "1.85.0"
+    rustupChannel = "1.88.0"
     apiLevel = 26
 
     // Ensure paths are consistent for reproducible builds.
