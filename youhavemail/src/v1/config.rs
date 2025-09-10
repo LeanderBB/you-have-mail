@@ -114,9 +114,9 @@ struct Proxy {
 fn test_config_v1_into_v2() {
     use secrecy::ExposeSecret;
     use std::time::Duration;
-    let tmp_dir = temp_dir::TempDir::new().expect("failed to create tmp dir");
+    let tmp_dir = tempfile::TempDir::new().expect("failed to create tmp dir");
     let encryption_key = Key::new();
-    let config_path = tmp_dir.child("config");
+    let config_path = tmp_dir.path().join("config");
 
     let poll_interval = Duration::from_secs(10);
     let proxy = Proxy {

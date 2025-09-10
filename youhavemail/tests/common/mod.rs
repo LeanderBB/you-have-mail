@@ -1,7 +1,7 @@
 use proton_api::mocks::mockito;
 use sqlite_watcher::watcher::Watcher;
 use std::sync::Arc;
-use temp_dir::TempDir;
+use tempfile::TempDir;
 use you_have_mail_common::backend::Backend;
 use you_have_mail_common::encryption::Key;
 use you_have_mail_common::state::State;

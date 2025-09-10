@@ -14,7 +14,7 @@ secrecy.workspace = true
 parking_lot.workspace = true
 tracing.workspace = true
 anyhow.workspace = true
-proton-srp = {git = "https://github.com/ProtonMail/proton-crypto-rs.git", rev="c3ccaf2c928c7a09deb7b009773056022cb9ea26"}
+proton-srp = {git = "https://github.com/ProtonMail/proton-crypto-rs.git", rev="8a66aeb7e90d6f86bbe2fe74546876ffe748cd30"}
 you-have-mail-http = { path = "../../you-have-mail-http" }
 mockito = { version = "1.7.0", optional = true }
 
