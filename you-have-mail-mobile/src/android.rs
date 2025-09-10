@@ -116,7 +116,7 @@ mod tests {
     use super::*;
     use sqlite_watcher::watcher::Watcher;
     use std::sync::Arc;
-    use tempdir::TempDir;
+    use tempfile::TempDir;
     use you_have_mail_common::encryption::Key;
     use you_have_mail_common::state::State;
 
@@ -160,7 +160,7 @@ mod tests {
     }
 
     fn new_state() -> (Arc<State>, TempDir) {
-        let tmp_dir = TempDir::new("yhm-android-test").unwrap();
+        let tmp_dir = TempDir::new().unwrap();
         let db_path = tmp_dir.path().join("sqlite.db");
         let watcher = Watcher::new().unwrap();
         let state = State::without_init(db_path, Key::new(), watcher);

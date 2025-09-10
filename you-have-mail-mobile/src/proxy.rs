@@ -12,20 +12,20 @@ pub enum Protocol {
     Socks5,
 }
 
-impl From<yhm::http::ProxyProtocol> for Protocol {
-    fn from(value: yhm::http::ProxyProtocol) -> Self {
+impl From<yhm::you_have_mail_http::ProxyProtocol> for Protocol {
+    fn from(value: yhm::you_have_mail_http::ProxyProtocol) -> Self {
         match value {
-            yhm::http::ProxyProtocol::Http => Self::Http,
-            yhm::http::ProxyProtocol::Socks5 => Self::Socks5,
+            yhm::you_have_mail_http::ProxyProtocol::Http => Self::Http,
+            yhm::you_have_mail_http::ProxyProtocol::Socks5 => Self::Socks5,
         }
     }
 }
 
-impl From<Protocol> for yhm::http::ProxyProtocol {
+impl From<Protocol> for yhm::you_have_mail_http::ProxyProtocol {
     fn from(value: Protocol) -> Self {
         match value {
-            Protocol::Http => yhm::http::ProxyProtocol::Http,
-            Protocol::Socks5 => yhm::http::ProxyProtocol::Socks5,
+            Protocol::Http => yhm::you_have_mail_http::ProxyProtocol::Http,
+            Protocol::Socks5 => yhm::you_have_mail_http::ProxyProtocol::Socks5,
         }
     }
 }
@@ -37,8 +37,8 @@ pub struct Auth {
     pub password: String,
 }
 
-impl From<yhm::http::ProxyAuth> for Auth {
-    fn from(value: yhm::http::ProxyAuth) -> Self {
+impl From<yhm::you_have_mail_http::ProxyAuth> for Auth {
+    fn from(value: yhm::you_have_mail_http::ProxyAuth) -> Self {
         Self {
             user: value.username,
             password: value.password.expose_secret().to_owned(),
@@ -46,9 +46,9 @@ impl From<yhm::http::ProxyAuth> for Auth {
     }
 }
 
-impl From<Auth> for yhm::http::ProxyAuth {
+impl From<Auth> for yhm::you_have_mail_http::ProxyAuth {
     fn from(value: Auth) -> Self {
-        yhm::http::ProxyAuth {
+        yhm::you_have_mail_http::ProxyAuth {
             username: value.user,
             password: SecretString::new(value.password.into()),
         }
@@ -67,8 +67,8 @@ pub struct Proxy {
     pub auth: Option<Auth>,
 }
 
-impl From<yhm::http::Proxy> for Proxy {
-    fn from(value: yhm::http::Proxy) -> Self {
+impl From<yhm::you_have_mail_http::Proxy> for Proxy {
+    fn from(value: yhm::you_have_mail_http::Proxy) -> Self {
         Self {
             protocol: value.protocol.into(),
             host: value.host,
@@ -78,9 +78,9 @@ impl From<yhm::http::Proxy> for Proxy {
     }
 }
 
-impl From<Proxy> for yhm::http::Proxy {
+impl From<Proxy> for yhm::you_have_mail_http::Proxy {
     fn from(value: Proxy) -> Self {
-        yhm::http::Proxy {
+        yhm::you_have_mail_http::Proxy {
             protocol: value.protocol.into(),
             host: value.host,
             auth: value.auth.map(Into::into),
@@ -96,7 +96,7 @@ impl From<Proxy> for yhm::http::Proxy {
 /// Returns error if the proxy configuration is invalid or the test failed.
 #[uniffi::export]
 pub fn test_proxy(proxy: Proxy) -> Result<(), YhmError> {
-    let client = yhm::http::Client::proton_client()
+    let client = yhm::you_have_mail_http::Client::proton_client()
         .with_proxy(proxy.into())
         .build()
         .map_err(|e| {

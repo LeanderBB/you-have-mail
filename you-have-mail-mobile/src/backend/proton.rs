@@ -120,8 +120,8 @@ impl From<proton_api::login::Error> for ProtonLoginError {
     }
 }
 
-impl From<yhm::http::Error> for ProtonLoginError {
-    fn from(value: yhm::http::Error) -> Self {
+impl From<yhm::you_have_mail_http::Error> for ProtonLoginError {
+    fn from(value: yhm::you_have_mail_http::Error) -> Self {
         Self::Http(value.to_string())
     }
 }
