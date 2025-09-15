@@ -1,0 +1,20 @@
+[package]
+name = "you-have-mail-http"
+authors = ["Leander Beernaert <lbb-dev@pm.me>"]
+version = "0.1.0"
+edition = "2024"
+license = "AGPL-3.0-only"
+
+[dependencies]
+ureq.workspace = true
+secrecy.workspace = true
+thiserror.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+url.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+http = {workspace = true}
+
+[lints.clippy]
+pedantic = "deny"
