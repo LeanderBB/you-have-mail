@@ -18,6 +18,7 @@ future. Currently, the following email providers are supported:
 
 This repository is split into the following projects:
 
+* [you-have-mail-common](you-have-mail-common): Rust implementation.
 * [you-have-mail-mobile](you-have-mail-mobile): Shared code for mobile bindings
 * [you-have-mail-android](you-have-mail-android): Android Application
 
