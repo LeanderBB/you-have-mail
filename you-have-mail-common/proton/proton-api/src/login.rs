@@ -35,8 +35,8 @@ pub type Result<T> = std::result::Result<T, Error>;
 impl From<you_have_mail_http::Error> for Error {
     fn from(value: you_have_mail_http::Error) -> Self {
         match value {
-            you_have_mail_http::Error::Http(code, response) => {
-                let api_err = APIError::with_status_and_response(code, response);
+            you_have_mail_http::Error::Http(code, mut response) => {
+                let api_err = APIError::with_status_and_response(code, &mut response);
                 if let Ok(hv) = api_err.try_get_human_verification_details() {
                     Self::HumanVerificationRequired(hv)
                 } else {
@@ -125,7 +125,7 @@ impl Sequence {
     ) -> Result<()> {
         if !matches!(self.state, State::LoggedOut) {
             return Err(Error::InvalidState);
-        };
+        }
 
         if let Some(hv) = human_verification_login_data {
             if hv.hv_type != VerificationType::Captcha {
@@ -221,7 +221,7 @@ impl Sequence {
         self.catch_captcha(|this| {
             if !matches!(this.state, State::AwaitingTotp) {
                 return Err(Error::InvalidState);
-            };
+            }
             this.session
                 .execute_with_auth(PostTOTPRequest::new(totp))
                 .map_err(|e| {
@@ -242,7 +242,7 @@ impl Sequence {
     pub fn logout(&mut self) -> Result<()> {
         if !matches!(self.state, State::AwaitingTotp) {
             return Err(Error::InvalidState);
-        };
+        }
 
         self.session.logout()?;
         self.state = State::LoggedOut;

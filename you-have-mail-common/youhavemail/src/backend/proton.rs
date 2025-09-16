@@ -522,7 +522,7 @@ impl EventState {
                         tracing::trace!("Tracked message has been removed");
                     }
                 }
-            };
+            }
         }
     }
 

@@ -162,7 +162,7 @@ impl Yhm {
         tracing::info!("Adding new account");
         if self.backend_with_name(backend).is_none() {
             return Err(Error::BackendNotFound(backend.to_string()));
-        };
+        }
 
         Ok(self.state.new_account(email, backend).map_err(|e| {
             error!("Failed to create new account:{e}");

@@ -117,7 +117,7 @@ impl APIError {
     /// Create a new instance based of status code and response body.
     ///
     /// Note that if we fail to parse the response json only the you-have-mail-http status code is returned.
-    pub fn with_status_and_response(status: u16, mut response: Response<ureq::Body>) -> Self {
+    pub fn with_status_and_response(status: u16, response: &mut Response<ureq::Body>) -> Self {
         match serde_json::from_reader::<_, APIErrorDesc>(response.safe_reader()) {
             Ok(desc) => Self {
                 http_code: status,

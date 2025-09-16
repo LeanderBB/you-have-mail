@@ -24,7 +24,7 @@ use url::Url;
 #[derive(Debug, thiserror::Error)]
 pub enum Error {
     #[error("Http: {0}")]
-    Http(u16, http::Response<ureq::Body>),
+    Http(u16, Box<http::Response<ureq::Body>>),
     /// HTTP Transport error.
     #[error("Ureq: {0}")]
     Ureq(#[from] ureq::Error),
@@ -489,7 +489,7 @@ impl Client {
         let response_status = ureq_response.status();
 
         if response_status.is_client_error() || response_status.is_server_error() {
-            return Err(Error::Http(response_status.as_u16(), ureq_response));
+            return Err(Error::Http(response_status.as_u16(), Box::new(ureq_response)));
         }
 
         R::Response::from_response(ureq_response)
