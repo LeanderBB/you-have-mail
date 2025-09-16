@@ -26,6 +26,7 @@ rusqlite = { version = "0.37.0", features = ["chrono", "bundled"] }
 chrono = "0.4"
 mockito = "1.4.0"
 sqlite-watcher = { version = "0.6.0", features = ["rusqlite"] }
+sqlite-rwc = {version = "0.3.3",features = ["rusqlite_watcher"]}
 
 [profile.release]
 strip = true

@@ -489,7 +489,10 @@ impl Client {
         let response_status = ureq_response.status();
 
         if response_status.is_client_error() || response_status.is_server_error() {
-            return Err(Error::Http(response_status.as_u16(), Box::new(ureq_response)));
+            return Err(Error::Http(
+                response_status.as_u16(),
+                Box::new(ureq_response),
+            ));
         }
 
         R::Response::from_response(ureq_response)

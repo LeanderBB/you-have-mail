@@ -21,6 +21,7 @@ chacha20poly1305 = "0.10"
 you-have-mail-http = { path = "../you-have-mail-http" }
 chrono.workspace = true
 sqlite-watcher.workspace = true
+sqlite-rwc.workspace = true
 
 [dependencies.proton-api]
 path = "../proton/proton-api"

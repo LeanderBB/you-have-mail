@@ -2803,6 +2803,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "sqlite-rwc"
+version = "0.3.3"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "e548bd6dbc09af1da5a8a396597e73ac5363a57364bdd27e600e3fd4fc4b504a"
+dependencies = [
+ "parking_lot",
+ "rusqlite",
+ "sqlite-watcher",
+ "thiserror 2.0.16",
+ "tracing",
+]
+
+[[package]]
 name = "sqlite-watcher"
 version = "0.6.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3704,6 +3717,7 @@ dependencies = [
  "secrecy",
  "serde",
  "serde_json",
+ "sqlite-rwc",
  "sqlite-watcher",
  "tempfile",
  "thiserror 2.0.16",

@@ -94,7 +94,6 @@
 pub mod backend;
 pub mod encryption;
 //mod observer;
-pub mod db;
 pub mod state;
 pub mod yhm;
 

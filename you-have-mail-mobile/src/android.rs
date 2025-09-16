@@ -1,4 +1,5 @@
-use you_have_mail_common::exports::rusqlite::{Error as DBError, params};
+use you_have_mail_common::exports::rusqlite::params;
+use you_have_mail_common::state::Error as DBError;
 
 /// Notification ids associated with a given account.
 #[derive(Debug, Eq, PartialEq, Copy, Clone, uniffi::Record)]
@@ -68,13 +69,13 @@ CREATE TABLE IF NOT EXISTS android_next_mail_notification_id(
 
     fn android_next_mail_notification_id(&self, email: &str) -> Result<i32, DBError> {
         self.db_write(|tx| {
-            tx.query_row(
+            Ok(tx.query_row(
                 "INSERT OR REPLACE INTO android_next_mail_notification_id (email) VALUES (?) RETURNING id",
                 params![email],
                 |r| r.get(0),
             ).map(|v:u64| {
                i32::try_from(v % (i32::MAX as u64)).expect("Should never fail")
-            })
+            })?)
         })
     }
 
@@ -83,7 +84,7 @@ CREATE TABLE IF NOT EXISTS android_next_mail_notification_id(
         email: &str,
     ) -> Result<AccountNotificationIds, DBError> {
         self.db_write(|tx| {
-            tx.query_row(
+            Ok(tx.query_row(
                 r"
 WITH cte (gid) AS (
     SELECT IFNULL(MAX(group_id)+3,100) FROM android_notification_ids
@@ -106,7 +107,7 @@ RETURNING group_id, status_id, error_id
                         error: r.get(2)?,
                     })
                 },
-            )
+            )?)
         })
     }
 }
@@ -163,7 +164,7 @@ mod tests {
         let tmp_dir = TempDir::new().unwrap();
         let db_path = tmp_dir.path().join("sqlite.db");
         let watcher = Watcher::new().unwrap();
-        let state = State::without_init(db_path, Key::new(), watcher);
+        let state = State::without_init(db_path, Key::new(), watcher).unwrap();
         state.android_init_tables().unwrap();
 
         (state, tmp_dir)

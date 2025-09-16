@@ -88,7 +88,8 @@ impl Yhm {
         let key = yhm::encryption::Key::with_base64(encryption_key)
             .map_err(|e| yhm::yhm::Error::from(yhm::state::Error::from(e)))?;
         let state =
-            yhm::state::State::without_init(PathBuf::from(db_path), key, Arc::clone(watcher()));
+            yhm::state::State::without_init(PathBuf::from(db_path), key, Arc::clone(watcher()))
+                .map_err(yhm::yhm::Error::from)?;
         Ok(Self {
             yhm: yhm::yhm::Yhm::new(state),
         })
