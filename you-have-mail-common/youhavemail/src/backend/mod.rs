@@ -91,6 +91,8 @@ pub struct NewEmail {
     pub mark_as_read_action: Option<Action>,
     /// Encoded data to move this message to spam
     pub move_to_spam_action: Option<Action>,
+    /// Encoded data to move this message to arhcive
+    pub move_to_archive_action: Option<Action>,
 }
 
 /// Implementation for the backends.

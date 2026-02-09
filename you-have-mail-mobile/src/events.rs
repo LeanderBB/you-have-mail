@@ -25,6 +25,7 @@ pub struct NewEmail {
     pub move_to_trash_action: Option<Action>,
     pub move_to_spam_action: Option<Action>,
     pub mark_as_read_action: Option<Action>,
+    pub move_to_archive_action: Option<Action>,
 }
 #[derive(uniffi::Enum)]
 pub enum Event {
@@ -63,6 +64,7 @@ impl From<yhm::events::Event> for Event {
                         mark_as_read_action: v.mark_as_read_action.map(Into::into),
                         move_to_trash_action: v.move_to_trash_action.map(Into::into),
                         move_to_spam_action: v.move_to_spam_action.map(Into::into),
+                        move_to_archive_action: v.move_to_archive_action.map(Into::into),
                     })
                     .collect(),
             },

@@ -308,6 +308,21 @@ impl crate::backend::Poller for Poller {
                     })?;
                 }
             }
+            AccountAction::MoveMessageToArchive(id) => {
+                debug!("Moving {id} to archive");
+                let response = self
+                    .session
+                    .execute_with_auth(PutLabelMessageRequest::new(label::Id::archive(), [id]))
+                    .inspect_err(|e| {
+                        error!("Failed to move message to archive: {e}");
+                    })?;
+                for response in response.responses {
+                    response.into_result().map_err(|e| {
+                        error!("Failed to move message to archive: {}", e);
+                        Error::Unknown(anyhow!("Failed to move message to archive"))
+                    })?;
+                }
+            }
         }
 
         Ok(())
@@ -430,6 +445,8 @@ pub enum AccountAction {
     MoveMessageToTrash(message::Id),
     /// Move a message to spm.
     MoveMessageToSpam(message::Id),
+    /// Move a message to archive
+    MoveMessageToArchive(message::Id),
 }
 
 impl AccountAction {
@@ -546,6 +563,9 @@ impl EventState {
                     ),
                     move_to_spam_action: Some(
                         AccountAction::MoveMessageToSpam(msg.id.clone()).to_action(),
+                    ),
+                    move_to_archive_action: Some(
+                        AccountAction::MoveMessageToArchive(msg.id.clone()).to_action(),
                     ),
                 });
             }
@@ -976,18 +996,18 @@ mod tests {
         label::Label {
             id,
             parent_id: None,
-            name: "".to_string(),
-            path: "".to_string(),
-            color: "".to_string(),
+            name: String::new(),
+            path: String::new(),
+            color: String::new(),
             label_type,
             notify: if notify {
                 Boolean::True
             } else {
                 Boolean::False
             },
-            display: Default::default(),
-            sticky: Default::default(),
-            expanded: Default::default(),
+            display: Boolean::default(),
+            sticky: Boolean::default(),
+            expanded: Boolean::default(),
             order: 0,
         }
     }

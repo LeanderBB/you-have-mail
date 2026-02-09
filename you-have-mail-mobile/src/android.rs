@@ -123,9 +123,9 @@ mod tests {
 
     #[test]
     fn check_get_or_create_notification_ids() {
-        let (state, _tmp_dir) = new_state();
-
         const START_GROUP_ID: i32 = 100;
+
+        let (state, _tmp_dir) = new_state();
 
         // Insert first time should start with START_GROUP_ID
         let ids = state.android_get_or_create_notification_ids("foo").unwrap();

@@ -43,7 +43,7 @@ fn main() {
             if let Err(e) = line_reader.read_line(&mut line) {
                 eprintln!("Failed to read totp {e}");
                 return;
-            };
+            }
 
             let totp = line.trim_end_matches('\n');
 
@@ -53,7 +53,6 @@ fn main() {
                 }
                 Err(e) => {
                     eprintln!("Failed to submit totp: {e}");
-                    continue;
                 }
             }
         }

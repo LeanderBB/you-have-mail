@@ -73,6 +73,7 @@ impl crate::backend::Poller for Poller {
             mark_as_read_action: None,
             move_to_trash_action: None,
             move_to_spam_action: None,
+            move_to_archive_action: None,
         }])
     }
 

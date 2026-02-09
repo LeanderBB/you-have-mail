@@ -94,6 +94,7 @@ fn remove_old_account_without_domain_suffix() {
 }
 
 #[test]
+#[allow(clippy::too_many_lines)]
 fn poll_sequence() {
     // Test basic flow when polling an account, from basic initialization to subsequent runs.
     let mut ctx = TestCtx::new();
@@ -114,27 +115,27 @@ fn poll_sequence() {
         label::Label {
             id: label_id_with_notification.clone(),
             parent_id: None,
-            name: "".to_string(),
-            path: "".to_string(),
-            color: "".to_string(),
+            name: String::new(),
+            path: String::new(),
+            color: String::new(),
             label_type: label::Type::Folder,
             notify: Boolean::True,
-            display: Default::default(),
-            sticky: Default::default(),
-            expanded: Default::default(),
+            display: Boolean::default(),
+            sticky: Boolean::default(),
+            expanded: Boolean::default(),
             order: 0,
         },
         label::Label {
             id: label_id_without_notification.clone(),
             parent_id: None,
-            name: "".to_string(),
-            path: "".to_string(),
-            color: "".to_string(),
+            name: String::new(),
+            path: String::new(),
+            color: String::new(),
             label_type: label::Type::Folder,
             notify: Boolean::False,
-            display: Default::default(),
-            sticky: Default::default(),
-            expanded: Default::default(),
+            display: Boolean::default(),
+            sticky: Boolean::default(),
+            expanded: Boolean::default(),
             order: 0,
         },
     ];
@@ -405,7 +406,7 @@ fn mark_message_read_action() {
         },
     );
 
-    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap()
+    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap();
 }
 
 #[test]
@@ -427,7 +428,7 @@ fn move_to_trash_action() {
         },
     );
 
-    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap()
+    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap();
 }
 
 #[test]
@@ -449,9 +450,32 @@ fn move_to_spam_action() {
         },
     );
 
-    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap()
+    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap();
 }
 
+#[test]
+fn move_to_archive_action() {
+    // check event loop logic,
+    let mut ctx = TestCtx::new();
+    create_authenticated_account(&ctx, Some(TaskState::new()));
+
+    let id = message::Id("message".to_owned());
+
+    let action = AccountAction::MoveMessageToArchive(id.clone()).to_action();
+
+    let _mock = proton_api::mocks::message::label_message(
+        &mut ctx.server,
+        label::Id::archive(),
+        vec![id.clone()],
+        &PutLabelMessageResponse {
+            responses: vec![OperationResponse::ok(id.clone())],
+        },
+    );
+
+    ctx.yhm.apply_actions(ACCOUNT_EMAIL, [action]).unwrap();
+}
+
+#[allow(clippy::needless_pass_by_value)]
 fn create_authenticated_account(ctx: &TestCtx, state: Option<TaskState>) {
     let account = ctx
         .yhm

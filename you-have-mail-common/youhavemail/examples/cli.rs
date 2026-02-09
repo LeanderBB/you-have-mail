@@ -77,7 +77,7 @@ fn main() {
     loop {
         let result = yhm.poll().expect("Failed to poll");
         if !result.is_empty() {
-            println!("{result:?}")
+            println!("{result:?}");
         }
         std::thread::sleep(Duration::from_secs(5));
         if should_quit.load(Ordering::SeqCst) {
@@ -92,9 +92,10 @@ fn get_or_create_encryption_key() -> SecretBox<Key> {
     let entry = keyring::Entry::new("you-have-mail-common", "secret-key-b64").unwrap();
     match entry.get_password() {
         Err(e) => {
-            if !matches!(e, keyring::Error::NoEntry) {
-                panic!("failed to load encryption key: {e}")
-            }
+            assert!(
+                matches!(e, keyring::Error::NoEntry),
+                "failed to load encryption key: {e}"
+            );
 
             info!("No entry available, generating new key");
 
@@ -102,7 +103,7 @@ fn get_or_create_encryption_key() -> SecretBox<Key> {
             entry
                 .set_password(&key.expose_secret().to_base64())
                 .unwrap();
-            return key;
+            key
         }
         Ok(s) => {
             info!("Using existing key");

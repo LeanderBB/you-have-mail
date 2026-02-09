@@ -134,7 +134,7 @@ if (OperatingSystem.current().isMacOsX()) {
 }
 
 task genBindings(type: Exec) {
-    workingDir "../../you-have-mail-mobile"
+    workingDir "../.."
     commandLine "cargo", "run", "--bin", "uniffi-bindgen", "--", "generate", "--library",
             "target/debug/libyouhavemail.$ext",
             "--language", "kotlin", "--config", "uniffi.toml",

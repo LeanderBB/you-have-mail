@@ -1,5 +1,6 @@
 mod utils;
 use crate::utils::{new_mock_session_and_server, perform_login};
+use proton_api::domain::Boolean;
 use proton_api::domain::label::{Id, Label, Type as LabelType, Type};
 use proton_api::mocks::{DEFAULT_USER_EMAIL, DEFAULT_USER_PASSWORD};
 use proton_api::requests::GetLabelsRequest;
@@ -17,10 +18,10 @@ fn session_label_fetch() {
         path: "Path".to_string(),
         color: "Foo".to_string(),
         label_type: Type::Folder,
-        notify: Default::default(),
-        display: Default::default(),
-        sticky: Default::default(),
-        expanded: Default::default(),
+        notify: Boolean::default(),
+        display: Boolean::default(),
+        sticky: Boolean::default(),
+        expanded: Boolean::default(),
         order: 10,
     }];
 
