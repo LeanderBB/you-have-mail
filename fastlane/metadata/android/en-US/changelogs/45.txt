@@ -1,0 +1,3 @@
+# Changes
+
+Replaced notification quick action "Spam" with "Archive".

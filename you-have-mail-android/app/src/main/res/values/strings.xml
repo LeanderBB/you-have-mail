@@ -82,4 +82,7 @@
     <string name="action_mark_read">Mark Read</string>
     <string name="action_trash">Trash</string>
     <string name="action_spam">Spam</string>
+    <string name="action_archive">Archive</string>
+    <string name="msg_archive_success">Message moved to Archive</string>
+    <string name="msg_archive_fail">Failed to move message to Archive</string>
 </resources>

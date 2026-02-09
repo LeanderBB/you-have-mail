@@ -273,7 +273,7 @@ fun ShowSettingDialog(context: Context, openDialog: MutableState<Boolean>) {
                             openDialog.value = false
                             val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
                             intent.data = Uri.parse("package:${context.packageName}")
-                            startActivity(context, intent, Bundle())
+                            context.startActivity(intent)
                         },
                     ) {
                         Text(stringResource(id = R.string.ok))

@@ -295,6 +295,8 @@ class NotificationState {
             builder.addAction(0, getString(context, R.string.action_trash), pendingIntent)
         }
 
+        /*
+        //TODO: restore via setting in the future
         if (newEmail.moveToSpamAction != null) {
             val pendingIntent = PendingIntent.getBroadcast(
                 context,
@@ -310,6 +312,23 @@ class NotificationState {
             )
 
             builder.addAction(0, getString(context, R.string.action_spam), pendingIntent)
+        } */
+
+        if (newEmail.moveToArchiveAction != null) {
+            val pendingIntent = PendingIntent.getBroadcast(
+                context,
+                newRequestCode(),
+                MoveToArchiveReceiver.newIntent(
+                    context,
+                    notificationID,
+                    email,
+                    backend,
+                    newEmail.moveToArchiveAction!!
+                ),
+                PendingIntent.FLAG_IMMUTABLE or PendingIntent.FLAG_UPDATE_CURRENT
+            )
+
+            builder.addAction(0, getString(context, R.string.action_archive), pendingIntent)
         }
 
         if (newEmail.markAsReadAction != null) {

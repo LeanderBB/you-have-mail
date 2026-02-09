@@ -59,6 +59,7 @@
 
         <!-- used to handle notification actions -->
         <receiver android:name=".app.MoveToSpamReceiver" />
+        <receiver android:name=".app.MoveToArchiveReceiver" />
         <receiver android:name=".app.MoveToTrashReceiver" />
         <receiver android:name=".app.MarkReadReceiver" />
         <receiver android:name=".app.DismissGroupNotificationReceiver" />

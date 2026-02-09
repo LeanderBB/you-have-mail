@@ -21,8 +21,8 @@ android {
         applicationId "dev.lbeernaert.youhavemail"
         minSdk 26
         targetSdk 36
-        versionCode 44
-        versionName "0.21.1"
+        versionCode 45
+        versionName "0.22.0"
 
         testInstrumentationRunner "androidx.test.runner.AndroidJUnitRunner"
         vectorDrawables {
@@ -135,10 +135,11 @@ if (OperatingSystem.current().isMacOsX()) {
 
 task genBindings(type: Exec) {
     workingDir "../.."
-    commandLine "cargo", "run", "--bin", "uniffi-bindgen", "--", "generate", "--library",
+    commandLine "cargo", "run", "--bin", "uniffi-bindgen", "--", "generate",
+            "--no-format", "--library",
             "target/debug/libyouhavemail.$ext",
             "--language", "kotlin", "--config", "uniffi.toml",
-            "--out-dir", "../you-have-mail-android/app/src/main/java"
+            "--out-dir", "you-have-mail-android/app/src/main/java"
 }
 
 tasks.whenTaskAdded { task ->

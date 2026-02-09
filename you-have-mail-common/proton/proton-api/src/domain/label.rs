@@ -84,7 +84,7 @@ impl SysLabelId {
     pub const TRASH: SysLabelId = SysLabelId("3");
     pub const SPAM: SysLabelId = SysLabelId("4");
     pub const ALL_MAIL: SysLabelId = SysLabelId("5");
-    pub const ARCHIVE: SysLabelId = SysLabelId("5");
+    pub const ARCHIVE: SysLabelId = SysLabelId("6");
     pub const SENT: SysLabelId = SysLabelId("7");
     pub const DRAFTS: SysLabelId = SysLabelId("8");
     pub const OUTBOX: SysLabelId = SysLabelId("9");

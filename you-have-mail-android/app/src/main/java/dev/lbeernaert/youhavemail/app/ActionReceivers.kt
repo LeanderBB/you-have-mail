@@ -140,6 +140,28 @@ class MoveToSpamReceiver : ActionReceiver(
     }
 }
 
+class MoveToArchiveReceiver : ActionReceiver(
+    "MoveToArchive",
+    R.string.msg_archive_success,
+    R.string.msg_archive_fail
+) {
+    companion object {
+        fun newIntent(
+            context: Context,
+            notificationID: Int,
+            email: String,
+            backend: String,
+            action: String
+        ): Intent {
+            return Intent(context, MoveToArchiveReceiver::class.java).let {
+                fillIntentArgs(it, notificationID, email, backend, action)
+                    // Need to set unique action to prevent caching
+                    .setAction("MoveToArchive-$notificationID-${System.currentTimeMillis()}")
+            }
+        }
+    }
+}
+
 /**
  * Receiver to dismiss group notifications
  */
