@@ -46,6 +46,7 @@ import androidx.compose.ui.unit.sp
 import androidx.navigation.NavController
 import dev.lbeernaert.youhavemail.Account
 import dev.lbeernaert.youhavemail.R
+import dev.lbeernaert.youhavemail.app.ScreenshotMode
 import dev.lbeernaert.youhavemail.app.State
 import dev.lbeernaert.youhavemail.app.accountStatusString
 import kotlinx.coroutines.delay
@@ -199,7 +200,7 @@ fun ActiveAccount(account: Account, onClicked: (String) -> Unit) {
         Spacer(modifier = Modifier.width(10.dp))
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
-                text = email,
+                text = ScreenshotMode.redact(email),
                 style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )

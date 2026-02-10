@@ -2,6 +2,7 @@ package dev.lbeernaert.youhavemail.screens
 
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Column
+import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
@@ -15,6 +16,7 @@ import androidx.compose.material3.ExposedDropdownMenuAnchorType
 import androidx.compose.material3.ExposedDropdownMenuBox
 import androidx.compose.material3.ExposedDropdownMenuDefaults
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
@@ -24,6 +26,7 @@ import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
+import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.geometry.Size
 import androidx.compose.ui.layout.onGloballyPositioned
@@ -33,6 +36,7 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.toSize
 import dev.lbeernaert.youhavemail.R
+import dev.lbeernaert.youhavemail.app.ScreenshotMode
 import dev.lbeernaert.youhavemail.app.State
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
@@ -51,6 +55,7 @@ fun Settings(
         onBackClicked = onBackClicked
     ) { padding, runTask ->
 
+        var screenshotMode by remember { mutableStateOf(ScreenshotMode.isEnabled()) }
         val pollIntervalValue by state.getPollInterval().collectAsState()
         val updatingPollIntervalLabel = stringResource(id = R.string.update_poll_interval)
 
@@ -143,6 +148,25 @@ fun Settings(
 
             Spacer(modifier = Modifier.padding(5.dp))
 
+            Row (
+                verticalAlignment = Alignment.CenterVertically
+            ){
+                Text(
+                    text = stringResource(id = R.string.screenshot_mode),
+                    style = MaterialTheme.typography.titleMedium
+                )
+                Spacer(Modifier.fillMaxWidth(0.9f))
+                Switch(checked = screenshotMode, onCheckedChange = {
+                    ScreenshotMode.enable(it)
+                    screenshotMode = it
+                })
+            }
+
+            Spacer(modifier = Modifier.padding(5.dp))
+
+            HorizontalDivider()
+
+            Spacer(modifier = Modifier.padding(5.dp))
             ActionButton(
                 text = stringResource(id = R.string.export_logs),
                 onClick = onExportLogsClicked

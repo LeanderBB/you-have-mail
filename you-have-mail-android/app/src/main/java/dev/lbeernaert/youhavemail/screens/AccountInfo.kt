@@ -20,6 +20,7 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import dev.lbeernaert.youhavemail.Account
 import dev.lbeernaert.youhavemail.R
+import dev.lbeernaert.youhavemail.app.ScreenshotMode
 import dev.lbeernaert.youhavemail.app.accountStatusString
 import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
@@ -70,7 +71,7 @@ fun AccountInfo(
             )
 
             Text(
-                text = account.email(),
+                text = ScreenshotMode.redact(account.email()),
                 modifier = Modifier.fillMaxWidth(),
             )
 

@@ -211,6 +211,7 @@ class NotificationState {
         backend: String,
         unreadState: UnreadState,
     ): Notification {
+        val email = ScreenshotMode.redact(email)
         val clickIntent: PendingIntent? = OpenAppActivity.newIntent(context, email, backend)
 
         val dismissIntent: PendingIntent = PendingIntent.getBroadcast(
@@ -349,9 +350,9 @@ class NotificationState {
         }
 
         return builder
-            .setContentTitle(newEmail.sender)
-            .setContentText(newEmail.subject)
-            .setSubText(email)
+            .setContentTitle(ScreenshotMode.redact(newEmail.sender))
+            .setContentText(ScreenshotMode.redact(newEmail.subject))
+            .setSubText(ScreenshotMode.redact(email))
             .setDeleteIntent(dismissIntent)
             .setVisibility(NotificationCompat.VISIBILITY_PRIVATE)
             .setSmallIcon(R.drawable.ic_stat_alert)
@@ -406,6 +407,7 @@ class NotificationState {
      * Create a new notification for an account who's session expired.
      */
     fun onLoggedOut(context: Context, email: String) {
+        val email = ScreenshotMode.redact(email)
         try {
             val notification =
                 createAccountStatusNotification(context, "Account $email session expired")
@@ -424,6 +426,7 @@ class NotificationState {
      * Create an error notification for an account.
      */
     fun onError(context: Context, email: String, error: String) {
+        val email = ScreenshotMode.redact(email)
         try {
             val notification = createAccountErrorNotification(context, email, error)
             val ids = getOrCreateNotificationIDs(context, email)
