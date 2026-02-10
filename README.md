@@ -5,6 +5,8 @@ you only wish to be notified when your email account has a new message and the d
 does not work (e.g: Android without Google Play Services) or do not wish to have the web interface/email client open at
 all times.
 
+<img src="./fastlane/metadata/android/en-US/images/phoneScreenshots/screenshot-01.png" alt="Android Screenshot" width="400">
+
 If you want these features in CLI package, please see [You Have Mail CLI](https://github.com/LeanderBB/you-have-mail-cli).
 
 ## Supported Backends
@@ -30,7 +32,6 @@ Please only download the latest stable releases from:
 * F-Droid: [Link](https://f-droid.org/packages/dev.lbeernaert.youhavemail/)
 
 [<img src="https://f-droid.org/badge/get-it-on.png" alt="Get it on F-Droid" height="60">](https://f-droid.org/packages/dev.lbeernaert.youhavemail/)
-
 
 ## Donations
 
