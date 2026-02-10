@@ -1,6 +1,7 @@
 # Features
 
 - Update theme to Material 3
+- Add screenshot mode (redacts private information)
 
 # Changes
 
