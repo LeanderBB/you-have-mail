@@ -1,3 +1,8 @@
+# Features
+
+- Update theme to Material 3
+
 # Changes
 
-Replaced notification quick action "Spam" with "Archive".
+- Replaced notification quick action "Spam" with "Archive".
+- Update Android SDK and dependencies
