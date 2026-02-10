@@ -5,6 +5,7 @@ import android.util.Log
 import android.widget.Toast
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.res.stringResource
+import androidx.navigation.NavController
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
@@ -48,7 +49,7 @@ fun MainNavController(
                     accountEmail = accountEmail,
                     backendName = state.mLoginSequence!!.backendName(),
                     onBackClicked = {
-                        navController.popBackStack()
+                        popBack(navController)
                     },
                     onLoginClicked = { email, password ->
                         if(email.isBlank() or password.isEmpty()) {
@@ -84,7 +85,7 @@ fun MainNavController(
                     state.mLoginSequence!!.next(navController)
                 }
             Totp(onBackClicked = {
-                navController.popBackStack()
+                popBack(navController)
             }, onTotpClicked = onTotpClicked)
         }
         // ------------------ MAIN ---------------------------------------------------------------
@@ -165,7 +166,7 @@ fun MainNavController(
             } else {
                 ProxyScreen(
                     onBackClicked = {
-                        navController.popBackStack()
+                        popBack(navController)
                     },
                     applyButtonText = stringResource(id = R.string.next),
                     onApplyClicked = { proxy ->
@@ -200,14 +201,14 @@ fun MainNavController(
             } else {
                 ProxyScreen(
                     onBackClicked = {
-                        navController.popBackStack()
+                        popBack(navController)
                     },
                     applyButtonText = stringResource(id = R.string.apply),
                     onApplyClicked = { proxy ->
                         withContext(Dispatchers.Default) {
                             account.setProxy(proxy)
                         }
-                        navController.popBackStack()
+                        popBack(navController)
                     },
                     proxy = account.proxy(),
                     isLoginRequest = false,
@@ -228,7 +229,7 @@ fun MainNavController(
                 },
                 onCaptchaFail = {
                     Toast.makeText(context, it, Toast.LENGTH_SHORT).show()
-                    navController.popBackStack()
+                    popBack(navController)
                 },
                 html = state.mLoginSequence!!.protonCaptchaHtml(),
             )
@@ -236,4 +237,9 @@ fun MainNavController(
     }
 }
 
-
+fun popBack(navController: NavController) {
+    // Always make sure the main route is present if everything is popped of the stack
+    if (!navController.popBackStack()) {
+        navController.navigate(Routes.Main.route)
+    }
+}

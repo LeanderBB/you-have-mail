@@ -10,7 +10,7 @@ plugins {
     id 'org.jetbrains.kotlin.android'
     id 'kotlin-parcelize'
     id "org.mozilla.rust-android-gradle.rust-android" version "0.9.6"
-    id "org.jetbrains.kotlin.plugin.compose" version '2.2.20'
+    id "org.jetbrains.kotlin.plugin.compose" version '2.3.0'
 }
 
 android {
@@ -46,9 +46,6 @@ android {
     buildFeatures {
         compose true
     }
-    composeOptions {
-        kotlinCompilerExtensionVersion '1.4.0'
-    }
     packagingOptions {
         resources {
             excludes += '/META-INF/{AL2.0,LGPL2.1}'
@@ -77,11 +74,11 @@ dependencies {
     implementation "androidx.work:work-runtime-ktx:$versions_work"
 
     implementation 'androidx.core:core-ktx:1.17.0'
-    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.9.3'
-    implementation 'androidx.activity:activity-compose:1.11.0'
+    implementation 'androidx.lifecycle:lifecycle-runtime-ktx:2.10.0'
+    implementation 'androidx.activity:activity-compose:1.12.3'
     implementation "androidx.compose.ui:ui:$compose_ui_version"
     implementation "androidx.compose.ui:ui-tooling-preview:$compose_ui_version"
-    implementation 'androidx.compose.material:material:1.9.1'
+    implementation 'androidx.compose.material3:material3:1.4.0'
     implementation 'androidx.security:security-crypto-ktx:1.1.0'
     implementation 'androidx.appcompat:appcompat:1.7.1'
     implementation 'com.google.android.material:material:1.13.0'
@@ -92,14 +89,15 @@ dependencies {
     androidTestImplementation "androidx.compose.ui:ui-test-junit4:$compose_ui_version"
     debugImplementation "androidx.compose.ui:ui-tooling:$compose_ui_version"
     debugImplementation "androidx.compose.ui:ui-test-manifest:$compose_ui_version"
-    implementation 'androidx.navigation:navigation-compose:2.9.4'
+    implementation 'androidx.navigation:navigation-compose:2.9.7'
     implementation "androidx.compose.material:material-icons-extended:1.7.8"
 
     // Required for JNI
-    implementation 'net.java.dev.jna:jna:5.17.0@aar'
+    implementation 'net.java.dev.jna:jna:5.18.1@aar'
 }
 
 apply plugin: 'org.mozilla.rust-android-gradle.rust-android'
+
 
 cargo {
     module = "../../you-have-mail-mobile"
@@ -204,6 +202,8 @@ project.afterEvaluate {
 afterEvaluate {
     genBindings.dependsOn(bindingBuild, cargoBuild)
     android.applicationVariants.all { variant ->
-        variant.javaCompiler.dependsOn(genBindings)
+        variant.javaCompileProvider.configure {
+            dependsOn(genBindings)
+        }
     }
 }

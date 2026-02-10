@@ -7,15 +7,16 @@ import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
-import androidx.compose.material.Divider
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.ExposedDropdownMenuBox
-import androidx.compose.material.ExposedDropdownMenuDefaults
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
-import androidx.compose.material.TextField
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
@@ -37,7 +38,7 @@ import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
 
 
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Settings(
     state: State,
@@ -48,13 +49,14 @@ fun Settings(
     AsyncScreen(
         title = stringResource(id = R.string.settings),
         onBackClicked = onBackClicked
-    ) { _, runTask ->
+    ) { padding, runTask ->
 
         val pollIntervalValue by state.getPollInterval().collectAsState()
         val updatingPollIntervalLabel = stringResource(id = R.string.update_poll_interval)
 
         Column(
             modifier = Modifier
+                .padding(padding)
                 .padding(20.dp)
                 .fillMaxSize()
         ) {
@@ -77,13 +79,13 @@ fun Settings(
             Text(
                 text = stringResource(id = R.string.poll_interval),
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.h6,
+                style = MaterialTheme.typography.titleSmall,
                 modifier = Modifier.fillMaxWidth()
             )
             Spacer(modifier = Modifier.padding(5.dp))
             Text(
                 text = stringResource(id = R.string.poll_interval_desc),
-                style = MaterialTheme.typography.subtitle1
+                style = MaterialTheme.typography.titleMedium
             )
 
             Spacer(modifier = Modifier.padding(5.dp))
@@ -98,19 +100,17 @@ fun Settings(
             ) {
                 TextField(
                     modifier = Modifier
+                        .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
                         .fillMaxWidth()
-                        .clickable { expanded = !expanded }
                         .onGloballyPositioned { coordinates ->
                             textFieldWidth = coordinates.size.toSize()
                         },
                     readOnly = true,
-                    enabled = true,
                     value = secondsToText(pollIntervalValue),
                     onValueChange = { },
                     trailingIcon = {
                         ExposedDropdownMenuDefaults.TrailingIcon(
-                            expanded = expanded,
-                            onIconClick = { expanded = true }
+                            expanded = expanded
                         )
                     },
                     colors = ExposedDropdownMenuDefaults.textFieldColors()
@@ -121,27 +121,25 @@ fun Settings(
                     expanded = expanded,
                     onDismissRequest = {
                         expanded = false
-                    },
+                    }
                 ) {
                     timeIntervals.forEachIndexed { index, seconds ->
                         DropdownMenuItem(
-                            modifier = Modifier
-                                .fillMaxWidth(),
+                            text = { Text(text = secondsToText(seconds)) },
                             onClick = {
                                 expanded = false
                                 selectedIndex = index
                                 onPollIntervalModified()
                             },
-                        ) {
-                            Text(text = secondsToText(seconds))
-                        }
+                            modifier = Modifier.fillMaxWidth()
+                        )
                     }
                 }
             }
 
             Spacer(modifier = Modifier.padding(5.dp))
 
-            Divider()
+            HorizontalDivider()
 
             Spacer(modifier = Modifier.padding(5.dp))
 

@@ -14,24 +14,27 @@ import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.itemsIndexed
-import androidx.compose.material.Button
-import androidx.compose.material.ButtonDefaults
-import androidx.compose.material.FabPosition
-import androidx.compose.material.FloatingActionButton
-import androidx.compose.material.Icon
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Scaffold
-import androidx.compose.material.Text
-import androidx.compose.material.TopAppBar
+import androidx.compose.material3.Button
+import androidx.compose.material3.ButtonDefaults
+import androidx.compose.material3.FabPosition
+import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.Icon
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Settings
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
+import androidx.compose.runtime.rememberCoroutineScope
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -45,9 +48,10 @@ import dev.lbeernaert.youhavemail.Account
 import dev.lbeernaert.youhavemail.R
 import dev.lbeernaert.youhavemail.app.State
 import dev.lbeernaert.youhavemail.app.accountStatusString
-import java.util.Timer
-import java.util.TimerTask
+import kotlinx.coroutines.delay
+import kotlinx.coroutines.launch
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun Main(
     state: State,
@@ -66,6 +70,7 @@ fun Main(
 }
 
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AccountList(
     state: State,
@@ -76,20 +81,25 @@ fun AccountList(
 ) {
     val accounts by state.accounts().collectAsState()
     var pollActive by remember { mutableStateOf(true) }
+    val coroutineScope = rememberCoroutineScope()
 
     Scaffold(topBar = {
-        TopAppBar(title = { Text(text = stringResource(id = R.string.app_name)) }, actions = {
+        TopAppBar(
+            title = { Text(text = stringResource(id = R.string.app_name)) },
+            colors = TopAppBarDefaults.topAppBarColors(
+                containerColor = MaterialTheme.colorScheme.primaryContainer,
+                titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                actionIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+            ),
+            actions = {
             Button(
                 onClick = {
                     onPollClicked()
                     pollActive = false
-                    Timer().schedule(
-                        object : TimerTask() {
-                            override fun run() {
-                                pollActive = true
-                            }
-                        }, 15000
-                    )
+                    coroutineScope.launch {
+                        delay(15000)
+                        pollActive = true
+                    }
                 },
                 colors = ButtonDefaults.outlinedButtonColors(),
                 enabled = pollActive,
@@ -175,13 +185,13 @@ fun ActiveAccount(account: Account, onClicked: (String) -> Unit) {
             verticalArrangement = Arrangement.Center,
             modifier = Modifier
                 .size(60.dp)
-                .background(MaterialTheme.colors.primary, MaterialTheme.shapes.large),
+                .background(MaterialTheme.colorScheme.primary, MaterialTheme.shapes.large),
         ) {
             Text(
                 modifier = Modifier.fillMaxWidth(),
                 text = email.first().toString().uppercase(),
                 textAlign = TextAlign.Center,
-                style = MaterialTheme.typography.button,
+                style = MaterialTheme.typography.labelLarge,
                 fontWeight = FontWeight.Bold,
                 fontSize = 30.sp
             )
@@ -190,13 +200,13 @@ fun ActiveAccount(account: Account, onClicked: (String) -> Unit) {
         Column(modifier = Modifier.fillMaxWidth()) {
             Text(
                 text = email,
-                style = MaterialTheme.typography.subtitle1,
+                style = MaterialTheme.typography.titleMedium,
                 fontWeight = FontWeight.Bold
             )
 
             Text(
                 text = stringResource(id = R.string.status, accountStatusString(account)),
-                style = MaterialTheme.typography.body2
+                style = MaterialTheme.typography.bodyMedium
             )
         }
     }

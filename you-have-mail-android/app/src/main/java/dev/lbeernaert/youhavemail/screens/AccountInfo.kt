@@ -9,9 +9,9 @@ import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.Divider
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Text
+import androidx.compose.material3.HorizontalDivider
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
@@ -66,7 +66,7 @@ fun AccountInfo(
                 text = "Email",
                 modifier = Modifier.fillMaxWidth(),
                 fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.h5,
+                style = MaterialTheme.typography.titleSmall,
             )
 
             Text(
@@ -80,7 +80,7 @@ fun AccountInfo(
                 text = "Backend",
                 modifier = Modifier.fillMaxWidth(),
                 fontWeight = FontWeight.Bold,
-                style = MaterialTheme.typography.h5,
+                style = MaterialTheme.typography.titleSmall,
             )
 
             Text(
@@ -94,7 +94,7 @@ fun AccountInfo(
                 text = stringResource(id = R.string.status_no_colon),
                 fontWeight = FontWeight.Bold,
                 modifier = Modifier.fillMaxWidth(),
-                style = MaterialTheme.typography.h5,
+                style = MaterialTheme.typography.titleSmall,
             )
 
             Text(
@@ -104,7 +104,7 @@ fun AccountInfo(
 
             Spacer(modifier = Modifier.height(20.dp))
 
-            Divider()
+            HorizontalDivider()
 
             Spacer(modifier = Modifier.height(20.dp))
 

@@ -1,7 +1,6 @@
 package dev.lbeernaert.youhavemail.screens
 
 import android.widget.Toast
-import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -9,19 +8,21 @@ import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.imePadding
 import androidx.compose.foundation.layout.padding
-import androidx.compose.foundation.layout.wrapContentSize
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.text.KeyboardOptions
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material.DropdownMenu
-import androidx.compose.material.DropdownMenuItem
-import androidx.compose.material.ExperimentalMaterialApi
-import androidx.compose.material.ExposedDropdownMenuDefaults
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Switch
-import androidx.compose.material.Text
-import androidx.compose.material.TextField
+import androidx.compose.material3.DropdownMenu
+import androidx.compose.material3.DropdownMenuItem
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.ExposedDropdownMenuAnchorType
+import androidx.compose.material3.ExposedDropdownMenuBox
+import androidx.compose.material3.ExposedDropdownMenuDefaults
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Switch
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextField
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
@@ -44,7 +45,7 @@ import dev.lbeernaert.youhavemail.components.ActionButton
 import dev.lbeernaert.youhavemail.components.AsyncScreen
 import dev.lbeernaert.youhavemail.components.PasswordField
 
-@OptIn(ExperimentalMaterialApi::class)
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun ProxyScreen(
     onBackClicked: () -> Unit,
@@ -114,11 +115,13 @@ fun ProxyScreen(
     AsyncScreen(
         title = stringResource(id = R.string.proxy_settings),
         onBackClicked = onBackClicked
-    ) { _, runTask ->
+    ) { padding, runTask ->
         Column(
             modifier = Modifier
+                .padding(padding)
                 .padding(20.dp)
                 .verticalScroll(rememberScrollState(), true)
+                .imePadding()
         ) {
 
             val context = LocalContext.current
@@ -184,7 +187,7 @@ fun ProxyScreen(
             if (isLoginRequest) {
                 Text(
                     text = stringResource(id = R.string.proxy_info),
-                    style = MaterialTheme.typography.subtitle1
+                    style = MaterialTheme.typography.titleMedium
                 )
             }
 
@@ -193,7 +196,7 @@ fun ProxyScreen(
             ) {
                 Text(
                     text = stringResource(id = R.string.use_proxy),
-                    style = MaterialTheme.typography.subtitle1
+                    style = MaterialTheme.typography.titleMedium
                 )
                 Spacer(Modifier.fillMaxWidth(0.9f))
                 Switch(checked = useProxy, onCheckedChange = {
@@ -206,41 +209,40 @@ fun ProxyScreen(
 
             if (useProxy) {
 
-                TextField(
-                    modifier = Modifier
-                        .fillMaxWidth()
-                        .clickable { expanded = true },
-                    value = proxyProtocols[selectedIndex].toString(),
-                    readOnly = true,
-                    enabled = useProxy,
-                    singleLine = true,
-                    onValueChange = {},
-                    label = { Text(text = stringResource(id = R.string.proxy_protocol)) },
-                    trailingIcon = {
-                        ExposedDropdownMenuDefaults.TrailingIcon(
-                            expanded = expanded,
-                            onIconClick = { expanded = true })
-                    },
-                    colors = ExposedDropdownMenuDefaults.textFieldColors(),
-                )
-                Box(
-                    modifier = Modifier
-                        .fillMaxSize(0.9f)
-                        .wrapContentSize(Alignment.TopStart)
+                ExposedDropdownMenuBox(
+                    modifier = Modifier.fillMaxWidth(),
+                    expanded = expanded,
+                    onExpandedChange = { expanded = !expanded }
                 ) {
-                    DropdownMenu(
-                        expanded = expanded,
-                        onDismissRequest = { expanded = false },
+                    TextField(
                         modifier = Modifier
-                            .fillMaxWidth()
+                            .menuAnchor(ExposedDropdownMenuAnchorType.PrimaryEditable)
+                            .fillMaxWidth(),
+                        value = proxyProtocols[selectedIndex].toString(),
+                        readOnly = true,
+                        enabled = useProxy,
+                        singleLine = true,
+                        onValueChange = {},
+                        label = { Text(text = stringResource(id = R.string.proxy_protocol)) },
+                        trailingIcon = {
+                            ExposedDropdownMenuDefaults.TrailingIcon(
+                                expanded = expanded)
+                        },
+                        colors = ExposedDropdownMenuDefaults.textFieldColors(),
+                    )
+                    DropdownMenu(
+                        modifier = Modifier.exposedDropdownSize(),
+                        expanded = expanded,
+                        onDismissRequest = { expanded = false }
                     ) {
                         proxyProtocols.forEachIndexed { index, s ->
-                            DropdownMenuItem(onClick = {
-                                expanded = false
-                                selectedIndex = index
-                            }) {
-                                Text(text = s.toString())
-                            }
+                            DropdownMenuItem(
+                                text = { Text(text = s.toString()) },
+                                onClick = {
+                                    expanded = false
+                                    selectedIndex = index
+                                }
+                            )
                         }
                     }
                 }
@@ -281,7 +283,7 @@ fun ProxyScreen(
                 ) {
                     Text(
                         text = stringResource(id = R.string.proxy_auth),
-                        style = MaterialTheme.typography.subtitle1
+                        style = MaterialTheme.typography.titleMedium
                     )
                     Spacer(Modifier.fillMaxWidth(0.9f))
                     Switch(checked = useAuth, enabled = useProxy, onCheckedChange = {

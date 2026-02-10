@@ -40,10 +40,10 @@ fun ProtonCaptchaScreen(
     AsyncScreen(
         title = stringResource(id = R.string.captcha_request),
         onBackClicked = onBackClicked
-    ) { _, runTask ->
+    ) { padding, runTask ->
         Column(
             modifier = Modifier
-                .padding(0.dp)
+                .padding(padding)
                 .fillMaxSize()
         ) {
             val taskLabel = stringResource(id = R.string.retry_login_with_captcha)

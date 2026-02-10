@@ -2,15 +2,19 @@ package dev.lbeernaert.youhavemail.components
 
 import android.util.Log
 import androidx.compose.foundation.layout.PaddingValues
-import androidx.compose.material.Icon
-import androidx.compose.material.IconButton
-import androidx.compose.material.Scaffold
-import androidx.compose.material.SnackbarDuration
-import androidx.compose.material.Text
-import androidx.compose.material.TopAppBar
+import androidx.compose.material3.Icon
+import androidx.compose.material3.IconButton
+import androidx.compose.material3.Scaffold
+import androidx.compose.material3.SnackbarDuration
+import androidx.compose.material3.SnackbarHost
+import androidx.compose.material3.SnackbarHostState
+import androidx.compose.material3.Text
+import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.TopAppBarDefaults
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.automirrored.filled.ArrowBack
-import androidx.compose.material.rememberScaffoldState
+import androidx.compose.material3.ExperimentalMaterial3Api
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
@@ -19,13 +23,14 @@ import kotlinx.coroutines.launch
 
 const val asyncScreenLogTag = "async"
 
+@OptIn(ExperimentalMaterial3Api::class)
 @Composable
 fun AsyncScreen(
     title: String,
     onBackClicked: () -> Unit,
     content: @Composable (padding: PaddingValues, run: (String, suspend () -> Unit) -> Unit) -> Unit
 ) {
-    val scaffoldState = rememberScaffoldState()
+    val snackbarHostState = remember { SnackbarHostState() }
     val openDialog = remember { mutableStateOf(false) }
     val coroutineScope = rememberCoroutineScope()
     val backgroundText = remember {
@@ -42,11 +47,12 @@ fun AsyncScreen(
         )
     } else {
         Scaffold(
-            scaffoldState = scaffoldState,
+            snackbarHost = { SnackbarHost(snackbarHostState) },
             topBar = {
-                TopAppBar(title = {
-                    Text(text = title)
-                },
+                TopAppBar(
+                    title = {
+                        Text(text = title)
+                    },
                     navigationIcon = {
                         IconButton(onClick = onBackClicked) {
                             Icon(
@@ -54,7 +60,13 @@ fun AsyncScreen(
                                 contentDescription = "Back"
                             )
                         }
-                    })
+                    },
+                    colors = TopAppBarDefaults.topAppBarColors(
+                        containerColor = MaterialTheme.colorScheme.primaryContainer,
+                        titleContentColor = MaterialTheme.colorScheme.onPrimaryContainer,
+                        navigationIconContentColor = MaterialTheme.colorScheme.onPrimaryContainer
+                    )
+                )
             }
         ) { padding ->
             content(padding) { label, run ->
@@ -67,7 +79,7 @@ fun AsyncScreen(
                         openDialog.value = false
                         Log.e(asyncScreenLogTag, e.toString())
                         coroutineScope.launch {
-                            scaffoldState.snackbarHostState.showSnackbar(
+                            snackbarHostState.showSnackbar(
                                 message = e.message.orEmpty(),
                                 duration = SnackbarDuration.Short,
                             )
@@ -76,7 +88,7 @@ fun AsyncScreen(
                         openDialog.value = false
                         Log.e(asyncScreenLogTag, err.toString())
                         coroutineScope.launch {
-                            scaffoldState.snackbarHostState.showSnackbar(
+                            snackbarHostState.showSnackbar(
                                 message = "Unknown Error",
                                 duration = SnackbarDuration.Short,
                             )

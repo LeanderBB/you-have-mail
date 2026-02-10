@@ -23,12 +23,12 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.layout.wrapContentWidth
-import androidx.compose.material.AlertDialog
-import androidx.compose.material.Button
-import androidx.compose.material.MaterialTheme
-import androidx.compose.material.Surface
-import androidx.compose.material.Text
-import androidx.compose.material.TextButton
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
+import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.Surface
+import androidx.compose.material3.Text
+import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.MutableState
 import androidx.compose.runtime.getValue
@@ -69,6 +69,9 @@ class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         Log.i("BOOT", "OnCreate")
         super.onCreate(savedInstanceState)
+
+        // Enable edge-to-edge display for Android 15/16
+        androidx.core.view.WindowCompat.setDecorFitsSystemWindows(window, false)
 
         val notificationManager = NotificationManagerCompat.from(this)
 
@@ -111,7 +114,7 @@ class MainActivity : ComponentActivity() {
                 // A surface container using the 'background' color from the theme
                 Surface(
                     modifier = Modifier.fillMaxSize(),
-                    color = MaterialTheme.colors.background
+                    color = MaterialTheme.colorScheme.background
                 ) {
                     val permissionOpenDialog = remember { mutableStateOf(false) }
                     val rationalPermissionOpenDialog = remember { mutableStateOf(false) }
@@ -213,29 +216,22 @@ fun ShowRationalPermissionDialog(openDialog: MutableState<Boolean>, onclick: () 
             text = {
                 Text(stringResource(id = R.string.notification_permission_text2))
             },
-
-            buttons = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
+            confirmButton = {
+                TextButton(
+                    onClick = onclick,
                 ) {
-                    TextButton(
-                        onClick = {
-                            openDialog.value = false
-                        }
-                    ) {
-                        Text(stringResource(id = R.string.notification_permission))
-                    }
-                    Spacer(modifier = Modifier.width(20.dp))
-                    TextButton(
-                        onClick = onclick,
-                    ) {
-                        Text(stringResource(id = R.string.ok))
-                    }
+                    Text(stringResource(id = R.string.ok))
                 }
-
             },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        openDialog.value = false
+                    }
+                ) {
+                    Text(stringResource(id = R.string.notification_permission))
+                }
+            }
         )
     }
 }
@@ -253,33 +249,27 @@ fun ShowSettingDialog(context: Context, openDialog: MutableState<Boolean>) {
             text = {
                 Text(stringResource(id = R.string.notification_permission_text))
             },
-
-            buttons = {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.End,
-                    verticalAlignment = Alignment.CenterVertically,
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        openDialog.value = false
+                        val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
+                        intent.data = Uri.parse("package:${context.packageName}")
+                        context.startActivity(intent)
+                    },
                 ) {
-                    TextButton(
-                        onClick = {
-                            openDialog.value = false
-                        }
-                    ) {
-                        Text(stringResource(id = R.string.cancel))
-                    }
-                    Spacer(modifier = Modifier.width(20.dp))
-                    TextButton(
-                        onClick = {
-                            openDialog.value = false
-                            val intent = Intent(Settings.ACTION_APPLICATION_DETAILS_SETTINGS)
-                            intent.data = Uri.parse("package:${context.packageName}")
-                            context.startActivity(intent)
-                        },
-                    ) {
-                        Text(stringResource(id = R.string.ok))
-                    }
+                    Text(stringResource(id = R.string.ok))
                 }
             },
+            dismissButton = {
+                TextButton(
+                    onClick = {
+                        openDialog.value = false
+                    }
+                ) {
+                    Text(stringResource(id = R.string.cancel))
+                }
+            }
         )
     }
 }
@@ -305,22 +295,14 @@ private fun ShowErrorDialog() {
                 )
             }
         },
-        buttons = {
-            Column(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .padding(bottom = 20.dp),
-                verticalArrangement = Arrangement.Center,
-                horizontalAlignment = Alignment.CenterHorizontally
-            ) {
-                Button(
-                    modifier = Modifier.wrapContentWidth(),
-                    onClick = {
-                        exitProcess(0)
-                    }
-                ) {
-                    Text("Exit")
+        confirmButton = {
+            Button(
+                modifier = Modifier.wrapContentWidth(),
+                onClick = {
+                    exitProcess(0)
                 }
+            ) {
+                Text("Exit")
             }
         }
     )
