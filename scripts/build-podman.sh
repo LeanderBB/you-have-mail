@@ -4,5 +4,4 @@ set -eou pipefail
 
 mkdir -p artifacts
 
-scripts/podman-do.sh "/opt/scripts/build-podman-exec.sh"
-
+scripts/podman-do.sh "/opt/project/scripts/build-podman-exec.sh"
