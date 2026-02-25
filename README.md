@@ -1,5 +1,11 @@
 # You Have Mail
 
+---
+
+**This repo is now archived, development has moved to [codeberg](https://codeberg.org/angrypixel/you-have-mail)**
+
+---
+
 Small application to notify you when you receive an email in your email account. This may be useful for cases where
 you only wish to be notified when your email account has a new message and the default notification mechanism
 does not work (e.g: Android without Google Play Services) or do not wish to have the web interface/email client open at
